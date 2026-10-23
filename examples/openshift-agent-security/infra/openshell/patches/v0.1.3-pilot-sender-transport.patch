@@ -1,0 +1,825 @@
+diff --git a/Cargo.lock b/Cargo.lock
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -194,7 +194,7 @@
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "5493c3bedbacf7fd7382c6346bbd66687d12bbaad3a89a2d2c303ee6cf20b048"
+ dependencies = [
+- "asn1-rs-derive",
++ "asn1-rs-derive 0.5.1",
+  "asn1-rs-impl",
+  "displaydoc",
+  "nom",
+@@ -205,10 +205,38 @@
+ ]
+ 
+ [[package]]
++name = "asn1-rs"
++version = "0.7.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "b7f43a50ac4fdca5df8e885c21b835997f0a1cdee65494a6847694a98652d9d8"
++dependencies = [
++ "asn1-rs-derive 0.6.0",
++ "asn1-rs-impl",
++ "displaydoc",
++ "nom",
++ "num-traits",
++ "rusticata-macros",
++ "thiserror 2.0.20",
++ "time",
++]
++
++[[package]]
+ name = "asn1-rs-derive"
+ version = "0.5.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "965c2d33e53cb6b267e148a4cb0760bc01f4904c1cd4bb4002a085bb016d1490"
++dependencies = [
++ "proc-macro2",
++ "quote",
++ "syn 2.0.117",
++ "synstructure",
++]
++
++[[package]]
++name = "asn1-rs-derive"
++version = "0.6.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3109e49b1e4909e9db6515a30c633684d68cdeaa252f215214cb4fa1a5bfee2c"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -1665,7 +1693,21 @@
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "5cd0a5c643689626bec213c4d8bd4d96acc8ffdb4ad4bb6bc16abf27d5f4b553"
+ dependencies = [
+- "asn1-rs",
++ "asn1-rs 0.6.2",
++ "displaydoc",
++ "nom",
++ "num-bigint 0.4.6",
++ "num-traits",
++ "rusticata-macros",
++]
++
++[[package]]
++name = "der-parser"
++version = "10.0.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "07da5016415d5a3c4dd39b11ed26f915f52fc4e0dc197d87908bc916e51bc1a6"
++dependencies = [
++ "asn1-rs 0.7.2",
+  "displaydoc",
+  "nom",
+  "num-bigint 0.4.6",
+@@ -4185,7 +4227,16 @@
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "a8d8034d9489cdaf79228eb9f6a3b8d7bb32ba00d6645ebd48eef4077ceb5bd9"
+ dependencies = [
+- "asn1-rs",
++ "asn1-rs 0.6.2",
++]
++
++[[package]]
++name = "oid-registry"
++version = "0.8.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "12f40cff3dde1b6087cc5d5f5d4d65712f34016a03ed60e9c08dcc392736b5b7"
++dependencies = [
++ "asn1-rs 0.7.2",
+ ]
+ 
+ [[package]]
+@@ -4237,7 +4288,7 @@
+  "tempfile",
+  "tokio",
+  "tracing",
+- "x509-parser",
++ "x509-parser 0.16.0",
+ ]
+ 
+ [[package]]
+@@ -4989,7 +5040,7 @@
+  "url",
+  "uuid",
+  "wiremock",
+- "x509-parser",
++ "x509-parser 0.16.0",
+ ]
+ 
+ [[package]]
+@@ -6332,7 +6383,7 @@
+  "pem",
+  "rustls-pki-types",
+  "time",
+- "x509-parser",
++ "x509-parser 0.16.0",
+  "yasna",
+ ]
+ 
+@@ -7364,6 +7415,7 @@
+  "hyper-util",
+  "jsonwebtoken",
+  "log",
++ "pkcs8 0.10.2",
+  "prost",
+  "prost-types",
+  "serde",
+@@ -7377,6 +7429,7 @@
+  "tower",
+  "tracing",
+  "url",
++ "x509-parser 0.18.1",
+  "zeroize",
+ ]
+ 
+@@ -9480,15 +9533,32 @@
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "fcbc162f30700d6f3f82a24bf7cc62ffe7caea42c0b2cba8bf7f3ae50cf51f69"
+ dependencies = [
+- "asn1-rs",
++ "asn1-rs 0.6.2",
+  "data-encoding",
+- "der-parser",
++ "der-parser 9.0.0",
+  "lazy_static",
+  "nom",
+- "oid-registry",
++ "oid-registry 0.7.1",
+  "ring",
+  "rusticata-macros",
+  "thiserror 1.0.69",
++ "time",
++]
++
++[[package]]
++name = "x509-parser"
++version = "0.18.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "d43b0f71ce057da06bc0851b23ee24f3f86190b07203dd8f567d0b706a185202"
++dependencies = [
++ "asn1-rs 0.7.2",
++ "data-encoding",
++ "der-parser 10.0.0",
++ "lazy_static",
++ "nom",
++ "oid-registry 0.8.1",
++ "rusticata-macros",
++ "thiserror 2.0.20",
+  "time",
+ ]
+ 
+diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oauth.rs
+--- a/crates/openshell-core/src/oauth.rs
++++ b/crates/openshell-core/src/oauth.rs
+@@ -69,6 +69,33 @@
+         .form(&form_params)
+         .send()
+         .await
++        .map_err(|error| {
++            if Some(token_endpoint) == option_env!("OPENSHELL_DEMO_TOKEN_ENDPOINT") {
++                // Fixed categories only: issuer errors may echo credentials.
++                tracing::warn!(
++                    "Pilot sender HTTP failure: connect={} timeout={} request={} body={} decode={} status={:?}",
++                    error.is_connect(), error.is_timeout(), error.is_request(),
++                    error.is_body(), error.is_decode(), error.status().map(|v| v.as_u16()),
++                );
++                let mut source = std::error::Error::source(&error);
++                while let Some(cause) = source {
++                    if let Some(tls) = cause.downcast_ref::<rustls::Error>() {
++                        let category = match tls {
++                            rustls::Error::InvalidCertificate(_) => "invalid_certificate",
++                            rustls::Error::AlertReceived(_) => "peer_alert",
++                            rustls::Error::NoCertificatesPresented => "no_peer_certificate",
++                            _ => "tls_other",
++                        };
++                        tracing::warn!("Pilot sender TLS failure: category={category}");
++                    }
++                    if let Some(io) = cause.downcast_ref::<std::io::Error>() {
++                        tracing::warn!("Pilot sender IO failure: kind={:?}", io.kind());
++                    }
++                    source = cause.source();
++                }
++            }
++            error
++        })
+         .into_diagnostic()
+         .wrap_err_with(|| format!("failed to POST to token endpoint {token_endpoint}"))?;
+ 
+diff --git a/crates/openshell-supervisor-network/src/lib.rs b/crates/openshell-supervisor-network/src/lib.rs
+--- a/crates/openshell-supervisor-network/src/lib.rs
++++ b/crates/openshell-supervisor-network/src/lib.rs
+@@ -20,6 +20,7 @@
+ pub mod procfs;
+ pub mod proxy;
+ pub mod run;
++mod sender_snapshot;
+ pub mod sigv4;
+ mod spiffe_endpoint;
+ mod token_grant;
+diff --git a/crates/openshell-supervisor-network/src/token_grant.rs b/crates/openshell-supervisor-network/src/token_grant.rs
+--- a/crates/openshell-supervisor-network/src/token_grant.rs
++++ b/crates/openshell-supervisor-network/src/token_grant.rs
+@@ -147,6 +147,13 @@
+ }
+ 
+ pub async fn obtain_provider_token(request: ObtainProviderTokenRequest<'_>) -> Result<String> {
++    obtain_provider_token_with_sender(request, None).await
++}
++
++pub(crate) async fn obtain_provider_token_with_sender(
++    request: ObtainProviderTokenRequest<'_>,
++    sender: Option<&crate::sender_snapshot::SenderSnapshot>,
++) -> Result<String> {
+     let grant_type =
+         ProviderCredentialTokenGrantType::try_from(request.grant_type).map_err(|_| {
+             tracing::error!(
+@@ -176,6 +183,15 @@
+             // Fetch JWT-SVID with authorization server as audience
+             // For RFC 7523, the JWT assertion's aud claim identifies the issuer/realm
+             let jwt_svid = fetch_jwt_svid_for_token_grant(&jwt_audience).await?;
++            if let Some(sender) = sender {
++                tracing::info!("Pilot sender checkpoint: workload_assertion_received");
++                sender.ensure_valid()?;
++                let claims = openshell_core::spiffe::parse_unverified_jwt_svid_claims(&jwt_svid)
++                    .into_diagnostic()?;
++                if claims.sub != sender.subject.to_string() {
++                    return Err(miette::miette!("JWT and X.509 workload identity mismatch"));
++                }
++            }
+ 
+             match grant_type {
+                 ProviderCredentialTokenGrantType::ClientCredentials
+@@ -211,7 +227,11 @@
+                             )
+                         })?;
+                     validate_access_token(&intermediate.access_token)?;
+-                    perform_token_exchange(
++                    if sender.is_some() {
++                        tracing::info!("Pilot sender checkpoint: intermediate_token_received");
++                    }
++                    let result = perform_token_exchange(
++                        sender.map_or(&*TOKEN_GRANT_HTTP_CLIENT, |s| &s.oauth),
+                         request.token_endpoint,
+                         &TokenExchangeParams {
+                             client_assertion: &jwt_svid,
+@@ -223,7 +243,11 @@
+                             requested_token_type: request.requested_token_type,
+                         },
+                     )
+-                    .await
++                    .await;
++                    if sender.is_some() && result.is_err() {
++                        tracing::warn!("Pilot sender grant rejected: final_exchange_failed");
++                    }
++                    result
+                 }
+             }
+         },
+@@ -347,10 +371,11 @@
+ }
+ 
+ async fn perform_token_exchange(
++    client: &reqwest::Client,
+     token_endpoint: &str,
+     params: &TokenExchangeParams<'_>,
+ ) -> Result<OAuthTokenResponse> {
+-    oauth::post_oauth_token_exchange(&TOKEN_GRANT_HTTP_CLIENT, token_endpoint, params).await
++    oauth::post_oauth_token_exchange(client, token_endpoint, params).await
+ }
+ 
+ pub use oauth::validate_access_token;
+diff --git a/crates/openshell-supervisor-network/src/proxy.rs b/crates/openshell-supervisor-network/src/proxy.rs
+--- a/crates/openshell-supervisor-network/src/proxy.rs
++++ b/crates/openshell-supervisor-network/src/proxy.rs
+@@ -3103,29 +3103,36 @@
+                         return Err(error);
+                     }
+                 };
+-            let mut tls_upstream = match crate::l7::tls::tls_connect_upstream(
+-                upstream,
+-                &host_lc,
+-                tls.upstream_config(),
+-            )
+-            .await
+-            {
+-                Ok(upstream) => upstream,
+-                Err(error) => {
+-                    if let Some(observer) = connect_endpoint_observer.as_ref() {
+-                        observer.observe(EndpointResult::TlsFailed);
++            let sender =
++                crate::sender_snapshot::for_connection(&host_lc, port, tls.upstream_config())
++                    .await?;
++            let upstream_config = if let Some(sender) = sender.as_ref() {
++                let resolver: Arc<dyn crate::l7::token_grant_injection::TokenGrantResolver> = sender.clone();
++                ctx.token_grant_resolver = Some(resolver);
++                &sender.tls
++            } else {
++                tls.upstream_config()
++            };
++            let mut tls_upstream =
++                match crate::l7::tls::tls_connect_upstream(upstream, &host_lc, upstream_config)
++                    .await
++                {
++                    Ok(upstream) => upstream,
++                    Err(error) => {
++                        if let Some(observer) = connect_endpoint_observer.as_ref() {
++                            observer.observe(EndpointResult::TlsFailed);
++                        }
++                        let event = NetworkActivityBuilder::new(openshell_ocsf::ctx::ctx())
++                            .activity(ActivityId::Fail)
++                            .severity(SeverityId::Low)
++                            .status(StatusId::Failure)
++                            .dst_endpoint(Endpoint::from_domain(&host_lc, port))
++                            .message("Upstream TLS establishment failed")
++                            .build();
++                        ocsf_emit!(event);
++                        return Err(error);
+                     }
+-                    let event = NetworkActivityBuilder::new(openshell_ocsf::ctx::ctx())
+-                        .activity(ActivityId::Fail)
+-                        .severity(SeverityId::Low)
+-                        .status(StatusId::Failure)
+-                        .dst_endpoint(Endpoint::from_domain(&host_lc, port))
+-                        .message("Upstream TLS establishment failed")
+-                        .build();
+-                    ocsf_emit!(event);
+-                    return Err(error);
+-                }
+-            };
++                };
+             let tls_result = async {
+                 let Some(relay_context) =
+                     relay::prepare_http_relay(l7_route, &opa_engine, &decision, &ctx)
+diff --git a/crates/openshell-supervisor-network/src/sender_snapshot.rs b/crates/openshell-supervisor-network/src/sender_snapshot.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/openshell-supervisor-network/src/sender_snapshot.rs
+@@ -0,0 +1,467 @@
++// SPDX-License-Identifier: Apache-2.0
++//! Opt-in pilot sender transport. One immutable SVID snapshot per MCP connection.
++//! No bearer fallback, shared token cache, or exported workload private key.
++
++use std::sync::Arc;
++use std::future::Future;
++use std::time::{Duration, SystemTime, UNIX_EPOCH};
++
++use miette::{IntoDiagnostic, Result, miette};
++use rustls::pki_types::{CertificateDer, PrivateKeyDer};
++use sha2::{Digest, Sha256};
++use spiffe::{SpiffeId, WorkloadApiClient, X509Svid};
++
++/// One immutable identity: OAuth and upstream TLS use the same certificate/key.
++/// Intentionally has no Debug implementation that could include private material.
++pub(crate) struct SenderSnapshot {
++    _svid: X509Svid,
++    pub(crate) subject: SpiffeId,
++    fingerprint: String,
++    not_before: i64,
++    pub(crate) not_after: i64,
++    pub(crate) tls: Arc<rustls::ClientConfig>,
++    pub(crate) oauth: reqwest::Client,
++}
++
++impl SenderSnapshot {
++    /// This compiles the exact Workload API available after enabling X.509.
++    /// Live SPIRE behavior remains a separate deployment acceptance gate.
++    pub(crate) async fn fetch(
++        socket: &str,
++        expected: &str,
++        base: Arc<rustls::ClientConfig>,
++    ) -> Result<Self> {
++        let endpoint = openshell_core::spiffe::workload_api_endpoint(std::path::Path::new(socket));
++        let client = WorkloadApiClient::connect_to(&endpoint)
++            .await
++            .into_diagnostic()?;
++        let all = client.fetch_all_x509_svids().await.into_diagnostic()?;
++        let expected = SpiffeId::try_from(expected).into_diagnostic()?;
++        let mut matches = all.into_iter().filter(|svid| svid.spiffe_id() == &expected);
++        let selected = matches
++            .next()
++            .ok_or_else(|| miette!("expected X.509 identity absent"))?;
++        if matches.next().is_some() {
++            return Err(miette!("ambiguous X.509 identity selection"));
++        }
++        Self::from_svid(selected, &expected.to_string(), base)
++    }
++
++    fn from_svid(svid: X509Svid, expected: &str, base: Arc<rustls::ClientConfig>) -> Result<Self> {
++        let expected = SpiffeId::try_from(expected).into_diagnostic()?;
++        if svid.spiffe_id() != &expected {
++            return Err(miette!("X.509 identity does not match protected workload"));
++        }
++        let leaf = CertificateDer::from(svid.leaf().as_bytes());
++        // This rcgen parser supplies time metadata only. SVID structure was
++        // validated by spiffe; TLS server validation supplies chain validation.
++        let times = rcgen::CertificateParams::from_ca_cert_der(&leaf).into_diagnostic()?;
++        let not_before = times.not_before.unix_timestamp();
++        let not_after = times.not_after.unix_timestamp();
++        valid_at(not_before, not_after, now())?;
++        let fingerprint = hex::encode(Sha256::digest(svid.leaf().as_bytes()));
++        let chain = svid
++            .cert_chain()
++            .iter()
++            .map(|cert| CertificateDer::from(cert.as_bytes().to_vec()))
++            .collect();
++        let key = PrivateKeyDer::try_from(svid.private_key().as_bytes().to_vec())
++            .map_err(|_| miette!("invalid X.509 private-key encoding"))?;
++        let signing_key =
++            rustls::crypto::aws_lc_rs::sign::any_supported_type(&key).into_diagnostic()?;
++        let certified = rustls::sign::CertifiedKey::new(chain, signing_key);
++        certified.keys_match().into_diagnostic()?;
++        let mut tls = (*base).clone();
++        tls.client_auth_cert_resolver = Arc::new(SnapshotResolver(Arc::new(certified)));
++        tls.alpn_protocols = vec![b"http/1.1".to_vec()];
++        // One certificate snapshot per client/connection. Disable idle reuse
++        // for the pilot; a future pool must partition by fingerprint and run.
++        let oauth = reqwest::Client::builder()
++            .use_preconfigured_tls(tls.clone())
++            .https_only(true)
++            .http1_only()
++            .pool_max_idle_per_host(0)
++            .no_proxy()
++            .redirect(reqwest::redirect::Policy::none())
++            .timeout(Duration::from_secs(15))
++            .connect_timeout(Duration::from_secs(15))
++            .build()
++            .into_diagnostic()?;
++        Ok(Self {
++            subject: svid.spiffe_id().clone(),
++            _svid: svid,
++            fingerprint,
++            not_before,
++            not_after,
++            tls: Arc::new(tls),
++            oauth,
++        })
++    }
++
++    pub(crate) fn ensure_valid(&self) -> Result<()> {
++        valid_at(self.not_before, self.not_after, now())
++    }
++
++
++}
++
++#[derive(Debug)]
++struct SnapshotResolver(Arc<rustls::sign::CertifiedKey>);
++
++impl rustls::client::ResolvesClientCert for SnapshotResolver {
++    fn resolve(
++        &self,
++        _root_hint_subjects: &[&[u8]],
++        schemes: &[rustls::SignatureScheme],
++    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
++        self.0.key.choose_scheme(schemes)?;
++        Some(Arc::clone(&self.0))
++    }
++    fn has_certs(&self) -> bool {
++        true
++    }
++}
++
++/// Enabled only for one explicitly compiled pilot hostname. Other endpoints keep
++/// the official transport. The trusted supervisor supplies the socket and sandbox ID.
++pub(crate) async fn for_connection(
++    host: &str,
++    port: u16,
++    base: &Arc<rustls::ClientConfig>,
++) -> Result<Option<Arc<SenderSnapshot>>> {
++    let Some(expected_host) = option_env!("OPENSHELL_DEMO_SENDER_HOST") else {
++        return Ok(None);
++    };
++    if expected_host.is_empty() {
++        return Err(miette!("empty compiled sender host"));
++    }
++    if host != expected_host || port != 443 {
++        return Ok(None);
++    }
++    let socket = std::env::var(openshell_core::sandbox_env::PROVIDER_SPIFFE_WORKLOAD_API_SOCKET)
++        .into_diagnostic()?;
++    let sandbox_id = std::env::var(openshell_core::sandbox_env::SANDBOX_ID).into_diagnostic()?;
++    let expected = format!("spiffe://agents.example.test/openshell/sandbox/{sandbox_id}");
++    let snapshot = tokio::time::timeout(
++        Duration::from_secs(10),
++        SenderSnapshot::fetch(&socket, &expected, Arc::clone(base)),
++    )
++    .await
++    .into_diagnostic()??;
++    Ok(Some(Arc::new(snapshot)))
++}
++
++impl crate::l7::token_grant_injection::TokenGrantResolver for SenderSnapshot {
++    fn obtain<'a>(
++        &'a self,
++        request: crate::l7::token_grant_injection::TokenGrantRequest<'a>,
++    ) -> std::pin::Pin<Box<dyn Future<Output = Result<String>> + Send + 'a>> {
++        Box::pin(async move {
++            self.ensure_valid()?;
++            // The compiled pilot endpoint cannot be redirected by provider metadata.
++            // This protects the workload certificate and intermediate human token.
++            if Some(request.token_endpoint) != option_env!("OPENSHELL_DEMO_TOKEN_ENDPOINT")
++                || Some(request.jwt_svid_audience) != option_env!("OPENSHELL_DEMO_JWT_AUDIENCE")
++                || Some(request.audience) != option_env!("OPENSHELL_DEMO_MCP_AUDIENCE")
++            {
++                tracing::warn!("Pilot sender contract rejected: endpoint_contract");
++                return Err(miette!("sender-bound pilot endpoint/audiences differ from reviewed inputs"));
++            }
++            if request.grant_type
++                != openshell_core::proto::ProviderCredentialTokenGrantType::TokenExchange as i32
++                || request.cache_ttl.is_none_or(|ttl| !ttl.is_zero())
++            {
++                tracing::warn!("Pilot sender contract rejected: cache_contract");
++                return Err(miette!(
++                    "sender-bound pilot requires exchange and disabled token caching"
++                ));
++            }
++            let token = crate::token_grant::obtain_provider_token_with_sender(
++                crate::token_grant::ObtainProviderTokenRequest {
++                    provider_name: request.provider_key,
++                    token_endpoint: request.token_endpoint,
++                    jwt_svid_audience: request.jwt_svid_audience,
++                    client_assertion_type: request.client_assertion_type,
++                    audience: request.audience,
++                    scopes: request.scopes,
++                    cache_ttl_override: Some(Duration::ZERO),
++                    grant_type: request.grant_type,
++                    requested_token_type: request.requested_token_type,
++                },
++                Some(self),
++            )
++            .await?;
++            tracing::info!("Pilot sender checkpoint: final_token_received");
++            self.ensure_valid()?;
++            // Defensive consistency check on the TLS-authenticated issuer response.
++            // The gateway independently verifies the token signature and all claims.
++            use base64::Engine as _;
++            let payload = token
++                .split('.')
++                .nth(1)
++                .ok_or_else(|| miette!("missing JWT payload"))?;
++            let value: serde_json::Value = serde_json::from_slice(
++                &base64::engine::general_purpose::URL_SAFE_NO_PAD
++                    .decode(payload)
++                    .into_diagnostic()?,
++            )
++            .into_diagnostic()?;
++            let fingerprint = base64::engine::general_purpose::URL_SAFE_NO_PAD
++                .encode(hex::decode(&self.fingerprint).into_diagnostic()?);
++            if value["cnf"]["x5t#S256"].as_str() != Some(fingerprint.as_str())
++                || value["azp"].as_str() != Some(self.subject.to_string().as_str())
++                || value["exp"]
++                    .as_i64()
++                    .is_none_or(|exp| exp <= now() || exp > self.not_after)
++            {
++                tracing::warn!(
++                    "Pilot sender binding rejected: cnf_match={} workload_match={} token_expiry={:?} certificate_expiry={}",
++                    value["cnf"]["x5t#S256"].as_str() == Some(fingerprint.as_str()),
++                    value["azp"].as_str() == Some(self.subject.to_string().as_str()),
++                    value["exp"].as_i64(),
++                    self.not_after,
++                );
++                return Err(miette!("issuer did not return the required sender binding"));
++            }
++            Ok(token)
++        })
++    }
++}
++
++fn now() -> i64 {
++    SystemTime::now()
++        .duration_since(UNIX_EPOCH)
++        .map_or(i64::MAX, |time| {
++            i64::try_from(time.as_secs()).unwrap_or(i64::MAX)
++        })
++}
++
++fn valid_at(not_before: i64, not_after: i64, now: i64) -> Result<()> {
++    if now < not_before || now >= not_after || not_before >= not_after {
++        return Err(miette!("X.509 snapshot is outside its validity window"));
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use rcgen::{
++        Certificate, CertificateParams, ExtendedKeyUsagePurpose, IsCa, KeyPair, KeyUsagePurpose,
++        SanType,
++    };
++    use tokio::io::{AsyncReadExt, AsyncWriteExt};
++    use tokio::net::{TcpListener, TcpStream};
++    use tokio_rustls::TlsAcceptor;
++
++    const SUBJECT: &str = "spiffe://identity-demo.example.test/openshell/sandbox/a";
++    const OTHER: &str = "spiffe://identity-demo.example.test/openshell/sandbox/b";
++
++    fn crypto() {
++        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
++    }
++
++    fn ca() -> (Certificate, KeyPair) {
++        crypto();
++        let key = KeyPair::generate().unwrap();
++        let mut params = CertificateParams::default();
++        params.is_ca = IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
++        params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
++        (params.self_signed(&key).unwrap(), key)
++    }
++
++    fn client_config(ca: &Certificate) -> Arc<rustls::ClientConfig> {
++        Arc::new(
++            rustls::ClientConfig::builder()
++                .with_root_certificates(roots(ca))
++                .with_no_client_auth(),
++        )
++    }
++
++    fn roots(ca: &Certificate) -> rustls::RootCertStore {
++        let mut store = rustls::RootCertStore::empty();
++        store.add(ca.der().clone()).unwrap();
++        store
++    }
++
++    fn svid(subject: &str, ca: &Certificate, ca_key: &KeyPair) -> X509Svid {
++        let key = KeyPair::generate().unwrap();
++        let mut params = CertificateParams::default();
++        params.is_ca = IsCa::ExplicitNoCa;
++        params.subject_alt_names = vec![SanType::URI(subject.try_into().unwrap())];
++        params.use_authority_key_identifier_extension = true;
++        params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
++        params.extended_key_usages = vec![
++            ExtendedKeyUsagePurpose::ClientAuth,
++            ExtendedKeyUsagePurpose::ServerAuth,
++        ];
++        let cert = params.signed_by(&key, ca, ca_key).unwrap();
++        X509Svid::parse_from_der(cert.der().as_ref(), &key.serialize_der()).unwrap()
++    }
++
++    #[test]
++    fn wrong_workload_is_rejected() {
++        let (ca, key) = ca();
++        assert!(
++            SenderSnapshot::from_svid(svid(OTHER, &ca, &key), SUBJECT, client_config(&ca)).is_err()
++        );
++    }
++
++    #[test]
++    fn fingerprint_is_exact_leaf_der_digest() {
++        let (ca, key) = ca();
++        let svid = svid(SUBJECT, &ca, &key);
++        let expected = hex::encode(Sha256::digest(svid.leaf().as_bytes()));
++        let snapshot = SenderSnapshot::from_svid(svid, SUBJECT, client_config(&ca)).unwrap();
++        assert_eq!(snapshot.fingerprint, expected);
++    }
++
++    #[test]
++    fn validity_fails_closed_at_both_boundaries() {
++        assert!(valid_at(100, 200, 99).is_err());
++        assert!(valid_at(100, 200, 100).is_ok());
++        assert!(valid_at(100, 200, 199).is_ok());
++        assert!(valid_at(100, 200, 200).is_err());
++        assert!(valid_at(100, 100, 100).is_err());
++        assert!(valid_at(200, 100, 150).is_err());
++    }
++
++    #[test]
++    fn rotated_leaf_changes_binding_while_preserving_workload() {
++        let (ca, key) = ca();
++        let first = SenderSnapshot::from_svid(svid(SUBJECT, &ca, &key), SUBJECT, client_config(&ca)).unwrap();
++        let rotated = SenderSnapshot::from_svid(svid(SUBJECT, &ca, &key), SUBJECT, client_config(&ca)).unwrap();
++        assert_ne!(first.fingerprint, rotated.fingerprint);
++        assert_eq!(first.subject, rotated.subject);
++    }
++
++    #[test]
++    fn mismatched_certificate_and_private_key_are_rejected() {
++        let (ca, key) = ca();
++        let first = svid(SUBJECT, &ca, &key);
++        let other = svid(SUBJECT, &ca, &key);
++        let mismatched =
++            X509Svid::parse_from_der(first.leaf().as_bytes(), other.private_key().as_bytes())
++                .unwrap();
++        assert!(SenderSnapshot::from_svid(mismatched, SUBJECT, client_config(&ca)).is_err());
++    }
++
++    #[tokio::test]
++    async fn native_oauth_helper_and_upstream_tls_present_same_leaf() {
++        tokio::time::timeout(Duration::from_secs(20), same_leaf_handshakes())
++            .await
++            .unwrap();
++    }
++
++    async fn same_leaf_handshakes() {
++        let (ca, ca_key) = ca();
++        let snapshot =
++            SenderSnapshot::from_svid(svid(SUBJECT, &ca, &ca_key), SUBJECT, client_config(&ca))
++                .unwrap();
++        let expected = snapshot.fingerprint.clone();
++        let server_key = KeyPair::generate().unwrap();
++        let mut params = CertificateParams::new(vec!["localhost".to_string()]).unwrap();
++        params.use_authority_key_identifier_extension = true;
++        params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
++        let server_cert = params.signed_by(&server_key, &ca, &ca_key).unwrap();
++        let client_verifier = rustls::server::WebPkiClientVerifier::builder(Arc::new(roots(&ca)))
++            .build()
++            .unwrap();
++        let mut server_config = rustls::ServerConfig::builder()
++            .with_client_cert_verifier(client_verifier)
++            .with_single_cert(
++                vec![server_cert.der().clone()],
++                PrivateKeyDer::try_from(server_key.serialize_der()).unwrap(),
++            )
++            .unwrap();
++        server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
++        let acceptor = TlsAcceptor::from(Arc::new(server_config));
++        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
++        let port = listener.local_addr().unwrap().port();
++        let server = tokio::spawn(async move {
++            let mut paths = Vec::new();
++            let mut fingerprints = Vec::new();
++            for _ in 0..2 {
++                let (stream, _) = listener.accept().await.unwrap();
++                let mut tls = acceptor.accept(stream).await.unwrap();
++                let cert = &tls.get_ref().1.peer_certificates().unwrap()[0];
++                fingerprints.push(hex::encode(Sha256::digest(cert.as_ref())));
++                let mut input = Vec::new();
++                let mut buf = [0u8; 1024];
++                loop {
++                    let count = tls.read(&mut buf).await.unwrap();
++                    assert!(count > 0);
++                    input.extend_from_slice(&buf[..count]);
++                    if let Some(end) = input.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
++                        let headers = std::str::from_utf8(&input[..end]).unwrap();
++                        let length = headers
++                            .lines()
++                            .find_map(|line| {
++                                let (name, value) = line.split_once(':')?;
++                                name.eq_ignore_ascii_case("content-length")
++                                    .then(|| value.trim().parse::<usize>().unwrap())
++                            })
++                            .unwrap_or(0);
++                        if input.len() >= end + 4 + length {
++                            paths.push(
++                                headers
++                                    .lines()
++                                    .next()
++                                    .unwrap()
++                                    .split_whitespace()
++                                    .nth(1)
++                                    .unwrap()
++                                    .to_string(),
++                            );
++                            break;
++                        }
++                    }
++                }
++                let body = br#"{"access_token":"synthetic-review-token","expires_in":30,"token_type":"Bearer"}"#;
++                let headers = format!(
++                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
++                    body.len()
++                );
++                tls.write_all(headers.as_bytes()).await.unwrap();
++                tls.write_all(body).await.unwrap();
++                tls.shutdown().await.unwrap();
++            }
++            (paths, fingerprints)
++        });
++        snapshot.ensure_valid().unwrap();
++        let response = openshell_core::oauth::post_oauth_token_exchange(
++            &snapshot.oauth,
++            &format!("https://localhost:{port}/realms/review/protocol/openid-connect/token"),
++            &openshell_core::oauth::TokenExchangeParams {
++                client_assertion: "synthetic-review-assertion",
++                client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-spiffe",
++                subject_token: "synthetic-review-human-token",
++                subject_token_type: openshell_core::oauth::ACCESS_TOKEN_TYPE,
++                audience: "synthetic-review-mcp",
++                scopes: &[],
++                requested_token_type: openshell_core::oauth::ACCESS_TOKEN_TYPE,
++            },
++        )
++        .await
++        .unwrap();
++        assert_eq!(response.expires_in, 30);
++        snapshot.ensure_valid().unwrap();
++        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
++        let mut stream = crate::l7::tls::tls_connect_upstream(stream, "localhost", &snapshot.tls)
++            .await
++            .unwrap();
++        stream
++            .write_all(b"GET /mcp HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
++            .await
++            .unwrap();
++        let mut reply = Vec::new();
++        stream.read_to_end(&mut reply).await.unwrap();
++        assert!(reply.starts_with(b"HTTP/1.1 200 OK"));
++        let (paths, fingerprints) = server.await.unwrap();
++        assert_eq!(
++            paths,
++            vec!["/realms/review/protocol/openid-connect/token", "/mcp"]
++        );
++        assert_eq!(fingerprints, vec![expected.clone(), expected]);
++    }
++}

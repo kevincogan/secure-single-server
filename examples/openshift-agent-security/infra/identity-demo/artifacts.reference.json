@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "images": {
+    "jira_runtime": "registry.example.test/demo/jira-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "keycloak_management": "registry.redhat.io/rhbk/keycloak-rhel9@sha256:b55a3fdf5c836cca9d6b754dd27adbd8de28a27ca46e7d205ceb6c0d7ae35ab9",
+    "keycloak_exchange": "quay.io/keycloak/keycloak@sha256:27b3230fbabb8c9ff3c66c864cf09dcd8a41aca82e5100679d109ef0eeb05741",
+    "openshell_gateway": "registry.example.test/demo/openshell-gateway@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "openshell_supervisor": "registry.example.test/demo/openshell-supervisor@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "source_reference": "Illustrative input shape only. Supply approved artifacts, real digests and a target-matching native build contract before installation."
+}

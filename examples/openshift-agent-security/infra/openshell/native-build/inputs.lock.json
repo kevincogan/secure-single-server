@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "source_commit": "e1f3c82caa3ed3b65de22889ae7ef32a774878ef",
+  "source_url": "https://api.github.com/repos/NVIDIA/OpenShell/tarball/e1f3c82caa3ed3b65de22889ae7ef32a774878ef",
+  "source_archive_sha256": "eecb5d94c4ba93f671f9d4f8b3f02fde8050018942266835e296f8e670293df5",
+  "upstream_cargo_lock_sha256": "a893a09822e9a1e7e891c495a4e40e81f88a63a39110ece7a74980cfb5722af3",
+  "cargo_lock_sha256": "8164113c68f6c032d94b6269d0688b1f120fd407c84e41d8a223d6f962563c61",
+  "builder_base": "docker.io/library/rust@sha256:e14e87345b4d5964ddcc3491d27ee046a0f23820f340c3c1e24da6880141f7c0",
+  "rust_version": "1.95.0",
+  "cargo_auditable_version": "0.7.7",
+  "debian_snapshot": "20260520T000000Z",
+  "target": "x86_64-unknown-linux-gnu",
+  "runtime_bases": {
+    "gateway": "ghcr.io/nvidia/openshell/gateway@sha256:ea14aa4db0980fab4769fb6b5509ac42ae3dc8495e645b1ba1fe1ada49892fa6",
+    "supervisor": "ghcr.io/nvidia/openshell/supervisor@sha256:4ab2b970cdb02c7518ba4ccbbadb4861ae9a8d0b8770e5b160697f0453b0a8e4"
+  },
+  "patches": [
+    {
+      "file": "v0.1.3-sandbox-subject-comparison.patch",
+      "sha256": "404034b59bf7ff75e279f276020407857f37dbd170a0f6039156cbf5cc4012d3"
+    },
+    {
+      "file": "v0.1.3-pilot-sender-transport.patch",
+      "sha256": "0a8dbaae04d1f0cc18eec1529418c917bda719b995edd5ff27227d536c83af64"
+    },
+    {
+      "file": "v0.1.3-sender-installation-domain.patch",
+      "sha256": "d4f618bd91076a2c684d7ec4da452ea266ea2e4311044aa7044da3d964a30eb7"
+    },
+    {
+      "file": "v0.1.3-sender-x509-feature.patch",
+      "sha256": "fcb7727b308560cf29d64277ca254336fcff792521dd4bdf4f87aa523017ed63"
+    },
+    {
+      "file": "v0.1.3-bounded-oauth-response.patch",
+      "sha256": "0758e2c604d20d009f6afb31fb3a880feb2fc48b32b73bf4d2d382d7d63e0c06"
+    }
+  ],
+  "support_boundary": "Development evaluation; vendor support, scans and live acceptance remain separate."
+}

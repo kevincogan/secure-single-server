@@ -1,0 +1,84 @@
+{
+  "realm": "identity-demo",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "accessTokenLifespan": 60,
+  "roles": {
+    "realm": [
+      {
+        "name": "analyst"
+      },
+      {
+        "name": "viewer"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "analyst",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "analyst@example.invalid",
+      "firstName": "analyst",
+      "lastName": "Synthetic",
+      "realmRoles": [
+        "analyst"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "${credential.analyst}"
+        }
+      ]
+    },
+    {
+      "username": "viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "viewer@example.invalid",
+      "firstName": "viewer",
+      "lastName": "Synthetic",
+      "realmRoles": [
+        "viewer"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "${credential.viewer}"
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "identity-demo-ui",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:18085/callback"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "mcp-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "identity-demo-mcp",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "notBefore": 0
+}

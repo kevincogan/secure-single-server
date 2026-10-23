@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+# Enable the X.509 API required by the accepted sender patch and its lockfile.
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -112,7 +112,7 @@
+ zeroize = { version = "1", features = ["derive"] }
+ getrandom = "0.3"
+ aws-lc-rs = "1.16"
+-spiffe = { version = "0.15", default-features = false, features = ["workload-api-jwt", "jwt-verify-rust-crypto", "tracing"] }
++spiffe = { version = "0.15", default-features = false, features = ["workload-api-jwt", "workload-api-x509", "jwt-verify-rust-crypto", "tracing"] }
+ 
+ # Filesystem embedding
+ include_dir = "0.7"

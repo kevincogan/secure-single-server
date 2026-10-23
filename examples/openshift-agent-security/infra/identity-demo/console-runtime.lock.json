@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "platform": "linux/amd64",
+  "python_base": "registry.access.redhat.com/ubi9/ubi-minimal@sha256:c2fcb1793e00a434470271be7f46eadc2462b39f8370e6a81c861c72fb8d38db",
+  "oc_version": "4.21.36",
+  "oc_archive_url": "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.21.36/openshift-client-linux.tar.gz",
+  "oc_archive_sha256": "f38cbe69694ebca49f067b9e3830f62c62c27bbe29dd00ad29c11c45509fde42",
+  "cli_lock": "infra/openshell/native-build/cli.lock.json",
+  "source_or_distribution_approved": false,
+  "python_rpms": [
+    "python3.12-3.12.15-1.el9_8",
+    "python3.12-pip-23.2.1-5.el9"
+  ],
+  "rpm_manifest_sha256": "6219587605b03d93b82f4c80a4240bf86a68c4458b0f370e7140ec43d22508cf"
+}

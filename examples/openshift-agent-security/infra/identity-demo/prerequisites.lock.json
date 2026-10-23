@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "openshift_minor": "4.21",
+  "gateway_class": "openshift-ai-inference",
+  "gateway_controller": "openshift.io/gateway-controller/v1",
+  "catalog": {
+    "name": "redhat-operators",
+    "namespace": "openshift-marketplace"
+  },
+  "operators": [
+    {
+      "package": "openshift-zero-trust-workload-identity-manager",
+      "channel": "stable-v1",
+      "csv": "zero-trust-workload-identity-manager.v1.1.1",
+      "namespace": "{identity_namespace}"
+    },
+    {
+      "package": "agent-sandbox-operator",
+      "channel": "preview-0.9",
+      "csv": "agent-sandbox-operator.v0.9.0",
+      "namespace": "agent-sandbox-system"
+    },
+    {
+      "package": "mcp-gateway",
+      "channel": "preview",
+      "csv": "mcp-gateway.v0.7.1",
+      "namespace": "openshift-operators"
+    },
+    {
+      "package": "rhcl-operator",
+      "channel": "stable",
+      "csv": "rhcl-operator.v1.4.3",
+      "namespace": "openshift-operators"
+    }
+  ],
+  "source_references": [
+    "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/ingress_and_load_balancing/index",
+    "https://github.com/opendatahub-io/odh-gitops/tree/8897054629471af15b79573a7a158c71ffb30abf/charts/rhai-on-openshift-chart",
+    "https://github.com/openshift/cluster-ingress-operator/blob/4605c76fc68b288c1007c3424c793088f8b3e9b5/pkg/operator/controller/gatewayclass/istio_sail_installer.go"
+  ],
+  "validation_boundary": "Fresh owned SPIRE 1.1.1 operator, CSI, identity/discovery and application installed on a shared OpenShift 4.21 platform using the guided administrator procedure. Compatible shared Sandbox/MCP/Gateway/authorization controllers were retained without upgrades. Empty-platform bootstrap of every controller and vendor support are not claimed.",
+  "istio_version": "1.27.8"
+}

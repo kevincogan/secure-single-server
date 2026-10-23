@@ -1,0 +1,5693 @@
+{
+  "schema_version": 1,
+  "objects": [
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "${core_namespace}",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}",
+          "kubernetes.io/metadata.name": "${core_namespace}",
+          "pod-security.kubernetes.io/audit": "restricted",
+          "pod-security.kubernetes.io/audit-version": "latest",
+          "pod-security.kubernetes.io/warn": "restricted",
+          "pod-security.kubernetes.io/warn-version": "latest"
+        },
+        "annotations": {
+          "security.openshift.io/MinimallySufficientPodSecurityStandard": "restricted"
+        }
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "automountServiceAccountToken": false,
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "fixture-identity-driver",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "fixture-openshell",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "fixture-openshell-sandbox",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-adapter-catalog-trust-v1",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "digests.json": {
+          "$secret": "fixture-adapter-catalog-trust-v1/digests.json"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-credentials",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "jira-admin": {
+          "$secret": "fixture-credentials/jira-admin"
+        },
+        "keycloak-admin": {
+          "$secret": "fixture-credentials/keycloak-admin"
+        },
+        "realm.json": {
+          "$secret": "fixture-credentials/realm.json"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-identity-driver-credentials",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "adapter_secret": {
+          "$secret": "fixture-identity-driver-credentials/adapter_secret"
+        },
+        "gateway_secret": {
+          "$secret": "fixture-identity-driver-credentials/gateway_secret"
+        },
+        "operator_secret": {
+          "$secret": "fixture-identity-driver-credentials/operator_secret"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-keycloak-recovery",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "realm.json": {
+          "$secret": "fixture-keycloak-recovery/realm.json"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-keycloak-upstream-client-trust",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "password": {
+          "$secret": "fixture-keycloak-upstream-client-trust/password"
+        },
+        "truststore.p12": {
+          "$secret": "fixture-keycloak-upstream-client-trust/truststore.p12"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-keycloak-upstream-realm",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "realm.json": {
+          "$secret": "fixture-keycloak-upstream-realm/realm.json"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-mcp-bound-mutual",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "kubernetes.io/tls",
+      "data": {
+        "ca.crt": {
+          "$secret": "fixture-mcp-bound-mutual/ca.crt"
+        },
+        "tls.crt": {
+          "$secret": "fixture-mcp-bound-mutual/tls.crt"
+        },
+        "tls.key": {
+          "$secret": "fixture-mcp-bound-mutual/tls.key"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-openshell-client-tls",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "kubernetes.io/tls",
+      "data": {
+        "ca.crt": {
+          "$secret": "fixture-openshell-client-tls/ca.crt"
+        },
+        "tls.crt": {
+          "$secret": "fixture-openshell-client-tls/tls.crt"
+        },
+        "tls.key": {
+          "$secret": "fixture-openshell-client-tls/tls.key"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-openshell-credential-storage-key-encryption-key",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "helm.sh/resource-policy": "keep"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "key-encryption-key": {
+          "$secret": "fixture-openshell-credential-storage-key-encryption-key/key-encryption-key"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-openshell-jwt-keys",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "Opaque",
+      "data": {
+        "kid": {
+          "$secret": "fixture-openshell-jwt-keys/kid"
+        },
+        "public.pem": {
+          "$secret": "fixture-openshell-jwt-keys/public.pem"
+        },
+        "signing.pem": {
+          "$secret": "fixture-openshell-jwt-keys/signing.pem"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "fixture-openshell-server-tls",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "type": "kubernetes.io/tls",
+      "data": {
+        "ca.crt": {
+          "$secret": "fixture-openshell-server-tls/ca.crt"
+        },
+        "tls.crt": {
+          "$secret": "fixture-openshell-server-tls/tls.crt"
+        },
+        "tls.key": {
+          "$secret": "fixture-openshell-server-tls/tls.key"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {
+        "adapter_auth.py": {
+          "$source": "tests/identity_demo/adapter_auth.py"
+        },
+        "adapter_discovery.py": {
+          "$source": "tests/identity_demo/adapter_discovery.py"
+        },
+        "adapter_live_auth.py": {
+          "$source": "tests/identity_demo/adapter_live_auth.py"
+        },
+        "identity_demo_jira_action_adapter.py": {
+          "$source": "scripts/identity_demo/identity_demo_jira_action_adapter.py"
+        },
+        "identity_demo_run_store.py": {
+          "$source": "scripts/identity_demo/identity_demo_run_store.py"
+        },
+        "jwks.json": "{\"keys\":[]}",
+        "probe_adapter_tls.py": {
+          "$source": "tests/identity_demo/probe_adapter_tls.py"
+        },
+        "probe_protected_adapter.py": {
+          "$source": "tests/identity_demo/probe_protected_adapter.py"
+        },
+        "start_protected_adapter.py": {
+          "$source": "tests/identity_demo/start_protected_adapter.py"
+        },
+        "deployment_profile.py": {
+          "$source": "scripts/identity_demo/deployment_profile.py"
+        },
+        "identity_demo_warm_pool.py": {
+          "$source": "scripts/identity_demo/identity_demo_warm_pool.py"
+        }
+      },
+      "immutable": true,
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-adapter-action-code-639aede22e",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {
+        "config.json": {
+          "$json": {
+            "issuer": "https://fixture-keycloak-upstream-${core_namespace}.${route_domain}/realms/identity-demo",
+            "client": "identity-demo-driver",
+            "origin": "https://fixture-identity-driver-${core_namespace}.${route_domain}",
+            "audience": "https://fixture-mcp-bound.${core_namespace}.svc.cluster.local/mcp",
+            "contexts": [],
+            "project": "TEST",
+            "issuer_service": "https://fixture-keycloak-upstream.${core_namespace}.svc.cluster.local:8443/realms/identity-demo",
+            "issuer_ca": "/issuer-ca/service-ca.crt",
+            "normalized_tool_host": "fixture-step4-read-route.fixture-mcp.local"
+          }
+        },
+        "identity_demo_driver.py": {
+          "$source": "scripts/identity_demo/identity_demo_driver.py"
+        },
+        "identity_demo_run_store.py": {
+          "$source": "scripts/identity_demo/identity_demo_run_store.py"
+        },
+        "deployment_profile.py": {
+          "$source": "scripts/identity_demo/deployment_profile.py"
+        },
+        "identity_demo_console.py": {
+          "$source": "scripts/identity_demo/identity_demo_console.py"
+        },
+        "identity_demo_console_store.py": {
+          "$source": "scripts/identity_demo/identity_demo_console_store.py"
+        },
+        "identity_demo_console_visuals.py": {
+          "$source": "scripts/identity_demo/identity_demo_console_visuals.py"
+        },
+        "identity_demo_warm_pool.py": {
+          "$source": "scripts/identity_demo/identity_demo_warm_pool.py"
+        },
+        "identity_demo_issue_view.py": {
+          "$source": "scripts/identity_demo/identity_demo_issue_view.py"
+        },
+        "identity_demo_login_state.py": {
+          "$source": "scripts/identity_demo/identity_demo_login_state.py"
+        },
+        "identity_demo_backend_observation.py": {
+          "$source": "scripts/identity_demo/identity_demo_backend_observation.py"
+        },
+        "identity_demo_admission.py": {
+          "$source": "scripts/identity_demo/identity_demo_admission.py"
+        }
+      },
+      "immutable": true,
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-identity-driver-code-d23d5a29b5",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {
+        "start_jira_fixture.py": {
+          "$source": "tests/identity_demo/start_jira_fixture.py"
+        },
+        "deployment_profile.py": {
+          "$source": "scripts/identity_demo/deployment_profile.py"
+        }
+      },
+      "immutable": true,
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-jira-https-code-32d18d3911",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {},
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-keycloak-service-ca",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "openshift.io/description": "Configmap is added/updated with a data item containing the CA signing bundle that can be used to verify service-serving certificates",
+          "openshift.io/owning-component": "service-ca",
+          "service.beta.openshift.io/inject-cabundle": "true"
+        },
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {},
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-keycloak-upstream-service-ca",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "openshift.io/description": "Configmap is added/updated with a data item containing the CA signing bundle that can be used to verify service-serving certificates",
+          "openshift.io/owning-component": "service-ca",
+          "service.beta.openshift.io/inject-cabundle": "true"
+        },
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {
+        "gateway.toml": "\n[openshell]\nversion = 2\n[openshell.drivers.kubernetes]\nallow_driver_config = false\nclient_tls_secret_name = \"fixture-openshell-client-tls\"\ndefault_image = \"nvcr.io/nvidia/base/ubuntu:24.04\"\ngateway_id = \"${gateway_id}\"\ngrpc_endpoint = \"https://fixture-openshell.${core_namespace}.svc.cluster.local:8080\"\nnamespace = \"${core_namespace}\"\nprovider_spiffe_workload_api_socket_path = \"/spiffe-workload-api/spire-agent.sock\"\nsa_token_ttl_secs = 3600\nsandbox_runtime = { boundary_port = 5500 }\nsandbox_runtime_image = \"ghcr.io/nvidia/openshell/sandbox@sha256:2658534bfb3f1ebba4bb7792e9e875a0972edbe7ae5f58d807ae22c46844a2ac\"\nsandbox_runtime_image_pull_policy = \"if_not_present\"\nservice_account_name = \"fixture-openshell-sandbox\"\nsupervisor_image = \"${image.openshell_supervisor}\"\nsupervisor_image_pull_policy = \"if_not_present\"\nworkspace_mode = \"operator\"\noperator_namespace_file = \"/etc/openshell/workspaces/namespaces.json\"\n[openshell.drivers.kubernetes.managed_ssh_ingress]\nenabled = true\ngateway_namespace = \"${core_namespace}\"\ngateway_pod_selector = { \"app.kubernetes.io/instance\" = \"fixture-openshell\", \"app.kubernetes.io/name\" = \"openshell\" }\n[openshell.drivers.kubernetes.resource_admission]\nenabled = true\n[openshell.gateway]\nbind_address = \"0.0.0.0:8080\"\ncompute_driver = \"kubernetes\"\ndisable_tls = false\nenable_loopback_service_http = true\nenable_websocket_tunnel = false\nhealth_bind_address = \"0.0.0.0:8081\"\nlog_level = \"info\"\nmetrics_bind_address = \"0.0.0.0:9090\"\nname = \"identity-demo-runtime\"\npolicy_validation_failure_mode = \"fail_closed\"\nserver_sans = [\"fixture-openshell.${core_namespace}.svc\", \"fixture-openshell.${core_namespace}.svc.cluster.local\"]\n[openshell.gateway.auth]\nallow_unauthenticated_users = false\n[openshell.gateway.credential_storage]\nkey_encryption_key_env = \"OPENSHELL_GATEWAY_CREDENTIAL_KEY_ENCRYPTION_KEY\"\n[openshell.gateway.gateway_jwt]\ngateway_id = \"${gateway_id}\"\nkid_path = \"/etc/openshell-jwt/kid\"\npublic_key_path = \"/etc/openshell-jwt/public.pem\"\nsigning_key_path = \"/etc/openshell-jwt/signing.pem\"\nttl_secs = 3600\n[openshell.gateway.oidc]\nadmin_role = \"identity-demo-runtime-admin\"\naudience = \"identity-demo-runtime\"\nissuer = \"https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo\"\nroles_claim = \"realm_access.roles\"\nuser_role = \"identity-demo-runtime-user\"\n[openshell.gateway.tls]\ncert_path = \"/etc/openshell-tls/server/tls.crt\"\nclient_ca_path = \"/etc/openshell-tls/client-ca/ca.crt\"\nkey_path = \"/etc/openshell-tls/server/tls.key\"\n",
+        "namespaces.json": "[\"${triage_namespace}\", \"${reader_namespace}\"]"
+      },
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-openshell-config",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {
+        "ca-bundle.pem": "${runtime_ca_bundle}"
+      },
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-openshell-upstream-trust-v1",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {
+        "adapter_auth.py": {
+          "$source": "tests/identity_demo/adapter_auth.py"
+        },
+        "adapter_live_auth.py": {
+          "$source": "tests/identity_demo/adapter_live_auth.py"
+        },
+        "jwks.json": "{\"keys\":[]}",
+        "probe_adapter_tls.py": {
+          "$source": "tests/identity_demo/probe_adapter_tls.py"
+        },
+        "probe_protected_adapter.py": {
+          "$source": "tests/identity_demo/probe_protected_adapter.py"
+        },
+        "start_protected_adapter.py": {
+          "$source": "tests/identity_demo/start_protected_adapter.py"
+        },
+        "deployment_profile.py": {
+          "$source": "scripts/identity_demo/deployment_profile.py"
+        }
+      },
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-protected-adapter",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "data": {},
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "fixture-service-ca",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "openshift.io/description": "Configmap is added/updated with a data item containing the CA signing bundle that can be used to verify service-serving certificates",
+          "openshift.io/owning-component": "service-ca",
+          "service.beta.openshift.io/inject-cabundle": "true"
+        },
+        "namespace": "${core_namespace}"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "fixture-identity-driver-state",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "1Gi"
+          }
+        },
+        "storageClassName": "${storage_class}",
+        "volumeMode": "Filesystem"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "fixture-keycloak-recovery-data",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "1Gi"
+          }
+        },
+        "storageClassName": "${storage_class}",
+        "volumeMode": "Filesystem"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "fixture-keycloak-upstream-data",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "1Gi"
+          }
+        },
+        "storageClassName": "${storage_class}",
+        "volumeMode": "Filesystem"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "openshell-data-fixture-openshell-0",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "resources": {
+          "requests": {
+            "storage": "1Gi"
+          }
+        },
+        "storageClassName": "${storage_class}",
+        "volumeMode": "Filesystem"
+      }
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "fixture-openshell-peer",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "rules": [
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods"
+          ],
+          "verbs": [
+            "get"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "fixture-openshell-sandbox",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "rules": [
+        {
+          "apiGroups": [
+            "agents.x-k8s.io"
+          ],
+          "resources": [
+            "sandboxes",
+            "sandboxes/status"
+          ],
+          "verbs": [
+            "create",
+            "delete",
+            "get",
+            "list",
+            "patch",
+            "update",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "events"
+          ],
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods"
+          ],
+          "verbs": [
+            "create",
+            "delete",
+            "get",
+            "list",
+            "patch",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "services"
+          ],
+          "verbs": [
+            "create",
+            "get"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "secrets"
+          ],
+          "verbs": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "apiGroups": [
+            "networking.k8s.io"
+          ],
+          "resources": [
+            "networkpolicies"
+          ],
+          "verbs": [
+            "create",
+            "get"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "identity-demo-workspace-ca",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "rules": [
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resourceNames": [
+            "fixture-openshell-client-tls"
+          ],
+          "resources": [
+            "secrets"
+          ],
+          "verbs": [
+            "get"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "fixture-openshell-peer",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "fixture-openshell-peer"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "fixture-openshell",
+          "namespace": "${core_namespace}"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "fixture-openshell-sandbox",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "fixture-openshell-sandbox"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "fixture-openshell",
+          "namespace": "${core_namespace}"
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "identity-demo-workspace-ca",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "identity-demo-workspace-ca"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "fixture-openshell",
+          "namespace": "${core_namespace}"
+        }
+      ]
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-action-adapter-driver-egress",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "fixture-identity-driver"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-protected-adapter"
+          }
+        },
+        "policyTypes": [
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-adapter-jwks",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-ingress"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "ingresscontroller.operator.openshift.io/deployment-ingresscontroller": "default"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-protected-adapter"
+          }
+        },
+        "policyTypes": [
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-gateway-control-plane",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 15012,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-ingress"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 50051,
+                "protocol": "TCP"
+              },
+              {
+                "port": 50052,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "kuadrant-system"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "authorino-resource": "authorino"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 8082,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-operators"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "kuadrant",
+                    "control-plane": "controller-manager"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+          }
+        },
+        "policyTypes": [
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-identity-driver",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-ingress"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "ingresscontroller.operator.openshift.io/deployment-ingresscontroller": "default"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 53,
+                "protocol": "TCP"
+              },
+              {
+                "port": 53,
+                "protocol": "UDP"
+              },
+              {
+                "port": 5353,
+                "protocol": "TCP"
+              },
+              {
+                "port": 5353,
+                "protocol": "UDP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-dns"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-ingress"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-identity-driver"
+          }
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-isolation",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${core_namespace}"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 53,
+                "protocol": "UDP"
+              },
+              {
+                "port": 53,
+                "protocol": "TCP"
+              },
+              {
+                "port": 5353,
+                "protocol": "UDP"
+              },
+              {
+                "port": 5353,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-dns"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "podSelector": {}
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchExpressions": [
+            {
+              "key": "gateway.networking.k8s.io/gateway-name",
+              "operator": "NotIn",
+              "values": [
+                "fixture-mcp"
+              ]
+            },
+            {
+              "key": "app.kubernetes.io/name",
+              "operator": "NotIn",
+              "values": [
+                "mcp-gateway"
+              ]
+            },
+            {
+              "key": "app",
+              "operator": "NotIn",
+              "values": [
+                "fixture-protected-adapter",
+                "fixture-jira"
+              ]
+            }
+          ]
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-keycloak-spire-discovery-egress",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${identity_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "identity-demo-oidc-discovery"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-keycloak"
+          }
+        },
+        "policyTypes": [
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-keycloak-upstream-egress",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${identity_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "identity-demo-oidc-discovery"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-ingress"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-keycloak-upstream"
+          }
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-mcp-controller-health",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-operators"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "mcp-controller",
+                    "component": "controller"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app.kubernetes.io/name": "mcp-gateway"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-mcp-route-ingress",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "podSelector": {
+          "matchLabels": {
+            "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-openshell-api-issuer-egress",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 443,
+                "protocol": "TCP"
+              },
+              {
+                "port": 6443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "$api_peers": true
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-ingress"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "ingresscontroller.operator.openshift.io/deployment-ingresscontroller": "default"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app.kubernetes.io/instance": "fixture-openshell",
+            "app.kubernetes.io/part-of": "identity-demo-preflight",
+            "identity-demo-owner": "${owner}"
+          }
+        },
+        "policyTypes": [
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-openshell-sandbox-ssh",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${core_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "app.kubernetes.io/instance": "fixture-openshell",
+                    "app.kubernetes.io/name": "openshell"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 2222,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "openshell.ai/managed-by": "openshell"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-step4-adapter-isolation",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "fixture-jira"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 53,
+                "protocol": "TCP"
+              },
+              {
+                "port": 5353,
+                "protocol": "TCP"
+              },
+              {
+                "port": 53,
+                "protocol": "UDP"
+              },
+              {
+                "port": 5353,
+                "protocol": "UDP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-dns"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+                  }
+                }
+              },
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app.kubernetes.io/name": "mcp-gateway"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-protected-adapter"
+          }
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-step4-broker-isolation",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "fixture-protected-adapter"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 53,
+                "protocol": "TCP"
+              },
+              {
+                "port": 5353,
+                "protocol": "TCP"
+              },
+              {
+                "port": 53,
+                "protocol": "UDP"
+              },
+              {
+                "port": 5353,
+                "protocol": "UDP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-dns"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              },
+              {
+                "port": 50051,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app.kubernetes.io/name": "mcp-gateway"
+          }
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-step4-gateway-isolation",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              },
+              {
+                "port": 50051,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app.kubernetes.io/name": "mcp-gateway"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "fixture-protected-adapter"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "ports": [
+              {
+                "port": 53,
+                "protocol": "TCP"
+              },
+              {
+                "port": 5353,
+                "protocol": "TCP"
+              },
+              {
+                "port": 53,
+                "protocol": "UDP"
+              },
+              {
+                "port": 5353,
+                "protocol": "UDP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-dns"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ]
+          },
+          {
+            "from": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app.kubernetes.io/name": "mcp-gateway"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+          }
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "fixture-step4-jira-isolation",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 53,
+                "protocol": "TCP"
+              },
+              {
+                "port": 5353,
+                "protocol": "TCP"
+              },
+              {
+                "port": 53,
+                "protocol": "UDP"
+              },
+              {
+                "port": 5353,
+                "protocol": "UDP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-dns"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "podSelector": {
+                  "matchLabels": {
+                    "app": "fixture-protected-adapter"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-jira"
+          }
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "identity-demo-workspace-issuer",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${triage_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              },
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${reader_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-keycloak-upstream"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "identity-demo-workspace-mcp",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${triage_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              },
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${reader_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8443,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "identity-demo-workspace-runtime",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "egress": [
+          {
+            "ports": [
+              {
+                "port": 2222,
+                "protocol": "TCP"
+              }
+            ],
+            "to": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${triage_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              },
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${reader_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${triage_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              },
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${reader_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "openshell.ai/boundary-role": "supervisor",
+                    "openshell.ai/gateway-id": "${gateway_id}"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app.kubernetes.io/instance": "fixture-openshell",
+            "app.kubernetes.io/name": "openshell"
+          }
+        },
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "keycloak-route-ingress",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "openshift-ingress"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "fixture-keycloak"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-identity-driver",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "service.beta.openshift.io/serving-cert-secret-name": "fixture-identity-driver-tls"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "name": "https",
+            "port": 8443,
+            "protocol": "TCP",
+            "targetPort": 8443
+          }
+        ],
+        "selector": {
+          "app": "fixture-identity-driver"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-jira",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "service.beta.openshift.io/serving-cert-secret-name": "fixture-jira-rest-tls"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "name": "rest",
+            "port": 8080,
+            "protocol": "TCP",
+            "targetPort": 8080
+          },
+          {
+            "name": "sse",
+            "port": 8081,
+            "protocol": "TCP",
+            "targetPort": 8081
+          },
+          {
+            "name": "streamable",
+            "port": 8082,
+            "protocol": "TCP",
+            "targetPort": 8082
+          }
+        ],
+        "selector": {
+          "app": "fixture-jira"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-keycloak",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "name": "http",
+            "port": 8080,
+            "protocol": "TCP",
+            "targetPort": 8080
+          }
+        ],
+        "selector": {
+          "app": "fixture-keycloak"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-keycloak-upstream",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "service.beta.openshift.io/serving-cert-secret-name": "fixture-keycloak-upstream-tls"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "name": "https",
+            "port": 8443,
+            "protocol": "TCP",
+            "targetPort": 8443
+          }
+        ],
+        "selector": {
+          "app": "fixture-keycloak-upstream"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-mcp-bound",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "service.beta.openshift.io/serving-cert-secret-name": "fixture-mcp-bound-serving"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "name": "https",
+            "port": 443,
+            "protocol": "TCP",
+            "targetPort": 8443
+          }
+        ],
+        "selector": {
+          "gateway.networking.k8s.io/gateway-name": "fixture-mcp"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-openshell",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "appProtocol": "grpc",
+            "name": "grpc",
+            "port": 8080,
+            "protocol": "TCP",
+            "targetPort": "grpc"
+          },
+          {
+            "name": "metrics",
+            "port": 9090,
+            "protocol": "TCP",
+            "targetPort": "metrics"
+          }
+        ],
+        "selector": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/name": "openshell"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-openshell-peer",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "appProtocol": "grpc",
+            "name": "grpc",
+            "port": 8080,
+            "protocol": "TCP",
+            "targetPort": "grpc"
+          }
+        ],
+        "publishNotReadyAddresses": true,
+        "selector": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/name": "openshell"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "fixture-protected-adapter",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "service.beta.openshift.io/serving-cert-secret-name": "fixture-protected-adapter-tls"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "internalTrafficPolicy": "Cluster",
+        "ports": [
+          {
+            "name": "streamable",
+            "port": 8083,
+            "protocol": "TCP",
+            "targetPort": 8083
+          },
+          {
+            "name": "sse",
+            "port": 8084,
+            "protocol": "TCP",
+            "targetPort": 8084
+          },
+          {
+            "name": "https",
+            "port": 8443,
+            "protocol": "TCP",
+            "targetPort": 8443
+          }
+        ],
+        "selector": {
+          "app": "fixture-protected-adapter"
+        },
+        "sessionAffinity": "None",
+        "type": "ClusterIP"
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "fixture-identity-driver",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app": "fixture-identity-driver"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "kubectl.kubernetes.io/restartedAt": "2026-10-13T16:57:24+01:00"
+            },
+            "labels": {
+              "app": "fixture-identity-driver",
+              "app.kubernetes.io/part-of": "identity-demo-preflight",
+              "identity-demo-owner": "${owner}"
+            }
+          },
+          "spec": {
+            "automountServiceAccountToken": false,
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "-c",
+                  "import os;os.umask(0o077);os.makedirs('/state/private',mode=0o700,exist_ok=True);import identity_demo_driver;identity_demo_driver.main()"
+                ],
+                "env": [
+                  {
+                    "name": "DRIVER_CONFIG",
+                    "value": "/fixtures/config.json"
+                  },
+                  {
+                    "name": "DRIVER_DATABASE",
+                    "value": "/state/private/runs.db"
+                  },
+                  {
+                    "name": "DRIVER_TLS_CERT",
+                    "value": "/tls/tls.crt"
+                  },
+                  {
+                    "name": "DRIVER_TLS_KEY",
+                    "value": "/tls/tls.key"
+                  },
+                  {
+                    "name": "PYTHONPATH",
+                    "value": "/fixtures"
+                  },
+                  {
+                    "name": "PYTHONDONTWRITEBYTECODE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "GATEWAY_SECRET_FILE",
+                    "value": "/credentials/gateway_secret"
+                  },
+                  {
+                    "name": "OPERATOR_SECRET_FILE",
+                    "value": "/credentials/operator_secret"
+                  },
+                  {
+                    "name": "ADAPTER_SECRET_FILE",
+                    "value": "/credentials/adapter_secret"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.jira_runtime}",
+                "imagePullPolicy": "IfNotPresent",
+                "livenessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8443,
+                    "scheme": "HTTPS"
+                  },
+                  "initialDelaySeconds": 20,
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "name": "driver",
+                "ports": [
+                  {
+                    "containerPort": 8443,
+                    "name": "https",
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": 8443,
+                    "scheme": "HTTPS"
+                  },
+                  "initialDelaySeconds": 3,
+                  "periodSeconds": 5,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "500m",
+                    "memory": "384Mi"
+                  },
+                  "requests": {
+                    "cpu": "100m",
+                    "memory": "128Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  },
+                  "readOnlyRootFilesystem": true,
+                  "runAsNonRoot": true
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/fixtures",
+                    "name": "code",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/credentials",
+                    "name": "credentials",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/tls",
+                    "name": "tls",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/state",
+                    "name": "state"
+                  },
+                  {
+                    "mountPath": "/tmp",
+                    "name": "tmp"
+                  },
+                  {
+                    "mountPath": "/issuer-ca",
+                    "name": "issuer-ca",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+              "runAsNonRoot": true,
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "serviceAccount": "fixture-identity-driver",
+            "serviceAccountName": "fixture-identity-driver",
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-identity-driver-code-d23d5a29b5"
+                },
+                "name": "code"
+              },
+              {
+                "name": "credentials",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-identity-driver-credentials"
+                }
+              },
+              {
+                "name": "tls",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-identity-driver-tls"
+                }
+              },
+              {
+                "name": "state",
+                "persistentVolumeClaim": {
+                  "claimName": "fixture-identity-driver-state"
+                }
+              },
+              {
+                "emptyDir": {
+                  "sizeLimit": "64Mi"
+                },
+                "name": "tmp"
+              },
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-service-ca"
+                },
+                "name": "issuer-ca"
+              },
+              {
+                "name": "installation-profile",
+                "configMap": {
+                  "name": "identity-demo-installation"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "fixture-jira",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app": "fixture-jira"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "fixture-jira",
+              "app.kubernetes.io/part-of": "identity-demo-preflight",
+              "identity-demo-owner": "${owner}"
+            }
+          },
+          "spec": {
+            "automountServiceAccountToken": false,
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "/fixtures/start_jira_fixture.py"
+                ],
+                "env": [
+                  {
+                    "name": "AUTH_MODE",
+                    "value": "strict"
+                  },
+                  {
+                    "name": "ADMIN_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "jira-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "JIRA_SERVER",
+                    "value": "http://127.0.0.1:8080"
+                  },
+                  {
+                    "name": "JIRA_USER",
+                    "value": "admin"
+                  },
+                  {
+                    "name": "JIRA_TOKEN",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "jira-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SEED_DATA",
+                    "value": "true"
+                  },
+                  {
+                    "name": "BASE_URL",
+                    "value": "http://fixture-jira:8080"
+                  },
+                  {
+                    "name": "PYTHONDONTWRITEBYTECODE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "WEBHOOKS_ENABLED",
+                    "value": "false"
+                  },
+                  {
+                    "name": "LOG_LEVEL",
+                    "value": "WARNING"
+                  },
+                  {
+                    "name": "PYTHONPATH",
+                    "value": "/app:/app/src"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.jira_runtime}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "fixture-jira",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 8081,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "initialDelaySeconds": 10,
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "tcpSocket": {
+                    "port": 8080
+                  },
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "500m",
+                    "memory": "512Mi"
+                  },
+                  "requests": {
+                    "cpu": "100m",
+                    "memory": "256Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/data",
+                    "name": "data"
+                  },
+                  {
+                    "mountPath": "/fixtures",
+                    "name": "bootstrap",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/rest-tls",
+                    "name": "rest-tls",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              },
+              {
+                "command": [
+                  "python",
+                  "-c",
+                  "import asyncio; from mcp_servers.atlassian_jira import mcp; tools=asyncio.run(mcp.list_tools()); [mcp.remove_tool(t.name) for t in tools if t.name not in (\"searchJiraIssuesUsingJql\", \"getJiraIssue\")]; mcp.run(transport=\"sse\")"
+                ],
+                "env": [
+                  {
+                    "name": "JIRA_SERVER",
+                    "value": "http://127.0.0.1:8080"
+                  },
+                  {
+                    "name": "JIRA_USER",
+                    "value": "admin"
+                  },
+                  {
+                    "name": "JIRA_TOKEN",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "jira-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "MCP_HOST",
+                    "value": "0.0.0.0"
+                  },
+                  {
+                    "name": "MCP_PORT",
+                    "value": "8081"
+                  },
+                  {
+                    "name": "PYTHONDONTWRITEBYTECODE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.jira_runtime}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "adapter-sse",
+                "ports": [
+                  {
+                    "containerPort": 8081,
+                    "protocol": "TCP"
+                  }
+                ],
+                "resources": {
+                  "limits": {
+                    "cpu": "300m",
+                    "memory": "256Mi"
+                  },
+                  "requests": {
+                    "cpu": "50m",
+                    "memory": "128Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              },
+              {
+                "command": [
+                  "python",
+                  "-c",
+                  "import asyncio; from mcp_servers.atlassian_jira import mcp; tools=asyncio.run(mcp.list_tools()); [mcp.remove_tool(t.name) for t in tools if t.name not in (\"searchJiraIssuesUsingJql\", \"getJiraIssue\")]; mcp.run(transport=\"streamable-http\")"
+                ],
+                "env": [
+                  {
+                    "name": "JIRA_SERVER",
+                    "value": "http://127.0.0.1:8080"
+                  },
+                  {
+                    "name": "JIRA_USER",
+                    "value": "admin"
+                  },
+                  {
+                    "name": "JIRA_TOKEN",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "jira-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "MCP_HOST",
+                    "value": "0.0.0.0"
+                  },
+                  {
+                    "name": "MCP_PORT",
+                    "value": "8082"
+                  },
+                  {
+                    "name": "PYTHONDONTWRITEBYTECODE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.jira_runtime}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "adapter-streamable-http",
+                "ports": [
+                  {
+                    "containerPort": 8082,
+                    "protocol": "TCP"
+                  }
+                ],
+                "resources": {
+                  "limits": {
+                    "cpu": "300m",
+                    "memory": "256Mi"
+                  },
+                  "requests": {
+                    "cpu": "50m",
+                    "memory": "128Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+              "runAsNonRoot": true,
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "name": "data",
+                "persistentVolumeClaim": {
+                  "claimName": "fixture-jira-data"
+                }
+              },
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-jira-https-code-32d18d3911"
+                },
+                "name": "bootstrap"
+              },
+              {
+                "name": "rest-tls",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-jira-rest-tls"
+                }
+              },
+              {
+                "name": "installation-profile",
+                "configMap": {
+                  "name": "identity-demo-installation"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "fixture-keycloak",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app": "fixture-keycloak"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "fixture-keycloak",
+              "app.kubernetes.io/part-of": "identity-demo-preflight",
+              "identity-demo-owner": "${owner}"
+            }
+          },
+          "spec": {
+            "automountServiceAccountToken": false,
+            "containers": [
+              {
+                "args": [
+                  "start-dev",
+                  "--import-realm"
+                ],
+                "env": [
+                  {
+                    "name": "KC_BOOTSTRAP_ADMIN_USERNAME",
+                    "value": "fixture-admin"
+                  },
+                  {
+                    "name": "KC_BOOTSTRAP_ADMIN_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "keycloak-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "KC_HTTP_PORT",
+                    "value": "8080"
+                  },
+                  {
+                    "name": "KC_HOSTNAME_STRICT",
+                    "value": "false"
+                  },
+                  {
+                    "name": "KC_HOSTNAME",
+                    "value": "https://fixture-keycloak-${core_namespace}.${route_domain}"
+                  },
+                  {
+                    "name": "KC_PROXY_HEADERS",
+                    "value": "xforwarded"
+                  },
+                  {
+                    "name": "KC_FEATURES",
+                    "value": "spiffe"
+                  },
+                  {
+                    "name": "KC_HEALTH_ENABLED",
+                    "value": "true"
+                  },
+                  {
+                    "name": "JAVA_OPTS_APPEND",
+                    "value": "-Xms128m -Xmx512m"
+                  },
+                  {
+                    "name": "KC_TRUSTSTORE_PATHS",
+                    "value": "/etc/keycloak/service-ca/service-ca.crt"
+                  },
+                  {
+                    "name": "KC_TLS_HOSTNAME_VERIFIER",
+                    "value": "DEFAULT"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.keycloak_management}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "fixture-keycloak",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/realms/identity-demo/.well-known/openid-configuration",
+                    "port": 8080,
+                    "scheme": "HTTP"
+                  },
+                  "initialDelaySeconds": 20,
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "1",
+                    "memory": "1Gi"
+                  },
+                  "requests": {
+                    "cpu": "150m",
+                    "memory": "768Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/opt/keycloak/data/import",
+                    "name": "realm",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/opt/keycloak/data",
+                    "name": "data"
+                  },
+                  {
+                    "mountPath": "/etc/keycloak/service-ca",
+                    "name": "service-ca",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+              "runAsNonRoot": true,
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "name": "realm",
+                "secret": {
+                  "defaultMode": 420,
+                  "items": [
+                    {
+                      "key": "realm.json",
+                      "path": "realm.json"
+                    }
+                  ],
+                  "secretName": "fixture-keycloak-recovery"
+                }
+              },
+              {
+                "name": "data",
+                "persistentVolumeClaim": {
+                  "claimName": "fixture-keycloak-recovery-data"
+                }
+              },
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-keycloak-service-ca"
+                },
+                "name": "service-ca"
+              },
+              {
+                "name": "installation-profile",
+                "configMap": {
+                  "name": "identity-demo-installation"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "fixture-keycloak-upstream",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app": "fixture-keycloak-upstream"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "openshift.io/required-scc": "restricted-v2"
+            },
+            "labels": {
+              "app": "fixture-keycloak-upstream",
+              "app.kubernetes.io/part-of": "identity-demo-preflight",
+              "identity-demo-owner": "${owner}"
+            }
+          },
+          "spec": {
+            "automountServiceAccountToken": false,
+            "containers": [
+              {
+                "args": [
+                  "start-dev",
+                  "--import-realm"
+                ],
+                "env": [
+                  {
+                    "name": "KC_BOOTSTRAP_ADMIN_USERNAME",
+                    "value": "fixture-admin"
+                  },
+                  {
+                    "name": "KC_BOOTSTRAP_ADMIN_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "keycloak-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "KC_FEATURES",
+                    "value": "spiffe"
+                  },
+                  {
+                    "name": "JAVA_OPTS_APPEND",
+                    "value": "-Xms128m -Xmx512m"
+                  },
+                  {
+                    "name": "KC_TRUSTSTORE_PATHS",
+                    "value": "/etc/keycloak/service-ca/service-ca.crt"
+                  },
+                  {
+                    "name": "KC_TLS_HOSTNAME_VERIFIER",
+                    "value": "DEFAULT"
+                  },
+                  {
+                    "name": "KC_HOSTNAME",
+                    "value": "https://fixture-keycloak-upstream-${core_namespace}.${route_domain}"
+                  },
+                  {
+                    "name": "KC_HOSTNAME_STRICT",
+                    "value": "true"
+                  },
+                  {
+                    "name": "KC_HTTP_ENABLED",
+                    "value": "false"
+                  },
+                  {
+                    "name": "KC_PROXY_HEADERS",
+                    "value": "xforwarded"
+                  },
+                  {
+                    "name": "KC_HTTPS_CERTIFICATE_FILE",
+                    "value": "/etc/keycloak/serving-tls/tls.crt"
+                  },
+                  {
+                    "name": "KC_HTTPS_CERTIFICATE_KEY_FILE",
+                    "value": "/etc/keycloak/serving-tls/tls.key"
+                  },
+                  {
+                    "name": "KC_HTTPS_CLIENT_AUTH",
+                    "value": "request"
+                  },
+                  {
+                    "name": "KC_HTTPS_TRUST_STORE_FILE",
+                    "value": "/etc/keycloak/client-trust/truststore.p12"
+                  },
+                  {
+                    "name": "KC_HTTPS_TRUST_STORE_TYPE",
+                    "value": "PKCS12"
+                  },
+                  {
+                    "name": "KC_HTTPS_TRUST_STORE_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "password",
+                        "name": "fixture-keycloak-upstream-client-trust"
+                      }
+                    }
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.keycloak_exchange}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "fixture-keycloak",
+                "ports": [
+                  {
+                    "containerPort": 8443,
+                    "name": "https",
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "periodSeconds": 5,
+                  "successThreshold": 1,
+                  "tcpSocket": {
+                    "port": 8443
+                  },
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "1",
+                    "memory": "1Gi"
+                  },
+                  "requests": {
+                    "cpu": "150m",
+                    "memory": "768Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/opt/keycloak/data/import",
+                    "name": "realm",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/opt/keycloak/data",
+                    "name": "data"
+                  },
+                  {
+                    "mountPath": "/etc/keycloak/service-ca",
+                    "name": "service-ca",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/keycloak/serving-tls",
+                    "name": "serving-tls",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/keycloak/client-trust",
+                    "name": "client-trust",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+              "runAsNonRoot": true,
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "name": "realm",
+                "secret": {
+                  "defaultMode": 420,
+                  "items": [
+                    {
+                      "key": "realm.json",
+                      "path": "realm.json"
+                    }
+                  ],
+                  "secretName": "fixture-keycloak-upstream-realm"
+                }
+              },
+              {
+                "name": "data",
+                "persistentVolumeClaim": {
+                  "claimName": "fixture-keycloak-upstream-data"
+                }
+              },
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-keycloak-upstream-service-ca"
+                },
+                "name": "service-ca"
+              },
+              {
+                "name": "serving-tls",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-keycloak-upstream-tls"
+                }
+              },
+              {
+                "name": "client-trust",
+                "secret": {
+                  "defaultMode": 420,
+                  "items": [
+                    {
+                      "key": "truststore.p12",
+                      "path": "truststore.p12"
+                    }
+                  ],
+                  "secretName": "fixture-keycloak-upstream-client-trust"
+                }
+              },
+              {
+                "name": "installation-profile",
+                "configMap": {
+                  "name": "identity-demo-installation"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "fixture-protected-adapter",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app": "fixture-protected-adapter"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "annotations": {
+              "identity-demo-catalog-code": "dade52db05f2",
+              "identity-demo-fixture-config": "61f886d480547c1ea5fc879968a7d802f9a0970d20c4c20bafae519389f78fa6",
+              "kubectl.kubernetes.io/restartedAt": "2026-10-13T19:12:26+01:00"
+            },
+            "labels": {
+              "app": "fixture-protected-adapter",
+              "app.kubernetes.io/part-of": "identity-demo-preflight",
+              "identity-demo-owner": "${owner}"
+            }
+          },
+          "spec": {
+            "automountServiceAccountToken": false,
+            "containers": [
+              {
+                "command": [
+                  "python",
+                  "/fixtures/start_protected_adapter.py"
+                ],
+                "env": [
+                  {
+                    "name": "ADAPTER_ISSUER",
+                    "value": "https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo"
+                  },
+                  {
+                    "name": "ADAPTER_RESOURCE",
+                    "value": "http://fixture-protected-adapter.${core_namespace}.svc:8083/mcp"
+                  },
+                  {
+                    "name": "MCP_TRANSPORT",
+                    "value": "streamable-http"
+                  },
+                  {
+                    "name": "MCP_PORT",
+                    "value": "8083"
+                  },
+                  {
+                    "name": "JIRA_SERVER",
+                    "value": "http://fixture-jira:8080"
+                  },
+                  {
+                    "name": "JIRA_USER",
+                    "value": "admin"
+                  },
+                  {
+                    "name": "JIRA_TOKEN",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "jira-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "PYTHONDONTWRITEBYTECODE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "PYTHONPATH",
+                    "value": "/app:/app/src:/fixtures"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.jira_runtime}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "fixture-protected-adapter",
+                "ports": [
+                  {
+                    "containerPort": 8083,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "tcpSocket": {
+                    "port": 8083
+                  },
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "300m",
+                    "memory": "256Mi"
+                  },
+                  "requests": {
+                    "cpu": "50m",
+                    "memory": "128Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/fixtures",
+                    "name": "bootstrap",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              },
+              {
+                "command": [
+                  "python",
+                  "/fixtures/start_protected_adapter.py"
+                ],
+                "env": [
+                  {
+                    "name": "ADAPTER_ISSUER",
+                    "value": "https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo"
+                  },
+                  {
+                    "name": "ADAPTER_RESOURCE",
+                    "value": "http://fixture-protected-adapter.${core_namespace}.svc:8083/mcp"
+                  },
+                  {
+                    "name": "MCP_TRANSPORT",
+                    "value": "sse"
+                  },
+                  {
+                    "name": "MCP_PORT",
+                    "value": "8084"
+                  },
+                  {
+                    "name": "JIRA_SERVER",
+                    "value": "http://fixture-jira:8080"
+                  },
+                  {
+                    "name": "JIRA_USER",
+                    "value": "admin"
+                  },
+                  {
+                    "name": "JIRA_TOKEN",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "jira-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "PYTHONDONTWRITEBYTECODE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "PYTHONPATH",
+                    "value": "/app:/app/src:/fixtures"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.jira_runtime}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "adapter-sse",
+                "ports": [
+                  {
+                    "containerPort": 8084,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "tcpSocket": {
+                    "port": 8084
+                  },
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "300m",
+                    "memory": "256Mi"
+                  },
+                  "requests": {
+                    "cpu": "50m",
+                    "memory": "128Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/fixtures",
+                    "name": "bootstrap",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              },
+              {
+                "command": [
+                  "python",
+                  "/fixtures/start_protected_adapter.py"
+                ],
+                "env": [
+                  {
+                    "name": "ADAPTER_ISSUER",
+                    "value": "https://fixture-keycloak-upstream-${core_namespace}.${route_domain}/realms/identity-demo"
+                  },
+                  {
+                    "name": "JIRA_USER",
+                    "value": "admin"
+                  },
+                  {
+                    "name": "JIRA_TOKEN",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "jira-admin",
+                        "name": "fixture-credentials"
+                      }
+                    }
+                  },
+                  {
+                    "name": "PYTHONDONTWRITEBYTECODE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "PYTHONPATH",
+                    "value": "/app:/app/src:/fixtures"
+                  },
+                  {
+                    "name": "ADAPTER_RESOURCE",
+                    "value": "https://fixture-protected-adapter.${core_namespace}.svc:8443/mcp"
+                  },
+                  {
+                    "name": "MCP_TRANSPORT",
+                    "value": "streamable-http"
+                  },
+                  {
+                    "name": "MCP_PORT",
+                    "value": "8443"
+                  },
+                  {
+                    "name": "ADAPTER_LIVE_JWKS",
+                    "value": "1"
+                  },
+                  {
+                    "name": "MCP_TLS_CERTFILE",
+                    "value": "/tls/tls.crt"
+                  },
+                  {
+                    "name": "MCP_TLS_KEYFILE",
+                    "value": "/tls/tls.key"
+                  },
+                  {
+                    "name": "ADAPTER_DISCOVERY_DIGESTS_FILE",
+                    "value": "/catalog-trust/digests.json"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_ACTIONS",
+                    "value": "1"
+                  },
+                  {
+                    "name": "JIRA_WRITES_ENABLED",
+                    "value": "1"
+                  },
+                  {
+                    "name": "DRIVER_ADAPTER_SECRET_FILE",
+                    "value": "/driver-credentials/adapter_secret"
+                  },
+                  {
+                    "name": "DRIVER_CA_FILE",
+                    "value": "/service-ca/service-ca.crt"
+                  },
+                  {
+                    "name": "JIRA_SERVER",
+                    "value": "https://fixture-jira.${core_namespace}.svc.cluster.local:8080"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.jira_runtime}",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "adapter-https",
+                "ports": [
+                  {
+                    "containerPort": 8443,
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 10,
+                  "successThreshold": 1,
+                  "tcpSocket": {
+                    "port": 8443
+                  },
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "300m",
+                    "memory": "256Mi"
+                  },
+                  "requests": {
+                    "cpu": "50m",
+                    "memory": "128Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/fixtures",
+                    "name": "catalog-code",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/tls",
+                    "name": "tls",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/service-ca",
+                    "name": "service-ca",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/catalog-trust",
+                    "name": "catalog-trust",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/driver-credentials",
+                    "name": "driver-adapter-secret",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "hostAliases": [
+              {
+                "hostnames": [
+                  "fixture-keycloak-${core_namespace}.${route_domain}",
+                  "fixture-keycloak-upstream-${core_namespace}.${route_domain}"
+                ],
+                "ip": "${ingress_cluster_ip}"
+              }
+            ],
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+              "runAsNonRoot": true,
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-protected-adapter"
+                },
+                "name": "bootstrap"
+              },
+              {
+                "name": "tls",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-protected-adapter-tls"
+                }
+              },
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-service-ca"
+                },
+                "name": "service-ca"
+              },
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-adapter-action-code-639aede22e"
+                },
+                "name": "catalog-code"
+              },
+              {
+                "name": "catalog-trust",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-adapter-catalog-trust-v1"
+                }
+              },
+              {
+                "name": "driver-adapter-secret",
+                "secret": {
+                  "defaultMode": 420,
+                  "items": [
+                    {
+                      "key": "adapter_secret",
+                      "path": "adapter_secret"
+                    }
+                  ],
+                  "secretName": "fixture-identity-driver-credentials"
+                }
+              },
+              {
+                "name": "installation-profile",
+                "configMap": {
+                  "name": "identity-demo-installation"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "StatefulSet",
+      "metadata": {
+        "name": "fixture-openshell",
+        "labels": {
+          "app.kubernetes.io/instance": "fixture-openshell",
+          "app.kubernetes.io/managed-by": "identity-demo-runtime",
+          "app.kubernetes.io/name": "openshell",
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "app.kubernetes.io/version": "0.1.3",
+          "helm.sh/chart": "helm-chart-0.1.3",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "persistentVolumeClaimRetentionPolicy": {
+          "whenDeleted": "Retain",
+          "whenScaled": "Retain"
+        },
+        "podManagementPolicy": "OrderedReady",
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+          "matchLabels": {
+            "app.kubernetes.io/instance": "fixture-openshell",
+            "app.kubernetes.io/name": "openshell"
+          }
+        },
+        "serviceName": "fixture-openshell-peer",
+        "template": {
+          "metadata": {
+            "annotations": {
+              "checksum/gateway-config": "4c93fabb388b4730e782ead547263871f8efd697490cfe8e72f4b3d98f70fe87"
+            },
+            "labels": {
+              "app.kubernetes.io/instance": "fixture-openshell",
+              "app.kubernetes.io/managed-by": "Helm",
+              "app.kubernetes.io/name": "openshell",
+              "app.kubernetes.io/part-of": "identity-demo-preflight",
+              "app.kubernetes.io/version": "0.1.3",
+              "helm.sh/chart": "helm-chart-0.1.3",
+              "identity-demo-owner": "${owner}"
+            }
+          },
+          "spec": {
+            "containers": [
+              {
+                "args": [
+                  "--config",
+                  "/etc/openshell/gateway.toml",
+                  "--db-url",
+                  "sqlite:/var/openshell/openshell.db"
+                ],
+                "env": [
+                  {
+                    "name": "OPENSHELL_REPLICA_ID",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.name"
+                      }
+                    }
+                  },
+                  {
+                    "name": "OPENSHELL_POD_NAME",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.name"
+                      }
+                    }
+                  },
+                  {
+                    "name": "OPENSHELL_POD_NAMESPACE",
+                    "valueFrom": {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      }
+                    }
+                  },
+                  {
+                    "name": "OPENSHELL_SERVICE_ACCOUNT_NAME",
+                    "value": "fixture-openshell"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_SERVICE_NAME",
+                    "value": "fixture-openshell-peer"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_TOKEN_AUDIENCE",
+                    "value": "openshell-gateway-peer"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_SERVICE_ACCOUNT_TOKEN_FILE",
+                    "value": "/var/run/secrets/openshell-peer/token"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_POD_LABELS",
+                    "value": "app.kubernetes.io/name=openshell,app.kubernetes.io/instance=fixture-openshell"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_TLS_SERVER_NAME",
+                    "value": "fixture-openshell.${core_namespace}.svc.cluster.local"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_TLS_CA_FILE",
+                    "value": "/etc/openshell-tls/server/ca.crt"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_TLS_CERT_FILE",
+                    "value": "/etc/openshell-tls/peer-client/tls.crt"
+                  },
+                  {
+                    "name": "OPENSHELL_PEER_TLS_KEY_FILE",
+                    "value": "/etc/openshell-tls/peer-client/tls.key"
+                  },
+                  {
+                    "name": "OPENSHELL_GATEWAY_CREDENTIAL_KEY_ENCRYPTION_KEY",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "key-encryption-key",
+                        "name": "fixture-openshell-credential-storage-key-encryption-key"
+                      }
+                    }
+                  },
+                  {
+                    "name": "OPENSHELL_TELEMETRY_ENABLED",
+                    "value": "false"
+                  },
+                  {
+                    "name": "OPENSHELL_GATEWAY_SPIFFE_WORKLOAD_API_SOCKET",
+                    "value": "/spiffe-workload-api/spire-agent.sock"
+                  },
+                  {
+                    "name": "SSL_CERT_FILE",
+                    "value": "/etc/openshell-upstream-trust/ca-bundle.pem"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_CONFIG",
+                    "value": "/configuration/installation.json"
+                  }
+                ],
+                "image": "${image.openshell_gateway}",
+                "imagePullPolicy": "IfNotPresent",
+                "livenessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": "health",
+                    "scheme": "HTTP"
+                  },
+                  "initialDelaySeconds": 2,
+                  "periodSeconds": 5,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "name": "openshell-gateway",
+                "ports": [
+                  {
+                    "containerPort": 8080,
+                    "name": "grpc",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 8081,
+                    "name": "health",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 9090,
+                    "name": "metrics",
+                    "protocol": "TCP"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/readyz",
+                    "port": "health",
+                    "scheme": "HTTP"
+                  },
+                  "initialDelaySeconds": 1,
+                  "periodSeconds": 2,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "1",
+                    "memory": "512Mi"
+                  },
+                  "requests": {
+                    "cpu": "100m",
+                    "memory": "256Mi"
+                  }
+                },
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  },
+                  "runAsNonRoot": true
+                },
+                "startupProbe": {
+                  "failureThreshold": 30,
+                  "httpGet": {
+                    "path": "/healthz",
+                    "port": "health",
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 2,
+                  "successThreshold": 1,
+                  "timeoutSeconds": 1
+                },
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                  {
+                    "mountPath": "/var/openshell",
+                    "name": "openshell-data"
+                  },
+                  {
+                    "mountPath": "/etc/openshell/gateway.toml",
+                    "name": "gateway-config",
+                    "readOnly": true,
+                    "subPath": "gateway.toml"
+                  },
+                  {
+                    "mountPath": "/etc/openshell-jwt",
+                    "name": "sandbox-jwt",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/var/run/secrets/openshell-peer",
+                    "name": "gateway-peer-token",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/openshell-tls/server",
+                    "name": "tls-cert",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/openshell-tls/peer-client",
+                    "name": "peer-client-tls",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/openshell-tls/client-ca",
+                    "name": "tls-client-ca",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/spiffe-workload-api",
+                    "name": "spiffe-workload-api",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/openshell-upstream-trust",
+                    "name": "upstream-service-trust",
+                    "readOnly": true
+                  },
+                  {
+                    "mountPath": "/etc/openshell/workspaces",
+                    "name": "gateway-config",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/installation.json",
+                    "subPath": "installation.json",
+                    "readOnly": true
+                  }
+                ]
+              }
+            ],
+            "dnsPolicy": "ClusterFirst",
+            "hostAliases": [
+              {
+                "hostnames": [
+                  "fixture-keycloak-${core_namespace}.${route_domain}",
+                  "fixture-keycloak-upstream-${core_namespace}.${route_domain}"
+                ],
+                "ip": "${ingress_cluster_ip}"
+              }
+            ],
+            "restartPolicy": "Always",
+            "schedulerName": "default-scheduler",
+            "securityContext": {
+              "runAsNonRoot": true,
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "serviceAccount": "fixture-openshell",
+            "serviceAccountName": "fixture-openshell",
+            "terminationGracePeriodSeconds": 30,
+            "volumes": [
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-openshell-config"
+                },
+                "name": "gateway-config"
+              },
+              {
+                "name": "sandbox-jwt",
+                "secret": {
+                  "defaultMode": 288,
+                  "secretName": "fixture-openshell-jwt-keys"
+                }
+              },
+              {
+                "name": "gateway-peer-token",
+                "projected": {
+                  "defaultMode": 256,
+                  "sources": [
+                    {
+                      "serviceAccountToken": {
+                        "audience": "openshell-gateway-peer",
+                        "expirationSeconds": 3600,
+                        "path": "token"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "tls-cert",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-openshell-server-tls"
+                }
+              },
+              {
+                "name": "peer-client-tls",
+                "secret": {
+                  "defaultMode": 420,
+                  "secretName": "fixture-openshell-client-tls"
+                }
+              },
+              {
+                "name": "tls-client-ca",
+                "secret": {
+                  "defaultMode": 420,
+                  "items": [
+                    {
+                      "key": "ca.crt",
+                      "path": "ca.crt"
+                    }
+                  ],
+                  "secretName": "fixture-openshell-server-tls"
+                }
+              },
+              {
+                "csi": {
+                  "driver": "csi.spiffe.io",
+                  "readOnly": true
+                },
+                "name": "spiffe-workload-api"
+              },
+              {
+                "configMap": {
+                  "defaultMode": 420,
+                  "name": "fixture-openshell-upstream-trust-v1"
+                },
+                "name": "upstream-service-trust"
+              },
+              {
+                "name": "installation-profile",
+                "configMap": {
+                  "name": "identity-demo-installation"
+                }
+              }
+            ]
+          }
+        },
+        "updateStrategy": {
+          "rollingUpdate": {
+            "partition": 0
+          },
+          "type": "RollingUpdate"
+        },
+        "volumeClaimTemplates": [
+          {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+              "labels": {
+                "app.kubernetes.io/part-of": "identity-demo-preflight",
+                "identity-demo-owner": "${owner}"
+              },
+              "name": "openshell-data"
+            },
+            "spec": {
+              "accessModes": [
+                "ReadWriteOnce"
+              ],
+              "resources": {
+                "requests": {
+                  "storage": "1Gi"
+                }
+              },
+              "storageClassName": "${storage_class}",
+              "volumeMode": "Filesystem"
+            },
+            "status": {
+              "phase": "Pending"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "route.openshift.io/v1",
+      "kind": "Route",
+      "metadata": {
+        "name": "fixture-identity-driver",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "host": "fixture-identity-driver-${core_namespace}.${route_domain}",
+        "port": {
+          "targetPort": "https"
+        },
+        "tls": {
+          "destinationCACertificate": "${service_ca}",
+          "insecureEdgeTerminationPolicy": "Redirect",
+          "termination": "reencrypt"
+        },
+        "to": {
+          "kind": "Service",
+          "name": "fixture-identity-driver",
+          "weight": 100
+        },
+        "wildcardPolicy": "None"
+      }
+    },
+    {
+      "apiVersion": "route.openshift.io/v1",
+      "kind": "Route",
+      "metadata": {
+        "name": "fixture-keycloak",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "openshift.io/host.generated": "true"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "host": "fixture-keycloak-${core_namespace}.${route_domain}",
+        "port": {
+          "targetPort": "http"
+        },
+        "tls": {
+          "insecureEdgeTerminationPolicy": "Redirect",
+          "termination": "edge"
+        },
+        "to": {
+          "kind": "Service",
+          "name": "fixture-keycloak",
+          "weight": 100
+        },
+        "wildcardPolicy": "None"
+      }
+    },
+    {
+      "apiVersion": "route.openshift.io/v1",
+      "kind": "Route",
+      "metadata": {
+        "name": "fixture-keycloak-upstream",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "host": "fixture-keycloak-upstream-${core_namespace}.${route_domain}",
+        "port": {
+          "targetPort": "https"
+        },
+        "tls": {
+          "destinationCACertificate": "${service_ca}",
+          "insecureEdgeTerminationPolicy": "Redirect",
+          "termination": "reencrypt"
+        },
+        "to": {
+          "kind": "Service",
+          "name": "fixture-keycloak-upstream",
+          "weight": 100
+        },
+        "wildcardPolicy": "None"
+      }
+    },
+    {
+      "apiVersion": "route.openshift.io/v1",
+      "kind": "Route",
+      "metadata": {
+        "name": "fixture-mcp",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {
+          "openshift.io/host.generated": "true"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "host": "fixture-mcp-${core_namespace}.${route_domain}",
+        "port": {
+          "targetPort": 8080
+        },
+        "tls": {
+          "insecureEdgeTerminationPolicy": "Redirect",
+          "termination": "edge"
+        },
+        "to": {
+          "kind": "Service",
+          "name": "fixture-mcp-openshift-ai-inference",
+          "weight": 100
+        },
+        "wildcardPolicy": "None"
+      }
+    },
+    {
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "kind": "Gateway",
+      "metadata": {
+        "name": "fixture-mcp",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}",
+          "istio.io/rev": "openshift-gateway"
+        },
+        "annotations": {
+          "networking.istio.io/service-type": "ClusterIP",
+          "opendatahub.io/managed": "false",
+          "security.opendatahub.io/authorino-tls-bootstrap": "true"
+        },
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "gatewayClassName": "openshift-ai-inference",
+        "infrastructure": {
+          "annotations": {
+            "networking.istio.io/service-type": "ClusterIP"
+          },
+          "labels": {
+            "app.kubernetes.io/part-of": "identity-demo-preflight",
+            "identity-demo-owner": "${owner}"
+          }
+        },
+        "listeners": [
+          {
+            "allowedRoutes": {
+              "namespaces": {
+                "from": "Same"
+              }
+            },
+            "name": "mcp",
+            "port": 8080,
+            "protocol": "HTTP"
+          },
+          {
+            "allowedRoutes": {
+              "namespaces": {
+                "from": "Same"
+              }
+            },
+            "hostname": "*.fixture-mcp.local",
+            "name": "mcps",
+            "port": 8080,
+            "protocol": "HTTP"
+          },
+          {
+            "allowedRoutes": {
+              "namespaces": {
+                "from": "Same"
+              }
+            },
+            "hostname": "fixture-mcp-bound.${core_namespace}.svc.cluster.local",
+            "name": "bound",
+            "port": 8443,
+            "protocol": "HTTPS",
+            "tls": {
+              "certificateRefs": [
+                {
+                  "group": "",
+                  "kind": "Secret",
+                  "name": "fixture-mcp-bound-mutual"
+                }
+              ],
+              "mode": "Terminate",
+              "options": {
+                "gateway.istio.io/tls-terminate-mode": "MUTUAL"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "kind": "HTTPRoute",
+      "metadata": {
+        "name": "fixture-jira",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "hostnames": [
+          "jira.fixture-mcp.local"
+        ],
+        "parentRefs": [
+          {
+            "group": "gateway.networking.k8s.io",
+            "kind": "Gateway",
+            "name": "fixture-mcp",
+            "sectionName": "mcps"
+          }
+        ],
+        "rules": [
+          {
+            "backendRefs": [
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "fixture-jira",
+                "port": 8082,
+                "weight": 1
+              }
+            ],
+            "matches": [
+              {
+                "path": {
+                  "type": "PathPrefix",
+                  "value": "/mcp"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "kind": "HTTPRoute",
+      "metadata": {
+        "name": "fixture-mcp-bound",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "hostnames": [
+          "fixture-mcp-bound.${core_namespace}.svc.cluster.local"
+        ],
+        "parentRefs": [
+          {
+            "group": "gateway.networking.k8s.io",
+            "kind": "Gateway",
+            "name": "fixture-mcp",
+            "sectionName": "bound"
+          }
+        ],
+        "rules": [
+          {
+            "backendRefs": [
+              {
+                "group": "",
+                "kind": "Service",
+                "name": "mcp-gateway",
+                "port": 8080,
+                "weight": 1
+              }
+            ],
+            "matches": [
+              {
+                "path": {
+                  "type": "Exact",
+                  "value": "/mcp"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "kuadrant.io/v1",
+      "kind": "AuthPolicy",
+      "metadata": {
+        "name": "fixture-mcp-auth",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "rules": {
+          "authentication": {
+            "keycloak": {
+              "jwt": {
+                "issuerUrl": "https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo"
+              },
+              "metrics": false,
+              "priority": 0
+            }
+          },
+          "authorization": {
+            "audience": {
+              "metrics": false,
+              "patternMatching": {
+                "patterns": [
+                  {
+                    "predicate": "has(auth.identity.aud) && (auth.identity.aud == \"https://fixture-mcp-${core_namespace}.${route_domain}/mcp\" || (type(auth.identity.aud) == list && \"https://fixture-mcp-${core_namespace}.${route_domain}/mcp\" in auth.identity.aud))"
+                  }
+                ]
+              },
+              "priority": 0
+            },
+            "issuer": {
+              "metrics": false,
+              "patternMatching": {
+                "patterns": [
+                  {
+                    "predicate": "has(auth.identity.iss) && auth.identity.iss == \"https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo\""
+                  }
+                ]
+              },
+              "priority": 0
+            },
+            "request-inspection": {
+              "metrics": false,
+              "opa": {
+                "allValues": true,
+                "rego": "allow = true\nbody_present := object.get(input.context.request.http, \"body\", \"\") != \"\"\nraw_body_present := object.get(input.context.request.http, \"raw_body\", \"\") != \"\"\nraw_body_camel_present := object.get(input.context.request.http, \"rawBody\", \"\") != \"\"\ntool_name := object.get(input.context.request.http.headers, \"x-mcp-toolname\", \"\")\n"
+              },
+              "priority": 1
+            }
+          },
+          "response": {
+            "success": {
+              "headers": {
+                "x-identity-demo-body-present": {
+                  "metrics": false,
+                  "plain": {
+                    "expression": "string(auth.authorization['request-inspection'].body_present)"
+                  },
+                  "priority": 0
+                },
+                "x-identity-demo-tool": {
+                  "metrics": false,
+                  "plain": {
+                    "expression": "auth.authorization['request-inspection'].tool_name"
+                  },
+                  "priority": 0
+                }
+              }
+            },
+            "unauthenticated": {
+              "code": 401,
+              "headers": {
+                "WWW-Authenticate": {
+                  "value": "Bearer resource_metadata=https://fixture-mcp-${core_namespace}.${route_domain}/.well-known/oauth-protected-resource/mcp"
+                }
+              }
+            }
+          }
+        },
+        "targetRef": {
+          "group": "gateway.networking.k8s.io",
+          "kind": "Gateway",
+          "name": "fixture-mcp",
+          "sectionName": "mcp"
+        },
+        "when": [
+          {
+            "predicate": "!(request.method == 'GET' && request.path in ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])"
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "kuadrant.io/v1",
+      "kind": "AuthPolicy",
+      "metadata": {
+        "name": "fixture-mcp-bound",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "rules": {
+          "authentication": {
+            "keycloak": {
+              "jwt": {
+                "issuerUrl": "https://fixture-keycloak-upstream-${core_namespace}.${route_domain}/realms/identity-demo"
+              },
+              "metrics": false,
+              "priority": 0
+            }
+          },
+          "authorization": {
+            "closed-until-native-validation": {
+              "metrics": false,
+              "patternMatching": {
+                "patterns": [
+                  {
+                    "predicate": "false"
+                  }
+                ]
+              },
+              "priority": 0
+            }
+          }
+        },
+        "targetRef": {
+          "group": "gateway.networking.k8s.io",
+          "kind": "HTTPRoute",
+          "name": "fixture-mcp-bound"
+        }
+      }
+    },
+    {
+      "apiVersion": "kuadrant.io/v1",
+      "kind": "AuthPolicy",
+      "metadata": {
+        "name": "fixture-mcp-tools-auth",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "rules": {
+          "authentication": {
+            "keycloak": {
+              "jwt": {
+                "issuerUrl": "https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo"
+              },
+              "metrics": false,
+              "priority": 0
+            }
+          },
+          "authorization": {
+            "audience": {
+              "metrics": false,
+              "patternMatching": {
+                "patterns": [
+                  {
+                    "predicate": "has(auth.identity.aud) && (auth.identity.aud == \"https://fixture-mcp-${core_namespace}.${route_domain}/mcp\" || (type(auth.identity.aud) == list && \"https://fixture-mcp-${core_namespace}.${route_domain}/mcp\" in auth.identity.aud))"
+                  }
+                ]
+              },
+              "priority": 0
+            },
+            "issuer": {
+              "metrics": false,
+              "patternMatching": {
+                "patterns": [
+                  {
+                    "predicate": "has(auth.identity.iss) && auth.identity.iss == \"https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo\""
+                  }
+                ]
+              },
+              "priority": 0
+            },
+            "request-inspection": {
+              "metrics": false,
+              "opa": {
+                "allValues": true,
+                "rego": "allow = true\nbody_present := object.get(input.context.request.http, \"body\", \"\") != \"\"\nraw_body_present := object.get(input.context.request.http, \"raw_body\", \"\") != \"\"\nraw_body_camel_present := object.get(input.context.request.http, \"rawBody\", \"\") != \"\"\ntool_name := object.get(input.context.request.http.headers, \"x-mcp-toolname\", \"\")\n"
+              },
+              "priority": 1
+            }
+          },
+          "response": {
+            "success": {
+              "headers": {
+                "x-identity-demo-body-present": {
+                  "metrics": false,
+                  "plain": {
+                    "expression": "string(auth.authorization['request-inspection'].body_present)"
+                  },
+                  "priority": 0
+                },
+                "x-identity-demo-tool": {
+                  "metrics": false,
+                  "plain": {
+                    "expression": "auth.authorization['request-inspection'].tool_name"
+                  },
+                  "priority": 0
+                }
+              }
+            },
+            "unauthenticated": {
+              "code": 401,
+              "headers": {
+                "WWW-Authenticate": {
+                  "value": "Bearer resource_metadata=https://fixture-mcp-${core_namespace}.${route_domain}/.well-known/oauth-protected-resource/mcp"
+                }
+              }
+            }
+          }
+        },
+        "targetRef": {
+          "group": "gateway.networking.k8s.io",
+          "kind": "Gateway",
+          "name": "fixture-mcp",
+          "sectionName": "mcps"
+        }
+      }
+    },
+    {
+      "apiVersion": "mcp.kuadrant.io/v1alpha1",
+      "kind": "MCPGatewayExtension",
+      "metadata": {
+        "name": "fixture-mcp",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "backendPingIntervalSeconds": 60,
+        "httpRouteManagement": "Disabled",
+        "oauthProtectedResource": {
+          "authorizationServers": [
+            "https://fixture-keycloak-upstream-${core_namespace}.${route_domain}/realms/identity-demo"
+          ],
+          "bearerMethodsSupported": [
+            "header"
+          ],
+          "resource": "https://fixture-mcp-bound.${core_namespace}.svc.cluster.local/mcp",
+          "resourceName": "Synthetic identity demo MCP Gateway",
+          "scopesSupported": [
+            "openid"
+          ]
+        },
+        "privateHost": "fixture-mcp-openshift-ai-inference.${core_namespace}.svc.cluster.local:8080",
+        "publicHost": "fixture-mcp-bound.${core_namespace}.svc.cluster.local",
+        "targetRef": {
+          "group": "gateway.networking.k8s.io",
+          "kind": "Gateway",
+          "name": "fixture-mcp",
+          "namespace": "${core_namespace}",
+          "sectionName": "bound"
+        },
+        "urlElicitation": "Disabled"
+      }
+    },
+    {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "EnvoyFilter",
+      "metadata": {
+        "name": "fixture-mcp-bound-peer",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}",
+          "istio.io/rev": "openshift-gateway"
+        },
+        "annotations": {},
+        "namespace": "${core_namespace}"
+      },
+      "spec": {
+        "configPatches": [
+          {
+            "applyTo": "NETWORK_FILTER",
+            "match": {
+              "context": "GATEWAY",
+              "listener": {
+                "filterChain": {
+                  "filter": {
+                    "name": "envoy.filters.network.http_connection_manager"
+                  }
+                },
+                "portNumber": 8443
+              }
+            },
+            "patch": {
+              "operation": "MERGE",
+              "value": {
+                "name": "envoy.filters.network.http_connection_manager",
+                "typed_config": {
+                  "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+                  "forward_client_cert_details": "SANITIZE_SET",
+                  "set_current_client_cert_details": {
+                    "subject": true,
+                    "uri": true
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "workloadSelector": {
+          "labels": {
+            "app.kubernetes.io/part-of": "identity-demo-preflight",
+            "gateway.networking.k8s.io/gateway-name": "fixture-mcp",
+            "identity-demo-owner": "${owner}"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "${triage_namespace}",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}",
+          "kubernetes.io/metadata.name": "${triage_namespace}",
+          "pod-security.kubernetes.io/audit": "restricted",
+          "pod-security.kubernetes.io/audit-version": "latest",
+          "pod-security.kubernetes.io/enforce": "restricted",
+          "pod-security.kubernetes.io/warn": "restricted",
+          "pod-security.kubernetes.io/warn-version": "latest"
+        },
+        "annotations": {
+          "security.openshift.io/MinimallySufficientPodSecurityStandard": "restricted"
+        }
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "automountServiceAccountToken": false,
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "fixture-openshell-sandbox",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${triage_namespace}"
+      }
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "identity-demo-runtime",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${triage_namespace}"
+      },
+      "rules": [
+        {
+          "apiGroups": [
+            "agents.x-k8s.io"
+          ],
+          "resources": [
+            "sandboxes",
+            "sandboxes/status"
+          ],
+          "verbs": [
+            "create",
+            "delete",
+            "get",
+            "list",
+            "patch",
+            "update",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "events"
+          ],
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods"
+          ],
+          "verbs": [
+            "create",
+            "delete",
+            "get",
+            "list",
+            "patch",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "services"
+          ],
+          "verbs": [
+            "create",
+            "get"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "secrets"
+          ],
+          "verbs": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "apiGroups": [
+            "networking.k8s.io"
+          ],
+          "resources": [
+            "networkpolicies"
+          ],
+          "verbs": [
+            "create",
+            "get"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "identity-demo-runtime",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${triage_namespace}"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "identity-demo-runtime"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "fixture-openshell",
+          "namespace": "${core_namespace}"
+        }
+      ]
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "identity-demo-default-deny",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${triage_namespace}"
+      },
+      "spec": {
+        "podSelector": {},
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "identity-demo-gateway-ssh",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${triage_namespace}"
+      },
+      "spec": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${core_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "app.kubernetes.io/instance": "fixture-openshell",
+                    "app.kubernetes.io/name": "openshell"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 2222,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "openshell.ai/boundary-role": "supervisor",
+            "openshell.ai/gateway-id": "${gateway_id}"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "${reader_namespace}",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}",
+          "kubernetes.io/metadata.name": "${reader_namespace}",
+          "pod-security.kubernetes.io/audit": "restricted",
+          "pod-security.kubernetes.io/audit-version": "latest",
+          "pod-security.kubernetes.io/enforce": "restricted",
+          "pod-security.kubernetes.io/warn": "restricted",
+          "pod-security.kubernetes.io/warn-version": "latest"
+        },
+        "annotations": {
+          "security.openshift.io/MinimallySufficientPodSecurityStandard": "restricted"
+        }
+      },
+      "spec": {
+        "finalizers": [
+          "kubernetes"
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "automountServiceAccountToken": false,
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "fixture-openshell-sandbox",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${reader_namespace}"
+      }
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "identity-demo-runtime",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${reader_namespace}"
+      },
+      "rules": [
+        {
+          "apiGroups": [
+            "agents.x-k8s.io"
+          ],
+          "resources": [
+            "sandboxes",
+            "sandboxes/status"
+          ],
+          "verbs": [
+            "create",
+            "delete",
+            "get",
+            "list",
+            "patch",
+            "update",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "events"
+          ],
+          "verbs": [
+            "get",
+            "list",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "pods"
+          ],
+          "verbs": [
+            "create",
+            "delete",
+            "get",
+            "list",
+            "patch",
+            "watch"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "services"
+          ],
+          "verbs": [
+            "create",
+            "get"
+          ]
+        },
+        {
+          "apiGroups": [
+            ""
+          ],
+          "resources": [
+            "secrets"
+          ],
+          "verbs": [
+            "create",
+            "delete"
+          ]
+        },
+        {
+          "apiGroups": [
+            "networking.k8s.io"
+          ],
+          "resources": [
+            "networkpolicies"
+          ],
+          "verbs": [
+            "create",
+            "get"
+          ]
+        }
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "identity-demo-runtime",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${reader_namespace}"
+      },
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "Role",
+        "name": "identity-demo-runtime"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "fixture-openshell",
+          "namespace": "${core_namespace}"
+        }
+      ]
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "identity-demo-default-deny",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${reader_namespace}"
+      },
+      "spec": {
+        "podSelector": {},
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "identity-demo-gateway-ssh",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        },
+        "annotations": {},
+        "namespace": "${reader_namespace}"
+      },
+      "spec": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "namespaceSelector": {
+                  "matchLabels": {
+                    "kubernetes.io/metadata.name": "${core_namespace}"
+                  }
+                },
+                "podSelector": {
+                  "matchLabels": {
+                    "app.kubernetes.io/instance": "fixture-openshell",
+                    "app.kubernetes.io/name": "openshell"
+                  }
+                }
+              }
+            ],
+            "ports": [
+              {
+                "port": 2222,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "openshell.ai/boundary-role": "supervisor",
+            "openshell.ai/gateway-id": "${gateway_id}"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "identity-demo-installation",
+        "namespace": "${core_namespace}",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        }
+      },
+      "data": {
+        "installation.json": {
+          "$profile": true
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "PersistentVolumeClaim",
+      "metadata": {
+        "name": "fixture-jira-data",
+        "namespace": "${core_namespace}",
+        "labels": {
+          "app.kubernetes.io/part-of": "identity-demo-preflight",
+          "identity-demo-owner": "${owner}"
+        }
+      },
+      "spec": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "storageClassName": "${storage_class}",
+        "resources": {
+          "requests": {
+            "storage": "2Gi"
+          }
+        }
+      }
+    }
+  ]
+}

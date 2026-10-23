@@ -1,0 +1,201 @@
+--- a/crates/openshell-server/src/grpc/provider.rs
++++ b/crates/openshell-server/src/grpc/provider.rs
+@@ -4,6 +4,8 @@
+ //! Provider CRUD operations and environment resolution.
+ 
+ #![allow(clippy::result_large_err)] // gRPC handlers return Result<Response<_>, Status>
++
++mod supervisor_identity;
+ 
+ #[cfg(test)]
+ use crate::credentials::RefreshMaterialScope;
+@@ -4118,6 +4120,7 @@
+         &req.supervisor_jwt_svid,
+         &gateway_claims,
+         &jwt_svid_audience,
++        sandbox.object_id(),
+     )
+     .await?;
+ 
+@@ -4401,6 +4404,7 @@
+     token: &str,
+     gateway_claims: &SpiffeJwtClaims,
+     expected_audience: &str,
++    authenticated_sandbox_id: &str,
+ ) -> Result<SpiffeJwtClaims, Status> {
+     let unverified = parse_unverified_spiffe_claims(token)?;
+     if unverified.iss != gateway_claims.iss {
+@@ -4443,6 +4447,15 @@
+         .map_err(|e| Status::internal(format!("SPIFFE JWT bundle fetch failed: {e}")))?;
+     spiffe::JwtSvid::parse_and_validate(token, &bundles, &[expected_audience])
+         .map_err(|e| Status::permission_denied(format!("invalid supervisor JWT-SVID: {e}")))?;
++    if !supervisor_identity::subject_matches_canonical_sandbox(
++        &unverified.sub,
++        gateway_trust_domain,
++        authenticated_sandbox_id,
++    ) {
++        return Err(Status::permission_denied(
++            "supervisor SVID subject does not match authenticated sandbox registration",
++        ));
++    }
+     Ok(unverified)
+ }
+ 
+--- /dev/null
++++ b/crates/openshell-server/src/grpc/provider/supervisor_identity.rs
+@@ -0,0 +1,144 @@
++// SPDX-FileCopyrightText: Copyright (c) 2026 Red Hat, Inc.
++// SPDX-License-Identifier: Apache-2.0
++
++//! Exact subject comparison for the pilot's protected canonical registrations.
++//!
++//! This module does not authenticate a JWT or a caller. The handler must verify
++//! the caller's sandbox scope and JWT-SVID signature, audience and trust bundle
++//! before using this predicate. The identity path is the protected convention in
++//! `deploy/helm/openshell/ci/values-spire-stack.yaml`. Different registration paths
++//! intentionally fail closed; this is not a configurable upstream identity map.
++
++pub(super) fn subject_matches_canonical_sandbox(
++    verified_subject: &str,
++    gateway_trust_domain: &str,
++    authenticated_sandbox_id: &str,
++) -> bool {
++    // Both values come from trusted state. Reject path/URI syntax if a future
++    // caller violates that contract; do not normalize attacker-supplied subjects.
++    if gateway_trust_domain.is_empty()
++        || !gateway_trust_domain.bytes().all(|byte| {
++            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'-' | b'_')
++        })
++        || authenticated_sandbox_id.is_empty()
++        || !authenticated_sandbox_id
++            .bytes()
++            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
++    {
++        return false;
++    }
++
++    verified_subject
++        == format!("spiffe://{gateway_trust_domain}/openshell/sandbox/{authenticated_sandbox_id}")
++}
++
++#[cfg(test)]
++mod tests {
++    use super::subject_matches_canonical_sandbox;
++
++    const DOMAIN: &str = "identity-demo.example.test";
++    const SANDBOX: &str = "00000000-0000-4000-8000-000000000001";
++    const EXPECTED: &str = "spiffe://identity-demo.example.test/openshell/sandbox/00000000-0000-4000-8000-000000000001";
++
++    #[test]
++    fn accepts_the_authenticated_sandbox_exact_subject() {
++        assert!(subject_matches_canonical_sandbox(EXPECTED, DOMAIN, SANDBOX));
++    }
++
++    #[test]
++    fn rejects_a_different_sandbox_in_the_same_domain() {
++        assert!(!subject_matches_canonical_sandbox(
++            "spiffe://identity-demo.example.test/openshell/sandbox/fixture-step4-substitution",
++            DOMAIN,
++            SANDBOX,
++        ));
++    }
++
++    #[test]
++    fn rejects_the_gateway_subject_in_the_same_domain() {
++        assert!(!subject_matches_canonical_sandbox(
++            "spiffe://identity-demo.example.test/openshell/gateway/fixture-openshell",
++            DOMAIN,
++            SANDBOX,
++        ));
++    }
++
++    #[test]
++    fn rejects_the_bootstrap_jwt_subject_convention() {
++        assert!(!subject_matches_canonical_sandbox(
++            "spiffe://openshell/sandbox/00000000-0000-4000-8000-000000000001",
++            DOMAIN,
++            SANDBOX,
++        ));
++    }
++
++    #[test]
++    fn rejects_other_trust_domains() {
++        assert!(!subject_matches_canonical_sandbox(
++            EXPECTED,
++            "other.test",
++            SANDBOX
++        ));
++    }
++
++    #[test]
++    fn rejects_prefix_and_suffix_matches() {
++        for subject in [format!("{EXPECTED}-other"), format!("{EXPECTED}/other")] {
++            assert!(!subject_matches_canonical_sandbox(
++                &subject, DOMAIN, SANDBOX
++            ));
++        }
++    }
++
++    #[test]
++    fn rejects_uri_normalization_shortcuts() {
++        for subject in [
++            format!("{EXPECTED}/"),
++            format!("{EXPECTED}?run=approved"),
++            format!("{EXPECTED}#approved"),
++            EXPECTED.replace("/sandbox/", "/sandbox/../sandbox/"),
++            EXPECTED.replace("/sandbox/", "/%73andbox/"),
++            EXPECTED.replace("spiffe:", "SPIFFE:"),
++        ] {
++            assert!(!subject_matches_canonical_sandbox(
++                &subject, DOMAIN, SANDBOX
++            ));
++        }
++    }
++
++    #[test]
++    fn rejects_noncanonical_registration_paths() {
++        assert!(!subject_matches_canonical_sandbox(
++            "spiffe://identity-demo.example.test/custom/sandbox/00000000-0000-4000-8000-000000000001",
++            DOMAIN,
++            SANDBOX,
++        ));
++    }
++
++    #[test]
++    fn rejects_missing_trusted_inputs() {
++        assert!(!subject_matches_canonical_sandbox(EXPECTED, "", SANDBOX));
++        assert!(!subject_matches_canonical_sandbox(EXPECTED, DOMAIN, ""));
++    }
++
++    #[test]
++    fn rejects_uri_syntax_in_trusted_inputs() {
++        for domain in [
++            "test/evil",
++            "test:443",
++            "test?evil",
++            "test#evil",
++            "test%2f",
++            "TEST",
++        ] {
++            assert!(!subject_matches_canonical_sandbox(
++                EXPECTED, domain, SANDBOX
++            ));
++        }
++        for sandbox in ["a/b", "..", "a?b", "a#b", "a%2fb", "a b"] {
++            assert!(!subject_matches_canonical_sandbox(
++                EXPECTED, DOMAIN, sandbox
++            ));
++        }
++    }
++}
+--- a/docs/kubernetes/access-control.mdx
++++ b/docs/kubernetes/access-control.mdx
+@@ -26,7 +26,7 @@
+ 
+ Dynamic provider token grants can use SPIFFE without changing supervisor-to-gateway authentication. Set `gatewayConfig.openshell.drivers.kubernetes.provider_spiffe_workload_api_socket_path` to mount the SPIFFE CSI Workload API socket into gateway and sandbox pods while keeping the projected ServiceAccount token bootstrap and gateway-minted sandbox JWT path.
+ 
+-Provider token grants require a SPIFFE implementation such as SPIRE and identities for the gateway and sandbox pods. The repository's local SPIRE overlay assigns sandbox IDs from the pod's `openshell.ai/sandbox-id` annotation, but the gateway validation path only requires the supervisor SVID to be valid and in the same SPIFFE trust domain as the gateway SVID. Provider profiles with `token_grant` metadata cause the sandbox supervisor to request JWT-SVIDs and exchange them for upstream OAuth2 access tokens. Token-exchange profiles also require a gateway SPIFFE identity because the gateway brokers the intermediate token exchange with its own JWT-SVID.
++Provider token grants require a SPIFFE implementation such as SPIRE and identities for the gateway and sandbox pods. This pilot development candidate additionally requires the signature-validated supervisor subject to equal `spiffe://<gateway-trust-domain>/openshell/sandbox/<authenticated-sandbox-id>`, before intermediate-token cache lookup or exchange. Configure protected SPIRE registrations to match this canonical path. Other registration paths fail closed. The gateway's sandbox JWT subject uses a different convention and must not be compared directly with the SPIRE subject. Provider profiles with `token_grant` metadata cause the sandbox supervisor to request JWT-SVIDs and exchange them for upstream OAuth2 access tokens. Token-exchange profiles also require a gateway SPIFFE identity because the gateway brokers the intermediate token exchange with its own JWT-SVID.
+ 
+ The gateway verifies supervisor JWT-SVIDs with JWT bundles fetched from the SPIFFE Workload API, so intermediate token exchange does not require gateway access to the SPIRE OIDC discovery endpoint or its TLS CA.
+ 

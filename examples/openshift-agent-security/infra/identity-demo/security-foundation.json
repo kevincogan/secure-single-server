@@ -1,0 +1,403 @@
+[
+  {
+    "apiVersion": "operator.openshift.io/v1alpha1",
+    "kind": "ZeroTrustWorkloadIdentityManager",
+    "metadata": {
+      "name": "cluster",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "spec": {
+      "trustDomain": "{trust_domain}",
+      "clusterName": "{cluster_name}",
+      "bundleConfigMap": "spire-bundle"
+    }
+  },
+  {
+    "apiVersion": "operator.openshift.io/v1alpha1",
+    "kind": "SpireServer",
+    "metadata": {
+      "name": "cluster",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "spec": {
+      "labels": {
+        "identity-demo-owner": "{owner}"
+      },
+      "logLevel": "info",
+      "logFormat": "json",
+      "jwtIssuer": "https://spire-spiffe-oidc-discovery-provider.{identity_namespace}.svc:8443",
+      "caValidity": "24h",
+      "defaultX509Validity": "1h",
+      "defaultJWTValidity": "5m",
+      "caKeyType": "ec-p256",
+      "jwtKeyType": "ec-p256",
+      "caSubject": {
+        "commonName": "Identity Demo Lab CA",
+        "organization": "Identity Demo"
+      },
+      "keyManager": {
+        "diskEnabled": "true",
+        "memoryEnabled": "false"
+      },
+      "datastore": {
+        "databaseType": "sqlite3",
+        "connectionString": "/run/spire/data/datastore.sqlite3",
+        "maxOpenConns": 100,
+        "maxIdleConns": 2
+      },
+      "persistence": {
+        "size": "1Gi",
+        "accessMode": "ReadWriteOnce",
+        "storageClass": "{storage_class}"
+      },
+      "nodeSelector": {
+        "node-role.kubernetes.io/worker": ""
+      },
+      "resources": {
+        "requests": {
+          "cpu": "100m",
+          "memory": "256Mi"
+        },
+        "limits": {
+          "cpu": "500m",
+          "memory": "512Mi"
+        }
+      }
+    }
+  },
+  {
+    "apiVersion": "operator.openshift.io/v1alpha1",
+    "kind": "SpireAgent",
+    "metadata": {
+      "name": "cluster",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "spec": {
+      "labels": {
+        "identity-demo-owner": "{owner}"
+      },
+      "socketPath": "/run/spire/agent-sockets",
+      "logLevel": "info",
+      "logFormat": "json",
+      "nodeAttestor": {
+        "k8sPSATEnabled": "true"
+      },
+      "workloadAttestors": {
+        "k8sEnabled": "true",
+        "disableContainerSelectors": "false",
+        "useNewContainerLocator": "true",
+        "workloadAttestorsVerification": {
+          "type": "auto"
+        }
+      },
+      "nodeSelector": {
+        "node-role.kubernetes.io/worker": ""
+      },
+      "resources": {
+        "requests": {
+          "cpu": "50m",
+          "memory": "128Mi"
+        },
+        "limits": {
+          "cpu": "500m",
+          "memory": "512Mi"
+        }
+      }
+    }
+  },
+  {
+    "apiVersion": "operator.openshift.io/v1alpha1",
+    "kind": "SpiffeCSIDriver",
+    "metadata": {
+      "name": "cluster",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "spec": {
+      "labels": {
+        "identity-demo-owner": "{owner}"
+      },
+      "agentSocketPath": "/run/spire/agent-sockets",
+      "pluginName": "csi.spiffe.io",
+      "nodeSelector": {
+        "node-role.kubernetes.io/worker": ""
+      },
+      "resources": {
+        "requests": {
+          "cpu": "25m",
+          "memory": "64Mi"
+        },
+        "limits": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      }
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "ServiceAccount",
+    "metadata": {
+      "name": "identity-demo-oidc-discovery",
+      "namespace": "{identity_namespace}",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "automountServiceAccountToken": false
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+      "name": "spire-spiffe-oidc-discovery-provider",
+      "namespace": "{identity_namespace}",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      },
+      "annotations": {
+        "service.beta.openshift.io/serving-cert-secret-name": "identity-demo-oidc-serving-cert"
+      }
+    },
+    "spec": {
+      "selector": {
+        "app": "identity-demo-oidc-discovery"
+      },
+      "ports": [
+        {
+          "name": "https",
+          "port": 8443,
+          "targetPort": "https"
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "ConfigMap",
+    "metadata": {
+      "name": "identity-demo-oidc-service-ca",
+      "namespace": "{identity_namespace}",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      },
+      "annotations": {
+        "service.beta.openshift.io/inject-cabundle": "true"
+      }
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "ConfigMap",
+    "metadata": {
+      "name": "identity-demo-oidc-discovery-config",
+      "namespace": "{identity_namespace}",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "data": {
+      "oidc-discovery-provider.conf": "log_level = \"info\"\nlog_format = \"JSON\"\nlog_requests = false\ndomains = [\"spire-spiffe-oidc-discovery-provider.{identity_namespace}.svc\"]\njwt_issuer = \"https://spire-spiffe-oidc-discovery-provider.{identity_namespace}.svc:8443\"\njwks_uri = \"https://spire-spiffe-oidc-discovery-provider.{identity_namespace}.svc:8443/keys\"\nserving_cert_file {\n  addr = \":8443\"\n  cert_file_path = \"/etc/oidc/tls/tls.crt\"\n  key_file_path = \"/etc/oidc/tls/tls.key\"\n  file_sync_interval = \"10s\"\n}\nworkload_api {\n  socket_path = \"/spiffe-workload-api/spire-agent.sock\"\n  trust_domain = \"{trust_domain}\"\n  poll_interval = \"10s\"\n}\nhealth_checks {\n  bind_port = \"8008\"\n}\n"
+    }
+  },
+  {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "name": "identity-demo-oidc-discovery",
+      "namespace": "{identity_namespace}",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "spec": {
+      "replicas": 1,
+      "strategy": {
+        "type": "Recreate"
+      },
+      "selector": {
+        "matchLabels": {
+          "app": "identity-demo-oidc-discovery"
+        }
+      },
+      "template": {
+        "metadata": {
+          "labels": {
+            "app": "identity-demo-oidc-discovery",
+            "identity-demo-owner": "{owner}",
+            "app.kubernetes.io/part-of": "identity-demo-preflight"
+          },
+          "annotations": {
+            "openshift.io/required-scc": "restricted-v2"
+          }
+        },
+        "spec": {
+          "serviceAccountName": "identity-demo-oidc-discovery",
+          "automountServiceAccountToken": false,
+          "securityContext": {
+            "runAsNonRoot": true,
+            "seccompProfile": {
+              "type": "RuntimeDefault"
+            }
+          },
+          "containers": [
+            {
+              "name": "discovery",
+              "image": "registry.redhat.io/zero-trust-workload-identity-manager/spiffe-spire-oidc-discovery-provider-rhel9@sha256:1be96c9a470d16f2300b45d1d826c37c235dc192ed6fe33ed934ea4661392378",
+              "imagePullPolicy": "IfNotPresent",
+              "args": [
+                "-config",
+                "/run/spire/oidc/config/oidc-discovery-provider.conf"
+              ],
+              "ports": [
+                {
+                  "name": "https",
+                  "containerPort": 8443
+                },
+                {
+                  "name": "healthz",
+                  "containerPort": 8008
+                }
+              ],
+              "securityContext": {
+                "allowPrivilegeEscalation": false,
+                "readOnlyRootFilesystem": true,
+                "capabilities": {
+                  "drop": [
+                    "ALL"
+                  ]
+                }
+              },
+              "resources": {
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "64Mi"
+                },
+                "limits": {
+                  "cpu": "250m",
+                  "memory": "128Mi"
+                }
+              },
+              "startupProbe": {
+                "httpGet": {
+                  "path": "/ready",
+                  "port": "healthz"
+                },
+                "periodSeconds": 5,
+                "failureThreshold": 60
+              },
+              "readinessProbe": {
+                "httpGet": {
+                  "path": "/ready",
+                  "port": "healthz"
+                },
+                "periodSeconds": 5
+              },
+              "livenessProbe": {
+                "httpGet": {
+                  "path": "/live",
+                  "port": "healthz"
+                },
+                "periodSeconds": 10,
+                "failureThreshold": 3
+              },
+              "volumeMounts": [
+                {
+                  "name": "config",
+                  "mountPath": "/run/spire/oidc/config",
+                  "readOnly": true
+                },
+                {
+                  "name": "tls",
+                  "mountPath": "/etc/oidc/tls",
+                  "readOnly": true
+                },
+                {
+                  "name": "spiffe-workload-api",
+                  "mountPath": "/spiffe-workload-api",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "volumes": [
+            {
+              "name": "config",
+              "configMap": {
+                "name": "identity-demo-oidc-discovery-config"
+              }
+            },
+            {
+              "name": "tls",
+              "secret": {
+                "secretName": "identity-demo-oidc-serving-cert",
+                "defaultMode": 288
+              }
+            },
+            {
+              "name": "spiffe-workload-api",
+              "csi": {
+                "driver": "csi.spiffe.io",
+                "readOnly": true
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "identity-demo-default-deny",
+      "namespace": "{identity_namespace}",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": [
+        "Ingress",
+        "Egress"
+      ]
+    }
+  },
+  {
+    "apiVersion": "v1",
+    "kind": "ResourceQuota",
+    "metadata": {
+      "name": "identity-demo-object-budget",
+      "namespace": "{identity_namespace}",
+      "labels": {
+        "identity-demo-owner": "{owner}",
+        "app.kubernetes.io/part-of": "identity-demo-preflight"
+      }
+    },
+    "spec": {
+      "hard": {
+        "pods": "20",
+        "persistentvolumeclaims": "1",
+        "requests.storage": "1Gi"
+      }
+    }
+  }
+]

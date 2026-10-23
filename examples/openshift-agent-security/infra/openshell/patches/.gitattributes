@@ -1,0 +1,2 @@
+# Preserve literal unified-diff context and EOF whitespace.
+*.patch whitespace=-blank-at-eol,-blank-at-eof

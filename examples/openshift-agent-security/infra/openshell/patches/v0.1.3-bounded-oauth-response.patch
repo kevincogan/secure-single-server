@@ -1,0 +1,185 @@
+diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oauth.rs
+--- a/crates/openshell-core/src/oauth.rs
++++ b/crates/openshell-core/src/oauth.rs
+@@ -17,8 +17,6 @@
+     "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+ pub const ACCESS_TOKEN_TYPE: &str = "urn:ietf:params:oauth:token-type:access_token";
+ const TOKEN_EXCHANGE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:token-exchange";
+-
+-const MAX_OAUTH_ERROR_FIELD_LEN: usize = 256;
+ 
+ /// `OAuth2` token response.
+ #[derive(Debug, Clone)]
+@@ -40,7 +38,6 @@
+ #[derive(Debug, Deserialize)]
+ struct OAuthErrorResponse {
+     error: Option<String>,
+-    error_description: Option<String>,
+ }
+ 
+ async fn post_oauth_token_request(
+@@ -96,23 +93,36 @@
+             }
+             error
+         })
+-        .into_diagnostic()
+-        .wrap_err_with(|| format!("failed to POST to token endpoint {token_endpoint}"))?;
+-
+-    if !response.status().is_success() {
+-        let status = response.status();
+-        let body = response
+-            .text()
+-            .await
+-            .unwrap_or_else(|_| "<failed to read response body>".to_string());
+-        return Err(miette::miette!("{}", failure_message(status, &body)));
+-    }
+-
+-    let raw = response
+-        .json::<RawTokenResponse>()
++        .map_err(|_| miette::miette!("token endpoint transport failed"))?;
++
++    const MAX_TOKEN_RESPONSE_BYTES: usize = 131_072;
++    let mut response = response;
++    let status = response.status();
++    if response
++        .content_length()
++        .is_some_and(|length| length > MAX_TOKEN_RESPONSE_BYTES as u64)
++    {
++        return Err(miette::miette!("token endpoint response too large"));
++    }
++    let mut body = Vec::new();
++    while let Some(chunk) = response
++        .chunk()
+         .await
+-        .into_diagnostic()
+-        .wrap_err("failed to parse token response as JSON")?;
++        .map_err(|_| miette::miette!("token endpoint response read failed"))?
++    {
++        if chunk.len() > MAX_TOKEN_RESPONSE_BYTES.saturating_sub(body.len()) {
++            return Err(miette::miette!("token endpoint response too large"));
++        }
++        body.extend_from_slice(&chunk);
++    }
++    if !status.is_success() {
++        return Err(miette::miette!(
++            "{}",
++            failure_message(status, &String::from_utf8_lossy(&body))
++        ));
++    }
++    let raw: RawTokenResponse = serde_json::from_slice(&body)
++        .map_err(|_| miette::miette!("failed to parse token response as JSON"))?;
+     validate_access_token(&raw.access_token)?;
+     Ok(OAuthTokenResponse {
+         access_token: raw.access_token,
+@@ -290,40 +300,21 @@
+     let Ok(error_response) = serde_json::from_str::<OAuthErrorResponse>(body) else {
+         return format!("token grant failed with status {status}");
+     };
+-    let error = error_response
+-        .error
+-        .as_deref()
+-        .map(sanitize_oauth_error_field)
+-        .filter(|value| !value.is_empty());
+-    let description = error_response
+-        .error_description
+-        .as_deref()
+-        .map(sanitize_oauth_error_field)
+-        .filter(|value| !value.is_empty());
+-    match (error, description) {
+-        (Some(error), Some(description)) => {
+-            format!(
+-                "token grant failed with status {status}: error={error}; error_description={description}"
+-            )
+-        }
+-        (Some(error), None) => {
+-            format!("token grant failed with status {status}: error={error}")
+-        }
+-        (None, Some(description)) => {
+-            format!("token grant failed with status {status}: error_description={description}")
+-        }
+-        (None, None) => format!("token grant failed with status {status}"),
+-    }
+-}
+-
+-fn sanitize_oauth_error_field(value: &str) -> String {
+-    value
+-        .chars()
+-        .map(|ch| if ch.is_control() { ' ' } else { ch })
+-        .take(MAX_OAUTH_ERROR_FIELD_LEN)
+-        .collect::<String>()
+-        .trim()
+-        .to_string()
++    // Never reflect an issuer-controlled description or unknown error value.
++    let category = match error_response.error.as_deref() {
++        Some("invalid_request") => "invalid_request",
++        Some("invalid_client") => "invalid_client",
++        Some("invalid_grant") => "invalid_grant",
++        Some("unauthorized_client") => "unauthorized_client",
++        Some("unsupported_grant_type") => "unsupported_grant_type",
++        Some("unsupported_token_type") => "unsupported_token_type",
++        Some("invalid_scope") => "invalid_scope",
++        Some("access_denied") => "access_denied",
++        Some("server_error") => "server_error",
++        Some("temporarily_unavailable") => "temporarily_unavailable",
++        _ => return format!("token grant failed with status {status}"),
++    };
++    format!("token grant failed with status {status}: error={category}")
+ }
+ 
+ #[cfg(test)]
+@@ -547,7 +538,7 @@
+ 
+         assert_eq!(
+             err.to_string(),
+-            "token grant failed with status 401 Unauthorized: error=invalid_client; error_description=bad assertion"
++            "token grant failed with status 401 Unauthorized: error=invalid_client"
+         );
+     }
+ 
+@@ -764,7 +755,7 @@
+         );
+         assert_eq!(
+             message,
+-            "token grant failed with status 401 Unauthorized: error=invalid_client; error_description=Invalid client credentials"
++            "token grant failed with status 401 Unauthorized: error=invalid_client"
+         );
+     }
+ 
+@@ -781,14 +772,26 @@
+     }
+ 
+     #[test]
+-    fn failure_message_sanitizes_oauth_error_fields() {
+-        let long_description = "a".repeat(MAX_OAUTH_ERROR_FIELD_LEN + 20);
+-        let body =
+-            format!(r#"{{"error":"invalid_client\n","error_description":"{long_description}"}}"#);
+-        let message = failure_message(reqwest::StatusCode::UNAUTHORIZED, &body);
+-        assert!(!message.contains('\n'));
+-        assert!(message.contains("error=invalid_client"));
+-        assert!(message.contains(&"a".repeat(MAX_OAUTH_ERROR_FIELD_LEN)));
+-        assert!(!message.contains(&"a".repeat(MAX_OAUTH_ERROR_FIELD_LEN + 1)));
+-    }
+-}
++    fn failure_message_never_reflects_secret_canaries() {
++        let canary = "synthetic-private-credential-do-not-log";
++        for body in [
++            format!(r#"{{"error":"{canary}","error_description":"{canary}"}}"#),
++            format!(r#"{{"error":"invalid_client","error_description":"{canary}"}}"#),
++        ] {
++            let message = failure_message(reqwest::StatusCode::UNAUTHORIZED, &body);
++            assert!(!message.contains(canary));
++            assert!(!message.contains("error_description"));
++        }
++    }
++
++    #[tokio::test]
++    async fn rejects_oversized_token_response() {
++        let body = "x".repeat(131_073);
++        let (endpoint, request) = token_endpoint_once("200 OK", &body).await;
++        let error = post_oauth_token_grant(&test_client(), &endpoint, &empty_grant_params())
++            .await
++            .expect_err("oversized response must be rejected");
++        assert!(error.to_string().contains("response too large"));
++        let _ = request.await;
++    }
++}
