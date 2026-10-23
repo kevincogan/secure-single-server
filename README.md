@@ -54,6 +54,12 @@ Deploy the stack as a bootc image or install it manually with Podman. Both
 methods support the [post-deployment scenarios](docs/examples/README.md). See
 [Deployment methods](docs/deployment-methods.md) for the guides.
 
+For an alternative OpenShift deployment, see the
+[OpenShift agent security example](examples/openshift-agent-security/README.md).
+It demonstrates attested workload identity, certificate-bound delegation,
+protected MCP tools, exact-action approval and audit using synthetic workflows,
+with separate prerequisites and setup instructions.
+
 ## What can I do with this setup?
 
 For a post-deployment workflow, try the
