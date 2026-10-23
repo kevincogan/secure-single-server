@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "tokens": {
+    "endpoint_host": "inference.example.test",
+    "model": "approved-chat-model",
+    "workload_image": "registry.example.test/demo/cve-workload@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "diagnostic_image": "registry.example.test/demo/jira-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "files": [
+    {
+      "path": "scripts/identity_demo/identity_demo_console_store.py",
+      "sha256": "273f80fd878ce6001dd584378098205e0d5e38e62e1edc530a008fdbf8bae2da"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_execution_setup.py",
+      "sha256": "bd2b2387742c52f323e68ae88123158ac1df76b6116a8d4da4cc59600df428c1"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_spire_registration.py",
+      "sha256": "a56ffd70c9d4aa00e261da9a1409390f0d3c4499bdb003397ecc5bcee134d175"
+    },
+    {
+      "path": "tests/identity_demo/agent_runtime.py",
+      "sha256": "d560d26a75dadb8e16a52dd22e9f9849c0fa2bf93685e6b8fa539a8c5c61b865"
+    },
+    {
+      "path": "tests/identity_demo/boundary_flow.py",
+      "sha256": "ce2d171ddab63b4bbb078b0d177dc1fd4b984d21597da75e33955f56285a29a9"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_agent_runtime.py",
+      "sha256": "db8691f095316ffc9691b5b7f55bd471f5b25491c7867c6ffed9f73c6b55f833"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_enmaas_flow.py",
+      "sha256": "5a2ad57bfa1bad7de4c38051b78833639a37bd7d7d4ac17bf16cf835177791b7"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_offline_inventory.py",
+      "sha256": "b85a5a7aa1e77f6f30d12810e5abe2f4a8793006a5bbb9312aca614eb1729203"
+    },
+    {
+      "path": "tests/identity_demo/enmaas_flow.py",
+      "sha256": "818f9a675393730869a36cfd0b1b37a7cab233b87015cf508d67ce8608cfa728"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/Dockerfile",
+      "sha256": "9da059a9d17819e57c958ababdba667d24e5ad9790bbeb2102c34f66b2f18ab1"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/src/inference.py",
+      "sha256": "786ec35ba2f9ab99e0beb952b05dee856170ac3ed1249e4137d06e2cd9bcadbc"
+    }
+  ]
+}

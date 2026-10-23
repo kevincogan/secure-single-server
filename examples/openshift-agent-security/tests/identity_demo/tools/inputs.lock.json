@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "go_version": "go1.27.2",
+  "builder_image": "docker.io/library/golang@sha256:820153096fda4de6ac1b7194d12e416b7dd8f4e9a33d17e0345b111b945162d8",
+  "validation_image": "ghcr.io/nvidia/openshell/supervisor@sha256:4ab2b970cdb02c7518ba4ccbbadb4861ae9a8d0b8770e5b160697f0453b0a8e4",
+  "spire_version": "1.14.7",
+  "spire_archive_url": "https://github.com/spiffe/spire/releases/download/v1.14.7/spire-1.14.7-linux-amd64-musl.tar.gz",
+  "spire_archive_sha256": "de9402c7cb8e63f61a54bcd9d3d9a0b3e82b116887ce98b5bd03686b8a419552",
+  "spire_agent_member": "spire-1.14.7/bin/spire-agent",
+  "spire_agent_sha256": "7be9d568f47bec3eaad5529e32630c94ac8a011bbe9f902bad1f053a38baf1b8",
+  "spire_license_member": "spire-1.14.7/LICENSE"
+}

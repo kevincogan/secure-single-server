@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Operator-only setup and browser rehearsal, in addition to requirements-lock.txt.
+PyYAML==6.0.3
+playwright==1.64.0
+greenlet==3.5.6
+pyee==14.0.0
+pyte==0.8.2
+wcwidth==0.2.14

@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+pytest==8.4.2
+PyJWT[crypto]==2.15.0
+mcp==1.29.1
+h2==4.3.0

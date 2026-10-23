@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+name: service-request-demo
+type: deterministic
+input: SERVICE-0001
+project: SERVICE
+model: null
+tools:
+  - readJiraProject
+  - createJiraIssue
+approval: required
+transport: shared-native-mcp
+credentials: supplied-by-supervisor
