@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "installation_id": "demo-eval",
+  "owner": "demo-team",
+  "expected_server": "https://api.cluster.example.org:6443",
+  "core_namespace": "demo-eval-core",
+  "identity_namespace": "demo-eval-identity",
+  "triage_namespace": "demo-eval-triage",
+  "reader_namespace": "demo-eval-reader",
+  "route_domain": "apps.cluster.example.org",
+  "trust_domain": "agents.example.org",
+  "cluster_name": "evaluation-cluster",
+  "storage_class": "approved-storage"
+}

@@ -1,0 +1,31 @@
+{
+  "sequence": [
+    {
+      "workflow": "cve",
+      "role": "triage"
+    },
+    {
+      "workflow": "cve",
+      "role": "triage"
+    },
+    {
+      "workflow": "cve",
+      "role": "reader"
+    },
+    {
+      "workflow": "service-request",
+      "role": "triage"
+    },
+    {
+      "workflow": "incident-triage",
+      "role": "triage"
+    }
+  ],
+  "buffer": 0,
+  "workflow_limits": {
+    "cve": 4,
+    "service-request": 1,
+    "incident-triage": 1
+  },
+  "global_limit": 6
+}

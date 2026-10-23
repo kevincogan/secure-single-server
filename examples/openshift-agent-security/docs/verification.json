@@ -1,0 +1,383 @@
+{
+  "schema_version": 3,
+  "date": "2026-10-22",
+  "scope": "Verified connected evaluation setup and OpenShift-hosted presentation runtime on a shared platform. Compatible shared controllers were retained; empty-platform bootstrap is not established.",
+  "technical_scope_passed": true,
+  "customer_ready": false,
+  "evidence_policy": {
+    "current_summary": true,
+    "raw_receipts_and_prior_checkpoint_records": "Retained privately outside the customer package.",
+    "scope_note": "Historical live acceptance is distinguished from this source-only review. Skipped integration tests are not passes."
+  },
+  "source_review": {
+    "date": "2026-10-22",
+    "runtime_behavior_changed": true,
+    "deployed_resources_changed": true,
+    "generic_tests": {
+      "passed": 1939,
+      "skipped": 38
+    },
+    "source_checks": [
+      "Syntax, documentation links and shell example syntax",
+      "Native patch pins and complete source hash inventory",
+      "Public source and archive private-data scan",
+      "Standard-resource admission and real cryptographic/mTLS tests"
+    ],
+    "live_check": "Five post-migration browser permission/workflow cases; at most three new synthetic issues; renewal and trust-overlap fixtures retained privately.",
+    "confidential_data_found": false,
+    "independent_security_audit": false,
+    "scope": "Managed certificate integration and current generic delivery reviewed. Independent audit and release clearance remain separate gates.",
+    "live_readiness": {
+      "core_deployments_ready": 9,
+      "openshell_statefulset_ready": true,
+      "ready_contexts": 8,
+      "managed": 8,
+      "quarantined": 0,
+      "recovery_required": false
+    },
+    "documented_cli_validation": "Certificate status/loading and guarded worker update were exercised; all documented shell blocks passed syntax checks."
+  },
+  "fresh_setup": {
+    "target_initially_absent": true,
+    "old_installation_restored": false,
+    "owned_operator_version": "1.1.1",
+    "owned_operator_and_eight_spire_apis_installed_fresh": true,
+    "new_identity_keys_and_spire_datastore": true,
+    "exact_discovery_pod_attestation_verified": true,
+    "security_check_passed": true,
+    "shared_platform_controllers_reinstalled_or_upgraded": false,
+    "application_installation_complete": true,
+    "fresh_application_keys_and_databases": true,
+    "native_images_built_from_fresh_pinned_upstream_source": true,
+    "native_packaged_paths_and_hashes_verified": true,
+    "creation_ledger_complete": true
+  },
+  "live_scenarios": {
+    "scope": "Previously recorded actual browser/native acceptance; not rerun by the source review.",
+    "cases": [
+      {
+        "workflow": "cve",
+        "user": "analyst",
+        "workload": "triage",
+        "expected": "create",
+        "passed": true,
+        "cleanup_verified": true
+      },
+      {
+        "workflow": "cve",
+        "user": "viewer",
+        "workload": "triage",
+        "expected": "user_permission",
+        "passed": true,
+        "cleanup_verified": true
+      },
+      {
+        "workflow": "cve",
+        "user": "analyst",
+        "workload": "reader",
+        "expected": "workload_permission",
+        "passed": true,
+        "cleanup_verified": true
+      },
+      {
+        "workflow": "service-request",
+        "user": "analyst",
+        "workload": "triage",
+        "expected": "create",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_workload_inference": true
+      },
+      {
+        "workflow": "incident-triage",
+        "user": "analyst",
+        "workload": "triage",
+        "expected": "create",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_workload_inference": true
+      },
+      {
+        "workflow": "service-request",
+        "user": "viewer",
+        "workload": "triage",
+        "expected": "user_permission",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_workload_inference": true
+      }
+    ],
+    "viewer_incident": {
+      "actual_inference": true,
+      "user_permission_denial_and_backend_unchanged": true,
+      "started_during_preparation": true
+    },
+    "created_fields_match_exact_approval": true
+  },
+  "incident_project_isolation": {
+    "passed": true,
+    "gateway_http_status": 403,
+    "outside_project_data_returned": false,
+    "controlled_probe_supplied_as_tool_feedback": true,
+    "agent_independently_selected_probe": false
+  },
+  "identity_and_permissions": {
+    "native_certificate_bound_read": true,
+    "read_security_passed": true,
+    "sender_rejection_cases": 12,
+    "parser_report_isolation_and_live_revocation_passed": true,
+    "native_read_after_real_original_svid_expiry": true,
+    "tls_peer_matches_signed_cnf": true,
+    "same_user_workload_run_and_read_body": true,
+    "supervisor_restarted_for_renewal": false,
+    "security_checks_changed_backend_issue_count": false,
+    "same_domain_different_sandbox_denied": true,
+    "native_subject_test_boundary": "Administratively minted signature-verified assertion; no second sandbox attestation is claimed.",
+    "projected_token_rotation": {
+      "passed": true,
+      "roles": 2,
+      "token_lifetime_seconds": 7200,
+      "lifetime_guard_weakened": false,
+      "same_pods_and_process_lease_holders": true,
+      "restart_count": 0,
+      "changed_token_files_authenticated_by_api": true,
+      "lease_renewals_after_rotation": true,
+      "actual_runtime_token_reopening_module_hash_verified": true,
+      "raw_tokens_exported": false
+    },
+    "runtime_permission_checks": {
+      "effective_checks": 54,
+      "passed": 54,
+      "actual_projected_token_rotation_proven": true,
+      "pod_create_or_exec_granted": false,
+      "registration_write_granted": false,
+      "pvc_mutation_granted": false,
+      "issuer_or_gateway_serving_secret_read_granted": false,
+      "public_trust_observation_created": true,
+      "correct_subresource_reviews": true,
+      "actual_api_denials": 8,
+      "actual_api_denials_http_status": 403,
+      "actual_api_resource_changes": false,
+      "secret_contents_read_in_denial_probes": false
+    }
+  },
+  "cluster_operation": {
+    "mac_background_services_required": false,
+    "local_worker_off_browser_path_proven": true,
+    "private_operator_https": true,
+    "separate_scoped_workers_and_durable_leases": true,
+    "historical_issue_owner_http": 200,
+    "historical_issue_other_user_http": 403,
+    "history_after_restart_and_retirement": true,
+    "prior_installation_history_automatically_imported": false,
+    "shared_prerequisites_modified": false
+  },
+  "warm_pool": {
+    "target_ready": 8,
+    "per_workflow_role": 2,
+    "maximum_managed": 12,
+    "maximum_executing": 1,
+    "maximum_preparing_or_retiring": 1,
+    "single_use_identities": true,
+    "atomic_allocation_and_quarantine": true,
+    "run_started_during_preparation_proven": true,
+    "twelve_managed_boundary_observed": true,
+    "replenishment_and_subsequent_run_passed": true,
+    "uncertain_write_automatic_replay": false,
+    "historical_workspace_policy": "Preserved; only receipt-proven new disposable synthetic scratch is eligible for retirement deletion."
+  },
+  "recovery": {
+    "driver_jira_consistent_backup_and_restored_local_copies": true,
+    "issuer_cold_snapshot_and_signing_key_use_proven": true,
+    "live_history_overwritten": false,
+    "interrupted_preparation_and_retirement": "Offline native-effect fixtures exercised real preparer process exit/replacement and durable checkpoint recovery.",
+    "unused_context_quarantine_after_web_restart": true,
+    "uncertain_mutations_automatically_replayed": false,
+    "full_spire_openshell_disaster_recovery_proven": false
+  },
+  "public_trust_refresh": {
+    "opt_in_cluster_mode_verified": true,
+    "automatic_stale_copy_recovery_verified": true,
+    "authoritative_source": "recorded operator-managed SPIRE ConfigMap",
+    "runtime_serving_key_access": false,
+    "runtime_shared_spire_write_or_exec": false,
+    "public_only_secret_permissions_and_admission_verified": true,
+    "automatic_recovery_seconds": 284.2,
+    "projection_reload_wait_seconds": 210,
+    "issuer_and_gateway_restarted_during_automatic_refresh": false,
+    "test_boundary": "Omitted an already expired public CA from both owned copies; authoritative SPIRE state was not changed.",
+    "native_certificate_bound_read_and_reader_denial_verified": true,
+    "original_deadline_cleanup_replenishment_verified": true,
+    "new_jira_issues": 0,
+    "source_tests": {
+      "passed": 1887,
+      "skipped": 38
+    },
+    "focused_linux_runtime_tests_passed": 42,
+    "runtime_control_functions_match_tested_image": true,
+    "installer_followup": "Combined reload configuration with trust refresh to avoid a second rollout/status-version race.",
+    "uncertain_mutations_still_require_operator_review": true
+  },
+  "artifact_security": {
+    "distribution_approved": false,
+    "exact_current_runtime_rescan_and_findings_disposition": "Pending; previous-image scans are not approval of a later rebuilt image.",
+    "historical_runtime_scan_matches": {
+      "Critical": 11,
+      "High": 65,
+      "Medium": 209,
+      "Low": 99,
+      "Unknown": 2
+    },
+    "historical_exchange_issuer_scan_matches": {
+      "High": 6,
+      "Medium": 30,
+      "Low": 29
+    },
+    "native_gateway_scan_matches": {
+      "High": 11,
+      "Medium": 10,
+      "Low": 3,
+      "Negligible": 7
+    },
+    "native_supervisor_scan_matches": {
+      "High": 4,
+      "Medium": 9,
+      "Low": 3,
+      "Negligible": 7
+    },
+    "counts_are_scanner_matches_not_unique_vulnerabilities": true,
+    "management_issuer_registry_scan": "Blocked by registry authentication at the recorded checkpoint.",
+    "optional_diagnostic_cli": "Recorded Critical/High dependency matches require disposition; no binary is bundled.",
+    "provenance_signatures_licences_customer_pull_access": "Outstanding",
+    "security_suppressions_added": false
+  },
+  "customer_setup": {
+    "required_customer_guides": 2,
+    "default_runtime": "OpenShift",
+    "optional_local_cli_compatibility": true,
+    "private_inputs_outside_source": true,
+    "placeholder_artifacts_installable": false,
+    "independent_engineer_walkthrough_completed": false
+  },
+  "remaining_gates": [
+    "Independent engineer follows the final quickstart without undocumented assistance",
+    "Customer access to required approved external artifacts and authoritative provenance/licence records",
+    "Required security, licensing, distribution and preview-support release decisions, including unresolved optional diagnostic dependency findings"
+  ],
+  "deferred": [
+    "Keycloak production database/startup migration, customer SSO and high availability",
+    "Production certification and enterprise integrations"
+  ],
+  "not_claimed": [
+    "Entire empty-platform controller bootstrap",
+    "Separate-cluster acceptance",
+    "Disconnected installation/operation",
+    "Production certification or complete platform disaster recovery",
+    "Uninterrupted long-lived streams through renewal",
+    "External model-key rotation or live model-provider outage injection",
+    "Live vulnerability scanning, production remediation or arbitrary agent-to-agent delegation"
+  ],
+  "managed_application_certificates": {
+    "mode": "explicit_opt_in",
+    "date": "2026-10-22",
+    "controller_baseline": "cert-manager 1.20.4",
+    "issuer_boundary": "Approved namespaced evaluation CA issuer using the existing application authority; no shared controller changed.",
+    "standard_certificates": 3,
+    "requested_validity_hours": 720,
+    "renew_before_hours": 168,
+    "private_key_rotation": "Always",
+    "live_replacement_keys_verified": 3,
+    "issued_identities_usages_chain_and_key_pairs_verified": true,
+    "openshell_server_loading_verified": true,
+    "mcp_sds_renewal_without_pod_restart": true,
+    "renewed_client_credential_native_mtls_verified": true,
+    "ha_peer_rpc_exercised": false,
+    "ca_overlap_boundary": "Actual issued leaves and the deployed native binary tested with two exclusively owned candidate authorities, accepted new trust and rejected retired client trust.",
+    "whole_application_ca_rollover_rehearsed": false,
+    "unattended_ca_rollover": false,
+    "invalid_reload_and_recovery_verified": true,
+    "same_ca_migration_retained_native_binaries_and_unused_contexts": true,
+    "runtime_signing_key_read_granted": false,
+    "existing_tls_secret_uids_preserved": true,
+    "interrupted_idle_preparer_stop_reconciled_without_history_restore": true,
+    "initial_native_public_trust_volume_rollout": "Guarded idle maintenance; subsequent routine leaf renewal uses existing reload mechanisms.",
+    "platform_service_certificate_boundary": "OpenShift owns issuance; Python TLS consumers require a guarded restart and served-certificate verification.",
+    "regression_cases": [
+      {
+        "workflow": "cve",
+        "user": "analyst",
+        "workload": "triage",
+        "expected": "create",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_inference": false,
+        "project": "TEST"
+      },
+      {
+        "workflow": "cve",
+        "user": "viewer",
+        "workload": "triage",
+        "expected": "user_permission",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_inference": false,
+        "project": "TEST"
+      },
+      {
+        "workflow": "cve",
+        "user": "analyst",
+        "workload": "reader",
+        "expected": "workload_permission",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_inference": false,
+        "project": "TEST"
+      },
+      {
+        "workflow": "incident-triage",
+        "user": "analyst",
+        "workload": "triage",
+        "expected": "create",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_inference": true,
+        "project": "OPS"
+      },
+      {
+        "workflow": "service-request",
+        "user": "analyst",
+        "workload": "triage",
+        "expected": "create",
+        "passed": true,
+        "cleanup_verified": true,
+        "actual_inference": true,
+        "project": "SERVICE"
+      }
+    ],
+    "new_synthetic_issues": 3,
+    "original_deadlines_preserved": true,
+    "raw_receipts": "Private; excluded from source delivery.",
+    "post_migration_pool": {
+      "ready": 8,
+      "managed": 8,
+      "quarantined": 0,
+      "active_execution": false,
+      "preparation_in_progress": false
+    },
+    "runtime_key_access": {
+      "signing_key_denied_for_runtime_accounts": 3,
+      "serving_key_denied_for_worker_accounts": 2
+    },
+    "historical_jira_after_retirement_restart_expiry_and_reauthentication": true,
+    "shared_cluster_observation": {
+      "unrelated_new_readiness_failures": 0,
+      "unrelated_changes_observed": "One shared operator underwent an independent OLM version update; no such resources were modified by this work."
+    },
+    "post_migration_application_backup": {
+      "database_consistent_snapshots_verified": true,
+      "local_restored_copies_verified": true,
+      "live_database_restored": false,
+      "complete_platform_disaster_recovery": false
+    }
+  }
+}

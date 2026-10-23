@@ -1,0 +1,12 @@
+{
+  "certificate_management": {
+    "mode": "managed",
+    "issuer_ref": {
+      "group": "cert-manager.io",
+      "kind": "ClusterIssuer",
+      "name": "approved-application-pki"
+    },
+    "issuer_uid": "00000000-0000-0000-0000-000000000000",
+    "ca_file": "/absolute/private/demo/approved-application-ca.pem"
+  }
+}

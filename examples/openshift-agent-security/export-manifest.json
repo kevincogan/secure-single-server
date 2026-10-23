@@ -1,0 +1,1343 @@
+{
+  "schema_version": 1,
+  "scope": "Verified connected evaluation source with OpenShift-hosted orchestration and authenticated Jira history. External security/artifact/support and independent release gates remain pending. See docs/verification.json.",
+  "configuration_targets": "config/configuration-targets.json",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "54c610d3f8a83d5b78a73b87e0e8a9943fd5a012a919d43dbc601bf081eb4a92"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "c48d6a4a754c1579ba4a3cabeabe17c5526e5b712b356da678ec72afa27ceaab"
+    },
+    {
+      "path": "GETTING-STARTED.md",
+      "sha256": "43f136a9d51ae0630ac2210076b0c1c8aa51e62ee1591430b5a649a211a31b78"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "Makefile",
+      "sha256": "16b5debf8d576066f35bc2bc1eef72ba784bfaa5fd2285083a6deca07b92cc04"
+    },
+    {
+      "path": "README.md",
+      "sha256": "3c69e193f408de95ad52683ef05b63fb6a8888a010570743c0e9cd1d0dd8ca0b"
+    },
+    {
+      "path": "config/configuration-targets.json",
+      "sha256": "ae8f9b1a4ab043d0883acecbf15fd99f41da8c31cef88505df6961ff1f6106ce"
+    },
+    {
+      "path": "config/demo-contract.example.json",
+      "sha256": "a25f54a04b84e26de43e78480bfc47a862cd70f54bfbecf4cf49d73d17e2f8ad"
+    },
+    {
+      "path": "docs/examples/identity-demo-certificates.example.json",
+      "sha256": "32bceefc8ad518db4672a382552aec8b82f076c0e61faeaf31300c7a71c28ea6"
+    },
+    {
+      "path": "docs/examples/identity-demo-inference.example.json",
+      "sha256": "c70e57ca364e7e6fd78d67f75d5602ba97eef932c13cbbaf6bf8b25f02ebf797"
+    },
+    {
+      "path": "docs/examples/identity-demo-inputs.env.example",
+      "sha256": "c033bdc3fc961cda5ca24fef126eee16e40f3c385c4ebb900a6a0c59d8246e6f"
+    },
+    {
+      "path": "docs/examples/identity-demo-installation.example.json",
+      "sha256": "a820190eea8067b52ea12d71dbda8cada4e012c975dc151e0af0f8d573a64f76"
+    },
+    {
+      "path": "docs/examples/identity-demo-presentation.example.json",
+      "sha256": "8d39f3c4bbf65624498a5ff34762308ad2278b9da6718f5d334130d77fb1122b"
+    },
+    {
+      "path": "docs/examples/identity-demo-security-network.example.json",
+      "sha256": "03a7085f34e73f6b6798437d6cc7eabad501b39c76c7801640f3c09cdc4e0244"
+    },
+    {
+      "path": "docs/examples/identity-demo-source-config.example.json",
+      "sha256": "5fe27dd6f67d61a4d3c130b3d40ec11339499f6cb26567ad1e787ab1952252c2"
+    },
+    {
+      "path": "docs/examples/identity-demo-unused-retirement.example.json",
+      "sha256": "ff9658f9b50313b7b4162cc528e3d6ba3cf38d7bc3d242e1e784f35ffa1edc31"
+    },
+    {
+      "path": "docs/identity-demo-console.md",
+      "sha256": "a83ee62ab2cbf34aa0e72961b96d8a96c9ed4f30cb9cbe38156b381ed52a0da9"
+    },
+    {
+      "path": "docs/identity-demo-customer-quickstart.md",
+      "sha256": "6824d96715da108829c155814a59e258331b39e2f08c8ab076bb1c70d61fbb8d"
+    },
+    {
+      "path": "docs/identity-demo-reference.md",
+      "sha256": "96c7c042ec5f263854b09c9b2e177680fcdf54321d238b3af4a1f48f53420de3"
+    },
+    {
+      "path": "docs/verification.json",
+      "sha256": "01f5dbd7b2271fd3f4d84dcb879e250cba70d50c8c353360214ab997ed9f4213"
+    },
+    {
+      "path": "infra/identity-demo/artifacts.reference.json",
+      "sha256": "d023823ccc5c2bad27bd8be19a01d851cfbc18ec06b0430526cf40c02cb2a908"
+    },
+    {
+      "path": "infra/identity-demo/console-runtime.Containerfile",
+      "sha256": "2b508168bf3ca3a809d3b960f5fd17e1a93e10406cfa7ccbb3b5133024e6d446"
+    },
+    {
+      "path": "infra/identity-demo/console-runtime.lock.json",
+      "sha256": "d080be40c22411e4e9f186fe640b6be1cdaddf7c25edb4f8ce8ffc2d18715bed"
+    },
+    {
+      "path": "infra/identity-demo/gateway.Containerfile",
+      "sha256": "ca373184e210266ddfa46c109626902e62d4cf0f2d4f6378aa5cb3582a424205"
+    },
+    {
+      "path": "infra/identity-demo/prerequisites.lock.json",
+      "sha256": "ef2e7415275d5f4e04eb9f9ac4db28b64a6b61cc2e33faab7b6cdb98da38bbc7"
+    },
+    {
+      "path": "infra/identity-demo/security-foundation.json",
+      "sha256": "c3c4ff9f288678ae2362e403ef700632208bd46ce02cfac5676f44d57d0ac43c"
+    },
+    {
+      "path": "infra/identity-demo/supervisor.Containerfile",
+      "sha256": "4cc9e1ef49c4022ce6f09e1d91f599422dba88223de036a060a92efb710a4047"
+    },
+    {
+      "path": "infra/identity-demo/templates/application.json",
+      "sha256": "cfd48c9e1767beea0e4ad75c7d62f4dbc68c60170baf935d68c328018499a2ca"
+    },
+    {
+      "path": "infra/identity-demo/templates/exchange-realm.json",
+      "sha256": "623bb9a5afbaf0f145d9bb6d40d38ac9335acaa5629db144e454439194dd08d2"
+    },
+    {
+      "path": "infra/identity-demo/templates/initial-realm.json",
+      "sha256": "c9ee9106903b1992a39165417e5d06e4556d39928feb26f651aada9be0262253"
+    },
+    {
+      "path": "infra/identity-demo/templates/management-realm.json",
+      "sha256": "bbeef3553c6c989cd32df2363bb93fd3ec87fe4d0effd85d3ef98b22757378f3"
+    },
+    {
+      "path": "infra/openshell/native-build/Builder.Containerfile",
+      "sha256": "cb4ed5278ee4bf185db224f59039b8e0bd130498b85ac20eb39c4468e899a7c2"
+    },
+    {
+      "path": "infra/openshell/native-build/README.md",
+      "sha256": "c0b3e53b349d170fd8de9c1a908503578c30c02de4493c1779fdcf8a76c6fee9"
+    },
+    {
+      "path": "infra/openshell/native-build/build-native.sh",
+      "sha256": "a40f4be884b082951d1a3caf079aeb9ca33c4afbb89dc4fb2359219756a6628f"
+    },
+    {
+      "path": "infra/openshell/native-build/cli.lock.json",
+      "sha256": "90db82f952217a09c7a7c7914102380fbe0d6a886713d339f4d829c3e7331fa9"
+    },
+    {
+      "path": "infra/openshell/native-build/inputs.lock.json",
+      "sha256": "c1aebc8bda06c2f2a6bb70aa6a4f07b919d4da866100d8202c1f7ebd4dd83d70"
+    },
+    {
+      "path": "infra/openshell/patches/.gitattributes",
+      "sha256": "0509f82fc7f4acff50102ff99a5b7ab5aad8c638caf4973ee3fbb188eeea912d"
+    },
+    {
+      "path": "infra/openshell/patches/README.md",
+      "sha256": "1995757f3af5dc37a600c55e1a992810f7c9584c0b804b7a6f7e3ebf0f9e7cad"
+    },
+    {
+      "path": "infra/openshell/patches/v0.1.3-bounded-oauth-response.patch",
+      "sha256": "0758e2c604d20d009f6afb31fb3a880feb2fc48b32b73bf4d2d382d7d63e0c06"
+    },
+    {
+      "path": "infra/openshell/patches/v0.1.3-pilot-sender-transport.patch",
+      "sha256": "0a8dbaae04d1f0cc18eec1529418c917bda719b995edd5ff27227d536c83af64"
+    },
+    {
+      "path": "infra/openshell/patches/v0.1.3-sandbox-subject-comparison.patch",
+      "sha256": "404034b59bf7ff75e279f276020407857f37dbd170a0f6039156cbf5cc4012d3"
+    },
+    {
+      "path": "infra/openshell/patches/v0.1.3-sender-installation-domain.patch",
+      "sha256": "d4f618bd91076a2c684d7ec4da452ea266ea2e4311044aa7044da3d964a30eb7"
+    },
+    {
+      "path": "infra/openshell/patches/v0.1.3-sender-x509-feature.patch",
+      "sha256": "fcb7727b308560cf29d64277ca254336fcff792521dd4bdf4f87aa523017ed63"
+    },
+    {
+      "path": "pytest.ini",
+      "sha256": "0c547ab348fde3ed7444d05e5335b50b6dd37007ae7230dd4406e78600ea75ef"
+    },
+    {
+      "path": "scripts/check-public-safety.py",
+      "sha256": "7f1d12e2b9dc7667444edbac941dd191600c5eadb36a07e93b6e2606c151667c"
+    },
+    {
+      "path": "scripts/configure-demo.py",
+      "sha256": "512b6374c04c461866eafc0dd7ee92c49263a0fec8d84a0b5821f9fb49c914e9"
+    },
+    {
+      "path": "scripts/identity_demo/README.md",
+      "sha256": "a39240d825fa9ac6e93a0e474cbfbfa3b3bd250b452919bd9cd2b7cd9ee30a89"
+    },
+    {
+      "path": "scripts/identity_demo/certificate_operations.py",
+      "sha256": "71de2a85b33b30b9f1aa2890a7b6766a1dcb4e5a1d4e47930a5ee282a71c4a77"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_configuration.py",
+      "sha256": "348e880486380c40ea4893218a637484940aa5d28d473c696ebe278fb134174b"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_gateway.py",
+      "sha256": "5ed29f7bca457844b0410c40e108c67382d4313de57d98e1a2241583a389fe8f"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_install.py",
+      "sha256": "f1b8543c098482d45701e6e0c447e4b0c889d4290f66f27bc3807f3e05b0a1e7"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_operator.py",
+      "sha256": "558886874ed7f48d97689f408b8c4df7766d8b36a0342e1c4e8fbdffaffbcacb"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_plan.py",
+      "sha256": "41ebce0185a19fda6dfc6353b7ad5f7872152ec3cc550fa89d2f5a3a383c115b"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_public_trust.py",
+      "sha256": "ce6ade222302c66cec3947603c9ad65cdf0575071e479b6d58c4ab1bc0ac0ae8"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_realm.py",
+      "sha256": "d6915ebcbf0aca08bc7406376cb13b1f51735f55976229056cdf300d81f2fce9"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_resources.py",
+      "sha256": "d7cd043b7ba25b244be759b2c0a93e0b7651d11489c9fdaf0ca6265755f5f312"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_trust.py",
+      "sha256": "cf1c0415b7cb96b9dafb7b2a005f74ef74c18cb6302f787036c0511ad4913d35"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_console_update.py",
+      "sha256": "16d5405d16aa54d9053fc442b812706f1ff1ab92f2973a1721db17bef9165b69"
+    },
+    {
+      "path": "scripts/identity_demo/cluster_runtime_delivery.py",
+      "sha256": "9e5c793c485f18572068b747a4d8a66579c7174ad8e35cd92517fd290e19912a"
+    },
+    {
+      "path": "scripts/identity_demo/connected_install.py",
+      "sha256": "e59f3c660734bad3a6df40d2eb447a815c513f2562d20d950b2008d3a670ecf9"
+    },
+    {
+      "path": "scripts/identity_demo/console_runtime_build.py",
+      "sha256": "0b5a0122989054459c209517d47dc0532ee761e7552e9832bae608a5bb9c9722"
+    },
+    {
+      "path": "scripts/identity_demo/deployment_artifacts.py",
+      "sha256": "ebeaf69cc02ac1ea11f415992f745fd7b9201b23bf75c9b727c0578fc9bd81af"
+    },
+    {
+      "path": "scripts/identity_demo/deployment_backup.py",
+      "sha256": "c2a8b4ac2e7dca6a66b03903531e9748fa2f043fccfdbd60da8f44054114a5ac"
+    },
+    {
+      "path": "scripts/identity_demo/deployment_profile.py",
+      "sha256": "926f291dd54849ed1a4bbe85a2808638b389b9a470cd76d8884039679e4f2f36"
+    },
+    {
+      "path": "scripts/identity_demo/diagnostic_build.py",
+      "sha256": "4f5612319452b129bbcc4daa3275445457204604d9a4913b9578df12e6452267"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_action_policy.py",
+      "sha256": "59b66035f8e7fc6419a8836948ead83b340b92bfabc8751034a003407ef08d11"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_adapter.py",
+      "sha256": "a690e23ed9feb86f93ee89f4c57a8e05f2a471fa348b795cc5e5ac26d5ddbbe9"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_adapter_catalog.py",
+      "sha256": "132155f2b699b8cc19684f8fcabd07fb4485b7099c526fc599837f67554a2142"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_adapter_tls.py",
+      "sha256": "4dfdca1f274eeed2a890b576e25caa4f31757bacd76fb5ddf89cdda094643aeb"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_admission.py",
+      "sha256": "7b156e2fc5d08bfc1516835df66490df22769bc5386d3fc0ecc23c47f64fdbc0"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_backend_observation.py",
+      "sha256": "39939caf82751ef40b8d79db034f8e7e8602fa31b234474b60d5161ea9a3a416"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_capacity.py",
+      "sha256": "b3462ce4d2e0555f29851bc2fd0798f5441ed3b77de7eb4d548b36ce8520139c"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_cluster_bootstrap.py",
+      "sha256": "81a5f9effe6d33dc5af822f188e500fefd3e644f1f3458b2c68485712265b735"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_console.py",
+      "sha256": "8519a3fa687876b72a5c8cb0faf9aff4616fa03d209ea60874cbc30c4ad3968b"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_console_launch.sh",
+      "sha256": "cd721630e0777da20425263a0810ac77d15660aa4abe805cf530007c3f792681"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_console_launchd.py",
+      "sha256": "c90820a0b0505d5a494bc7bb1f03f024ca4b3a4f111d975026ef8ddd438e1ca6"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_console_preparer.py",
+      "sha256": "79ed236b3374fee4cdb38644ea56ff6288628b0bd294a85f4a74168cae6d5983"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_console_store.py",
+      "sha256": "273f80fd878ce6001dd584378098205e0d5e38e62e1edc530a008fdbf8bae2da"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_console_visuals.py",
+      "sha256": "3a2382ebb1b274b79a2dfd593a23249d9e39f5a443eb166ea647254358e24d8d"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_console_worker.py",
+      "sha256": "aa236ffbd54637beb6d849c9cadbd6214f96220211b380c7b7e71fec7442cc3a"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_control_transport.py",
+      "sha256": "e9dd6ad3d24158692541ea86fb6deb5fca5c1d9c79d8e401a2ecd9b201ab0e82"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_controller_identity.py",
+      "sha256": "dde2a23434c6d28e560e19a798138cda556f9f062d860e82edd3c52fdd760f87"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_discovery_registration.py",
+      "sha256": "395ed1dc8142d60f13a9fc546a0ce518c14f742631103d0ee540f58058851c7f"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_driver.py",
+      "sha256": "0b91bcad098270c204c0e9b129aadf526c9f5893174a15dc6b8ee5747c389026"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_execution_setup.py",
+      "sha256": "bd2b2387742c52f323e68ae88123158ac1df76b6116a8d4da4cc59600df428c1"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_gateway.py",
+      "sha256": "47ce57fc4f4ec54ab16997edafb349ebb3ee549f06526869aee1122841c69ba9"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_gateway_observation.py",
+      "sha256": "4b7a7cb31cab72f075b9c6788e19c837ad75e2987a607fef26715509bfc72f85"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_gateway_persistence.py",
+      "sha256": "6de16cc80bc3bc4c6614d9bafb0eaea5966782f8ef6e79599fa70056ad3db3c4"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_identity_inventory.py",
+      "sha256": "7b08db06066971a12ae16503b1f79385f59c11deafadbdea955514e853dfb6ce"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_issue_view.py",
+      "sha256": "dc26c72355c0a3094dd9da406d6522920f18300c570d1631f9a684824edba1b2"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_jira_action_adapter.py",
+      "sha256": "4578ac8ae8233164c004cfa5b00673f6b7a39b57c74a8e8edc3e84b9614d8f84"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_keycloak_recovery.py",
+      "sha256": "a3d28dc02afefd7651141a21236eaf77fed73ff47fc24007a613b11793e64c63"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_keycloak_upstream.py",
+      "sha256": "ec56b2c30f2a27a9fc9a136f9663313be2f41b32548fe198c2d23e3fef83b9cf"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_lab.py",
+      "sha256": "529f0096ecad3c0a902b68ec3b1a29005e046d08071ed8cd9c7f7a650edbb310"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_login_state.py",
+      "sha256": "1f1c2e5772bb716f1b8c1a6347c29896e6084051d222cd3ed43db4a7e6e5ddd0"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_management_profile.py",
+      "sha256": "b977254056ec191b89e35001a3bf36acc56597b16d42ac54deae29b1de300b89"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_management_session.py",
+      "sha256": "db8b3ac0e72fd1617b910dcfa180ce2f2003895d1cc231b309e12489a17fbc36"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_oauth.py",
+      "sha256": "376bf3b1547ee41f4f158fbf83144e05b2f1d93305fa1c37318b89f26c7a0981"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_offline_inventory.py",
+      "sha256": "209dd09a8b3582bd8aa6c87ab623c92fff04607f84dc8427805f68cf205ea530"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_operator_access.py",
+      "sha256": "e1758e1ba7d11e6deead1385dca481835769aa58056006b39f7b80f3afca6601"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_presentation.py",
+      "sha256": "cd016370211dff3def4241cde49338902a47e1585ce59ced81848e8bae14703b"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_public_trust.py",
+      "sha256": "279acd024803d458964161e8775688913a7d65c147bc625358c3b32e1d61ace6"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_realm_access.py",
+      "sha256": "802c976109aac72f1272913600b728e2826d5d7d978f8fa481a0133c70172faa"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_run_store.py",
+      "sha256": "a77351109357510c8cb73e4d171a0198eb3df33fb67e884da66234c45c9150d7"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_runtime.py",
+      "sha256": "8b85b24eef0f1615997bf6fd453eecbedb72e09675aa2b9b300e0e3c6aa1ebac"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_runtime_candidate.py",
+      "sha256": "4083000235af622645dfa6a9d61107a0dae14f45e9c0392c692fa8295d2c4721"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_runtime_cli.py",
+      "sha256": "1222398b80f767bb039ae4bf70b84f745c1f6837024c0c9edd58d87676f8fd53"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_runtime_grants.py",
+      "sha256": "23c6cac9241f3cf56df463f6bb992e55e847e837ed56725a854e5dc7b4a4320d"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_runtime_install.py",
+      "sha256": "96a27e6467ddd67c7ef5455e469c8698cd7f41ffd2d121875ccc9640647334c9"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_sender_trust.py",
+      "sha256": "19c7d84362762de445d2d17dd7050a4f63d94ff5ed031604d38258beeb5afc20"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_setup.py",
+      "sha256": "c29818f447234d4db5a3f748dd6ba564914b0c476f43633aac2dbf2b4709fba4"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_spire_network.py",
+      "sha256": "c9f7841329ec467368f8bf9d4228bbfa06b36f43480a61c3c7042afd9a775f9a"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_spire_registration.py",
+      "sha256": "a56ffd70c9d4aa00e261da9a1409390f0d3c4499bdb003397ecc5bcee134d175"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_step4_isolation.py",
+      "sha256": "d11273a206fffd5ff0b6ee464183b64263fd67af834189b7ed6b892ad0325597"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_warm_pool.py",
+      "sha256": "7fefcbe143e8223fda05da107d321fa1ddef3bdc3e53ee8ff162d4191c56b142"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_worker_lease.py",
+      "sha256": "968db4600b02c1377e6a13b2303ef13eb495f9dcf324863d385e9fe995730682"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_workspace_retention.py",
+      "sha256": "4844f3c84577396834db2a63d453740350e512e479cb6c485c1c93a1f6df614e"
+    },
+    {
+      "path": "scripts/identity_demo/identity_demo_workspaces.py",
+      "sha256": "c4b9a743918fc62359b2ce5eacf968fd426c9d5db38fed47caeaa29c14ee919c"
+    },
+    {
+      "path": "scripts/identity_demo/managed_certificates.py",
+      "sha256": "63b45a0ead3113c1e5790630f2f276e132e65eba2aa641c6f0b2960663f6ad08"
+    },
+    {
+      "path": "scripts/identity_demo/native_build.py",
+      "sha256": "a96c0759feee2b18940cb731bf6155da650636439bba50c1891ff9b682a1b70a"
+    },
+    {
+      "path": "scripts/identity_demo/native_publication.py",
+      "sha256": "660d56f6f63905065094654f633647d63515f2a3674372e5b04e34ed5ecc1084"
+    },
+    {
+      "path": "scripts/identity_demo/runtime_delivery.py",
+      "sha256": "4ae5b6d20fbe8980daf3779cd93d349b0132579e1c2f9fb10cd2b34575256927"
+    },
+    {
+      "path": "scripts/identity_demo/security_setup.py",
+      "sha256": "9b647bd46c682893f8e2a46e524558f398231dfb663b6a713cd113e3691ce755"
+    },
+    {
+      "path": "scripts/identity_demo/source_render.py",
+      "sha256": "61cdd36eb7de756cb1072d341dcf503ba97b2f4144b3bfba38c0dd0cbf6e1520"
+    },
+    {
+      "path": "scripts/identity_demo/unused_context_retirement.py",
+      "sha256": "044389f42d3055cd42b6ddd1d2375e737ec476a50aa437202efe00b150fb6751"
+    },
+    {
+      "path": "scripts/verify-source.py",
+      "sha256": "d845ec50c88feef3fcfb9e564a34370cc31f1545d714a1a4373d1b8a41f27ad3"
+    },
+    {
+      "path": "tests/export/test_cluster_console_plan.py",
+      "sha256": "32e1266e8172992181df5ffce448229fbee1631d97eb4546119aeec13a260115"
+    },
+    {
+      "path": "tests/export/test_cluster_runtime_delivery.py",
+      "sha256": "9dcd921a476dc17fa15f5f5199334fb604471c6bbbeb51b7fb47d830d957abf2"
+    },
+    {
+      "path": "tests/export/test_compiler_cache.py",
+      "sha256": "ca95e65d63870e77efcd3b8bfef59f3d620219d53a678f064401b3683157b0cb"
+    },
+    {
+      "path": "tests/export/test_configuration.py",
+      "sha256": "51938f4341d1b07e99f8eee55339052f38eb1334e9a36ca6152821a3d603bb9d"
+    },
+    {
+      "path": "tests/export/test_connected_resume.py",
+      "sha256": "995222d81f9a16bc93230a71f2af15d751555486834a2dee23ed9c8ecbafa63e"
+    },
+    {
+      "path": "tests/export/test_native_dependency_cache.py",
+      "sha256": "40caf8422032dc7bc3ae14c661bf97b54f690ec4a47e86d471bac1670f957653"
+    },
+    {
+      "path": "tests/export/test_runtime_delivery.py",
+      "sha256": "6a0d99ac3f741e897773b447d1af5e7a6f1c220f9543ba5883d60d8683edfae6"
+    },
+    {
+      "path": "tests/export/test_security_setup.py",
+      "sha256": "3fe141a2c41b8aa817c17cd58abc4bca42bb840f4dd5beb5d1ec92777a89c85e"
+    },
+    {
+      "path": "tests/identity_demo/README.md",
+      "sha256": "78ca1e5df85f725ece155a4e670a0f925088c0cff6a61d7dd8926dd4a076407b"
+    },
+    {
+      "path": "tests/identity_demo/adapter_auth.py",
+      "sha256": "5eea557564ce8dea84840379507fe1023ee85ecae3e740f186e855e6f7d65c0c"
+    },
+    {
+      "path": "tests/identity_demo/adapter_discovery.py",
+      "sha256": "6c5b2be70501f388abaa445596d8eaf4bcc414dda099c605715b940cc40f00df"
+    },
+    {
+      "path": "tests/identity_demo/adapter_live_auth.py",
+      "sha256": "8023f4b588dc4bded28c1424a16d211438696b9fd88332224ccda370409b0ec2"
+    },
+    {
+      "path": "tests/identity_demo/adapter_reply_fault.py",
+      "sha256": "3dbe5ecdf2ad330ef6718d3ad238d9ea87f99775fcdbe526505b97279c23bd7a"
+    },
+    {
+      "path": "tests/identity_demo/agent_egress.py",
+      "sha256": "98552202686081218d144455b5fbbf8f03a15c39c1613eda0b9c741a1b5dc728"
+    },
+    {
+      "path": "tests/identity_demo/agent_runtime.py",
+      "sha256": "d560d26a75dadb8e16a52dd22e9f9849c0fa2bf93685e6b8fa539a8c5c61b865"
+    },
+    {
+      "path": "tests/identity_demo/boundary_flow.py",
+      "sha256": "ce2d171ddab63b4bbb078b0d177dc1fd4b984d21597da75e33955f56285a29a9"
+    },
+    {
+      "path": "tests/identity_demo/browser_permission_flow.py",
+      "sha256": "9960f08a48ab0b3ddf5b2871beb4e3d4e3b950d8ad50ab55d219c3dc29f7892d"
+    },
+    {
+      "path": "tests/identity_demo/capture_openshell_tui.py",
+      "sha256": "a7e68f142d78f6394c9607839ae325daac1ec70e35149b9d0beb8345142b4686"
+    },
+    {
+      "path": "tests/identity_demo/checks/__init__.py",
+      "sha256": "572e8ec299b7b1ad500250b930ef2ae715ad6be5047e9fe56bc1a2d2e0c558bb"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_action_policy.py",
+      "sha256": "68248bdd519e3ce07d1320277ce7000987c31144a3f8c87566cb5b1acbc1f3d8"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_adapter.py",
+      "sha256": "dd1dde28876c6c9c8b74d34ea6347bb18784cd74b94a7c4de14d095c33b1fd62"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_adapter_discovery.py",
+      "sha256": "d041735f4296308ff20f61780643dc43dc2407f238b2bb765dae7f0ab41d2009"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_adapter_live_verifier.py",
+      "sha256": "de3ed3b92502ca160cfe7b7ca4b11719ae60e634c2c9cc622fb9f80053489094"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_adapter_reply_fault.py",
+      "sha256": "cea27fc892d828a6af6ea4d83e2aaf7fd2fe85c752a38055292006766b2b04df"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_adapter_verifier_vectors.py",
+      "sha256": "2c4eb6ac3dc9d64dcf96323d780927724e8b63c45b8342bb7962ba9e3cc6b2f8"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_agent_egress.py",
+      "sha256": "2524929457cee5a9db9bc4dba13a093ef1078f07490f5254ee978f89c8ee0fba"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_agent_runtime.py",
+      "sha256": "db8691f095316ffc9691b5b7f55bd471f5b25491c7867c6ffed9f73c6b55f833"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_authorizer_readiness.py",
+      "sha256": "9afc57142a1704739dbb6ce768802224b3b92dfac79bf105efc7a37728b415ee"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_automatic_warm_pool.py",
+      "sha256": "b1ccd6594b5decf696fc9239b05d109a135e3a12f63541cad7b9ed292ed9d10f"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_backend_observation.py",
+      "sha256": "a5e09e8b1c5e32ce48601c4b0b68194466d42b76447362461fa742e3755370ae"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_boundary_flow.py",
+      "sha256": "e033046818358a620a7e0a4204a3898643921f9a18fa6642bbf06c0896c8b3f0"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_broker_discovery_guards.py",
+      "sha256": "53be86c5e82dae512dd0a873d61b0aa4311a10acd5b53ca6ae3ecb8d2191c8a6"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_browser_permission_flow.py",
+      "sha256": "13f5ab1496a5addd098843ca2e864461dc8a2287e75c5be4dddd095bbed3b1b1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_capacity_runtime.py",
+      "sha256": "02be9c845a8ac3d7b4da81577608b9382f0a0b100629d6122323c1d63e38352b"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_catalog_rotation_recovery.py",
+      "sha256": "78264cf7f814aeabd231efd8baebe38c95befab4493b34c19c408627f286090c"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_authorizer_readiness.py",
+      "sha256": "0b4df082b8ece55ddb096d7e3281f623eaf8f0ea0a6f1df8b8db3a6984604290"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_bootstrap.py",
+      "sha256": "ecb8efb79910f0653897d7da3fc45d0c8debb8fd9b145dbcf034e1297afd12bd"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_console_code_receipt.py",
+      "sha256": "53f3bc5d0a6a4dc22b8b9eb4a44896df66afa2f4ebe9b36b3cecd0fb12974b12"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_console_configuration.py",
+      "sha256": "36c055dedb6afde0f9fa48fe383b37bfd6cc6a803b8860ef30f275ca501f3796"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_console_operator.py",
+      "sha256": "882989c47e3b5e2dacf880061d2029b0496592e7debc541e21a02a0e37178d64"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_console_realm.py",
+      "sha256": "3d3678ae8daad4ac971f6656cc079a21603651341eab2083922f607a4333dc18"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_console_update.py",
+      "sha256": "1ea3bdba884d637c38a6045d0c1940923794a224a0d722144ffc3389cb9505db"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_gateway_observation.py",
+      "sha256": "ee6ade15504798810415c0227e7b44ef69d71e47241ad2ce7fd4c601dfb8e325"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_security_boundaries.py",
+      "sha256": "9672f6647d46c94885e051d76c83840e128d16d38fc9065114fb68e49a135be0"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_cluster_trust_maintenance.py",
+      "sha256": "ef404a59a495444e277e3ea2becb79a59233c1547bee17298688490a38b5bb73"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_components.py",
+      "sha256": "fb38c785a985922470a85958ceee2012c9cb698b1989cefe7451b9bcb413e5a5"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_concurrency_flow.py",
+      "sha256": "f4f4ed0d47962fa08524cebc23da596759213c17b8cf690dd68c0a5e811e8c8e"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_connected_install.py",
+      "sha256": "d6b7148558b50f25e45b842cdc0127634002b61c9f80eb678abe70d8584ff978"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_console.py",
+      "sha256": "47e9ca66f7471df0354fc86eea4bd1e1ae4cbe04a5506d020cad13187ffcff48"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_console_atomic_admission.py",
+      "sha256": "8340b3b6f4fe969cf705f0aa5651dda1f443aff1201ccfc775cb49a1ba0bef48"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_console_launchd.py",
+      "sha256": "ca170c78654a56341f7330bf60ef22e9b955b63b5b5a6624faf88b09b57687ac"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_console_pool.py",
+      "sha256": "30bd5ecfaf73233eb06426bdc8aee62f44c70995566b704831be2f590ca94736"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_console_preparer.py",
+      "sha256": "927c275e08fb0f61943a6526fae572f72d4c01a54716b6b882a1af8eeaa07170"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_console_visuals.py",
+      "sha256": "e44eb4c22a6dbda9fc15e68242b953fea30db5aa93542a05c1f1183ea74178f7"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_console_worker.py",
+      "sha256": "7bad394248331fa2364590b5abdae83089509f3da7d2dbd8d6b54f4962c4eac1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_controller_identity.py",
+      "sha256": "821948804ca36e71fe09eff6e2b7b27a1f98be6b81e5403c92f0c718f6e823d3"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_dependency_flow.py",
+      "sha256": "92ca21c2e27ac723c42a25783f27f5d9f86ce42e2904794cf8a857d3ef7f7d2b"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_deployment_artifacts.py",
+      "sha256": "134e2bd8c3a4553f0b633e9cfe04aa92b51212a2daf34ead8343ab412028735f"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_deployment_backup.py",
+      "sha256": "3e0d62ae109b88a9753ffc52d6d0713d62aa379773dedbf426e9db6d338d1705"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_deployment_profile.py",
+      "sha256": "00a9e8bdc3902c70243783764c540226caf962ce2f3635ee7da968d0e07e69ee"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_diagnostic_build.py",
+      "sha256": "8234fff7c442ac2a9df3a01e5e91cf2b4fa635841becdfb1e3e8db8ee07ad177"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_driver.py",
+      "sha256": "b05484912cb5d347ae0a20bd7993b667dbbcb0d9871927b75fb58aae12b4aedd"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_driver_check_selection.py",
+      "sha256": "5e20bc9d3994e6e62ae7f2008c3a9fa261e943474d27add1a429c6c81f56118a"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_driver_keys.py",
+      "sha256": "11b981f6b1e5d00ef7ebf62f9e077e5f0b9ce5165fdd2f9528c5dc7a74c8bbc8"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_driver_workflows.py",
+      "sha256": "ca9fb7d82a686d1f559627fcf83dd6dc652a31648273e76ad34de17e1de2634f"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_enmaas_flow.py",
+      "sha256": "5a2ad57bfa1bad7de4c38051b78833639a37bd7d7d4ac17bf16cf835177791b7"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_execution_context.py",
+      "sha256": "d5a56c118f5b3e03f07032f9789d2b86064957921d0122b9923400cfd287bcfe"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_execution_setup.py",
+      "sha256": "1fc1811fda5f08efcbe7ae971d4cb1d2bcf75073b20db6394bad3b01443ef863"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_gateway.py",
+      "sha256": "6c32e0c8a6e16393c6ccb5e24f00c7fe76266c323794214e86f483a7ff89430d"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_gateway_credential_route.py",
+      "sha256": "e224143602a8a53ab1afcded2db29fc40285f64bde82034454771d3e89dd3225"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_gateway_oauth.py",
+      "sha256": "ae943ab64badec7f98b91b82fdf82c897be7f1e5a6bef66366ad95ba349dc10d"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_gateway_observation.py",
+      "sha256": "5776404f2e764a32777718c5f1be156cb77a0f9a1140b4d30baafda214d3d9f1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_gateway_overview.py",
+      "sha256": "9342d9107980759cf46fe4953f8be8b3451028db255059591397f9d974654b5f"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_gateway_response_parsing.py",
+      "sha256": "e948607cde93c286ba53e0730389ee60910fd6c789eead452fa5d6e2908cb37a"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_history_efficiency.py",
+      "sha256": "4260edae8d53f9f2563e20099a03a3a5ffb1a61b2b57b171c810eaf36cedc693"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_jira_action_adapter.py",
+      "sha256": "f961661d918bd00cc2d4f5533bb513b50ec714f99c8eaa24d0ab65fe66658787"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_jira_ui_preview.py",
+      "sha256": "f8d60f9ae9012ecb87f4e488ba72126e5daf6fcbd9758ff2d0957c91fdba60a2"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_key_rotation_flow.py",
+      "sha256": "eddbc2824dc7e8d3379fe56bdd34ce52fdc6c5aea2cb2dbb5bb12a794bcef088"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_lifecycle_flow.py",
+      "sha256": "acbf33f67324b84143a2bb04fe6f6ecbdbf55ce4027960d79fb82854da46bb9a"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_managed_certificates.py",
+      "sha256": "9c124870089e1523ef5dcf8a3f23c812f79dd6df6e483220b38d4f3fff0cca24"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_management_profile.py",
+      "sha256": "0bd2724cf5533e2bd2883f16e6fe83546e6e327ad0fe117aef1d71aa9814da7e"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_management_session.py",
+      "sha256": "5a8b81e668ce15be6bb4bbfd0f680385b083604fc9fc48943d3ff05e40b1f40e"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_build.py",
+      "sha256": "44db77c729d48b4e30c2fd0c3371ee7762e37397a063b19d962fb87ec961542f"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_completion_guards.py",
+      "sha256": "c9ce63ae324b47126f309fa1dfc682aea96520d6167c1209fbc63905312bdb2c"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_grant_diagnostic.py",
+      "sha256": "4b62e5777be58de4013539c1f8656da6a25ba6d4e986877edb67e48a78974123"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_parallel.py",
+      "sha256": "4a4b4955c12f33d9c382d1214ee63903d3ba9dee61df330099101d97ba29209d"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_preflight.py",
+      "sha256": "7bb94681bd63ba8f81f4b9ff98b8e91d636ebe5062380234bef44b0d0c5c39ba"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_publication.py",
+      "sha256": "e9f093442c86683cfc2ef438f95b4c9e3f965b025ebe1c569f632224bd487029"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_read_diagnostics.py",
+      "sha256": "255f07c0c1bce0e028a24d7ec5cd6152d91f6e38658e693a421f7dc19cd58cf5"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_read_retry.py",
+      "sha256": "bd5f4c286da6c906b8dcd10ef0b494f0d5ec85c2371b4b8dbb843f4873bd2be3"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_renewal_flow.py",
+      "sha256": "bfe89803c169255e41c68f4002936a7d236a2c5c09fc12a9b8dbe59fa3fa593d"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_safe_result.py",
+      "sha256": "d45064f340ea14ce452d9f959b615e33454bfe28a0ee265b73b74cdecff572c1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_sender_trust.py",
+      "sha256": "648af5da1306a7bc0a3f2a110d6fcdcaa2532cc089852a6716d0f4ff31bd6af6"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_native_subject_boundary.py",
+      "sha256": "8ceb805009ed7136e8718746388c322efcbc421291ff814936f51f9e27c69165"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_offline_inventory.py",
+      "sha256": "b85a5a7aa1e77f6f30d12810e5abe2f4a8793006a5bbb9312aca614eb1729203"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_operator_access.py",
+      "sha256": "b91cc3c2bdda99d4e8b53e29ac400d87d80830362124a3c4158f4f613ce312dc"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_operator_transport.py",
+      "sha256": "56cef094159023079cf30e0bc6f6beb9225ada040b5de3e583b3866aaca88f30"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_ownership.py",
+      "sha256": "674ece222e701729959b1e2e82e9a4dd013bb7e8ef2bd19a87c004272234feba"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_package_presentation.py",
+      "sha256": "19baf570e8071e8d4a2b7ed262cf101cf344933d400953dd4cf54d5da1d09105"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_permission_reauthentication.py",
+      "sha256": "4b92424324be14bbf63904f74ecde0024ce4bb803997db1b0f893a94b44774e8"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_pool_retention_and_gateway.py",
+      "sha256": "8fa60dc2404c11ac5269237f15b7dabb90e3a56d46e2fba004a3d1e7fe7b1dc8"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_presentation.py",
+      "sha256": "b7f4e321f9f874ebd897c2bbb5691582e69097fe3b6dcd2f60f5a1697c266eb8"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_private_authorizer_host.py",
+      "sha256": "29383739a088a236ee1764e821652fc213e0a442a6526eb8281905c00110a859"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_private_authorizer_migration.py",
+      "sha256": "19aa86af947b3e5333da79cbcf0aa5430640a204e0eb57c18f49758d900c122e"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_projected_operator_access.py",
+      "sha256": "edc4fd3f8356961b6fe7e32d496069261be09381b0e6770597ede5f2cc6e346a"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_public_admission.py",
+      "sha256": "9d8e08786bd3d2cbc9bf4c7daa40dcdb2654714a2813dc2e7a31851bb596e815"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_public_trust.py",
+      "sha256": "3d2da155edb9b230b9d504579fc6ebde2035aff13b840c129ba5b16f4bdd13f1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_read_security_flow.py",
+      "sha256": "b6ac38812a09e3c6be6658b1011c6046a082d0403162528c142778929a63ba7f"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_reconciliation_batch.py",
+      "sha256": "6e1b7351ae23c921e3bb5173896505d5fe60cbe3a87de3efcb5346216496263f"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_remediation.py",
+      "sha256": "2fc8021ace25a39c7909e2a335a3c2301f22142b7eea66ebd794e4bfc2e6a5a5"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_retirement_cleanup.py",
+      "sha256": "0378995a9f9a55bf91e72a7beb5b8adc4760ffa5f27f89214124a99755353df7"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_review_contracts.py",
+      "sha256": "36d62ff5ef208463f4cb0beceab58d6f951ce07bbd128779923bf6b5f5837045"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_run_binding.py",
+      "sha256": "ce0833678fe579a413b667b7773c6ee1e89553cafd3340665bcbfb889fd5b193"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_run_store.py",
+      "sha256": "4ec24860646728168f2177a8fc8ed275cc1cc10db4bf3a95a8f081fe32908d60"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_runtime_candidate.py",
+      "sha256": "c877388f2dc099eddd6114f060055cf382d23df9872aa2cf71b77202e9ed1468"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_runtime_grants.py",
+      "sha256": "620223c2fae3c674f8226b1080b21459811cfc1f880bbdc1928a6a007b829670"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_runtime_install.py",
+      "sha256": "90c19e29d40a0b7b264604b036d4437a2df38bb3accf5d567ac73f90c8f085f0"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_runtime_preparation.py",
+      "sha256": "37f3014a2b940d07d08b158d65fda0cad38e09ffe265e6c7d1d9450acadb1ad1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_security_setup.py",
+      "sha256": "b4e5cc4824bc0a313c59bba64c3295b5a2195cdf4b064f0592e5a8aae495ae02"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_sender_listener.py",
+      "sha256": "867cf5c7a2c680095e52cc06c2d0f48a0bf67bd6c3667ea4ad9e6ae3d9c11936"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_sender_trust.py",
+      "sha256": "c7143e507006084e42b65f4332fde3c9a2b0e2ccbbbeea817d889e9d53119aec"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_sender_trust_reconciliation.py",
+      "sha256": "37287bb8ae773e398ecd935117ba018352dbc9bca2c609d012b165605ee69bd1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_service_request_flow.py",
+      "sha256": "1d454c332654a450d2c8cea085a4849e033a0461a5d1901cc0818812fd43fe62"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_settings_pool.py",
+      "sha256": "0f476cbe5f9c4a4dbf3c2f7503a6ec5ad0a4cef87c0beb5e5fa5c416232b0af1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_setup_package.py",
+      "sha256": "21ab075481b8ccc30421cc6d6eb446bb31a2605189b7d626e8507c324e1b0261"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_source_render.py",
+      "sha256": "19da347e3ae085adb58045522fa3259c7219d10bf6680a2601c9d1a96f07cca1"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_spiffe_exchange_preparation.py",
+      "sha256": "5033016c6806df70ef6562655a25f1437bc0c447b6416891fe070b2faf8a720e"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_spire_kubelet_reconcile.py",
+      "sha256": "013b0219ced2ba42cfd5ff5fc95a7d3bb79cec4a9bd88a25cdd35a33a30225a2"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_step4_isolation.py",
+      "sha256": "3561846d144ab7d77185705dd97006037bb47df462bbe1ae7938a0726e125ff6"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_token_exchange_preparation.py",
+      "sha256": "bee76632d5adfa0674bfcb9e533afd7048c9fff1c598776a704e3beb096956c9"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_unused_context_retirement.py",
+      "sha256": "3ace7b1887c766e12f5aef01fb001e0370796652418fd5da76a1542ef59ce1ab"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_unused_retirement_installer.py",
+      "sha256": "559ef839d04b7e97235688ff0259bd21bf9e7e0a8e8c878af7d12af5e394e042"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_upstream_issuer.py",
+      "sha256": "113c0ea5855bc1733ca237554d7f824bd3a9759099f653d85f5cbf3599f888a3"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_upstream_request_guards.py",
+      "sha256": "ae6f1c9052e3bce3372fbdf45783df04f4a0720f3894e6ae47f63202e5426109"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_user_sessions.py",
+      "sha256": "00a69b2b578134139a13b898c6d6d90948b708b67ed152565d139e463f34061a"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_worker_lease.py",
+      "sha256": "43cc2c9a0bee0071116025fee3b05cfab227750b2d8accd3b44ff4fc7eef65b8"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_workspaces.py",
+      "sha256": "08b55624304e37de6dc95fdaffb2b49047b529a782f287fa2c48d7bbe17b8ac8"
+    },
+    {
+      "path": "tests/identity_demo/concurrency_flow.py",
+      "sha256": "a2ef221b10063a6d9d257fbd84a0a1e4d72d3567b2e6a4ea19fce05075d0e643"
+    },
+    {
+      "path": "tests/identity_demo/console_browser_flow.py",
+      "sha256": "760d187450bc21937f3368d682ff7bb7a74dac724c143ebedba5317cde7c29b3"
+    },
+    {
+      "path": "tests/identity_demo/cve-runtime-policy.yaml",
+      "sha256": "f344a02f6a1b90a9e3428438f938f7776709c397c5d9cc020bb0c180faacb436"
+    },
+    {
+      "path": "tests/identity_demo/cve_runtime_fixture.py",
+      "sha256": "4b7a82ee92fdf231d9a5fd73bfd8c33f9c2d5b7ce91d1e94bc8169732016d37e"
+    },
+    {
+      "path": "tests/identity_demo/dependency_flow.py",
+      "sha256": "fe366e340dfaf75e9a99b5599f1b0a97b63e91abaede5193ee61a80c1ff848cc"
+    },
+    {
+      "path": "tests/identity_demo/enmaas_flow.py",
+      "sha256": "818f9a675393730869a36cfd0b1b37a7cab233b87015cf508d67ce8608cfa728"
+    },
+    {
+      "path": "tests/identity_demo/execution_context.py",
+      "sha256": "a111f2edf6ba413c74b7c28c54ee5e8c00cd5ecfd7103b08bc54ea5f4aa475cd"
+    },
+    {
+      "path": "tests/identity_demo/gateway_credential_route.py",
+      "sha256": "ca32aa63058a37605dde026bbaa0fd0cb0c714bce9f26fe3e49ff580ba167f38"
+    },
+    {
+      "path": "tests/identity_demo/gateway_overview.py",
+      "sha256": "339932859809e55b919815a58aacca8b44944160ab10e1699a7979013f3a1699"
+    },
+    {
+      "path": "tests/identity_demo/inspect_gateway.py",
+      "sha256": "c9fbaf6ffd7f37d43384b48f95f296dbd2bf125f95996c8f6a138b485cc14207"
+    },
+    {
+      "path": "tests/identity_demo/jira_ui_preview.py",
+      "sha256": "03c18034d12d5d21ba489774063decdf2c006c8f36fdcf36de3892efb7bbcbb0"
+    },
+    {
+      "path": "tests/identity_demo/key_rotation_flow.py",
+      "sha256": "35fb424d3417be05b76d5c07c5728651b798641ff39616b59ef56005a73fc536"
+    },
+    {
+      "path": "tests/identity_demo/lifecycle_flow.py",
+      "sha256": "699ac010c4c9d71208df2fd9e5fd115b396de2e467472ee1242a5f15d540ee31"
+    },
+    {
+      "path": "tests/identity_demo/native_audit.py",
+      "sha256": "38c44297ce0863824b3f16ec9c926cb0e572f868a1478f67ba5512c266189380"
+    },
+    {
+      "path": "tests/identity_demo/native_backend.py",
+      "sha256": "7b40adbc730c746e83e795b2b354f97d492bdf8e341ea4be00749ca1b89d23d9"
+    },
+    {
+      "path": "tests/identity_demo/native_backend_rotation.py",
+      "sha256": "c99c92ca1210106641bc437e627423fe5141e4155fb6d0b8b740633c7938d76e"
+    },
+    {
+      "path": "tests/identity_demo/native_grant_diagnostic.py",
+      "sha256": "77e2e595ae59082c57f7dc5aa2354408d66d635f4dacbcfcb90dbd439293bc11"
+    },
+    {
+      "path": "tests/identity_demo/native_key_rollover.py",
+      "sha256": "a4cff46e1d2f05a89562dad8d50451d317249a4f2b7a322a6de8918c36631cdf"
+    },
+    {
+      "path": "tests/identity_demo/native_parallel.py",
+      "sha256": "6655d5383514f85e23bfec84970a87e959330db7f396722e278b67da7e2f032a"
+    },
+    {
+      "path": "tests/identity_demo/native_read_diagnostics.py",
+      "sha256": "8502647772eff0abdefc5b1c470af132943e1b85c266a638c3ba4cf1a9d4f921"
+    },
+    {
+      "path": "tests/identity_demo/native_read_retry.py",
+      "sha256": "acf5105bf182e7bbb48e5982411344ae22d6548c46c6b847c9c745841bc8dbb6"
+    },
+    {
+      "path": "tests/identity_demo/native_renewal_flow.py",
+      "sha256": "d24c6dafd172d05c892698ade50ea39d40bad7ef81c4dfcb832bf72b2de8b4d9"
+    },
+    {
+      "path": "tests/identity_demo/native_run_lifecycle.py",
+      "sha256": "094fb871a11bd64948e33150b9321a0f93887fee2a7813a44e526c54a17a4203"
+    },
+    {
+      "path": "tests/identity_demo/native_sender_acceptance.py",
+      "sha256": "64bee18550ab6335ec05d84df5fe1ceea8c2930115ebdae931c19a0f8df6cbb0"
+    },
+    {
+      "path": "tests/identity_demo/native_subject_boundary.py",
+      "sha256": "671d5a2a76b47f6dadaf833ba874083446c2fe09da0ab2b53a229aca3b228760"
+    },
+    {
+      "path": "tests/identity_demo/package_presentation.py",
+      "sha256": "01f203eea7ecec09769063ad12fceb331d6bfc4a28c0ecba4d197c5239809f06"
+    },
+    {
+      "path": "tests/identity_demo/permission_flow.py",
+      "sha256": "9e49c0802f6ee899e9422245c8b39be64689a3563a9f09d31b10bf6bda9028e7"
+    },
+    {
+      "path": "tests/identity_demo/probe_adapter_catalog.py",
+      "sha256": "f87cb04e9f85fe540ce2d1bd55ec37676e3847ad486e59aa28adc4182d35741f"
+    },
+    {
+      "path": "tests/identity_demo/probe_adapter_tls.py",
+      "sha256": "ca92e1923f93e9059064f57419157a5b72ae2cbab3182d8fce1110a7bfd8c605"
+    },
+    {
+      "path": "tests/identity_demo/probe_body.py",
+      "sha256": "798816be50bf06b07fb30ae25b2e20f0ddf7775864d8af5e5c4e5da273a4aa23"
+    },
+    {
+      "path": "tests/identity_demo/probe_broker_discovery.py",
+      "sha256": "43f6d037bcffef1400c1a4c0a2c0698d5e297dd984e0942164e7358e3825d34e"
+    },
+    {
+      "path": "tests/identity_demo/probe_discovery.py",
+      "sha256": "bd07f66aa93ccc3f35c8208150d815e7d88ad46829a2aade4031d32479546384"
+    },
+    {
+      "path": "tests/identity_demo/probe_gateway_credential_route.py",
+      "sha256": "9d30105b860dd0d6003111ab9a85cba4dab00e0dbde05df34c27561c0e43e155"
+    },
+    {
+      "path": "tests/identity_demo/probe_gateway_denials.py",
+      "sha256": "560223ea8d2b8fad814132f1be0ba052cb7723521796b4b14143413f86e271b5"
+    },
+    {
+      "path": "tests/identity_demo/probe_keycloak_discovery.py",
+      "sha256": "9b11708ab8a4ee74051820c1163d9b092ab0c5885e3fe5ff34f76df8b1430a61"
+    },
+    {
+      "path": "tests/identity_demo/probe_keycloak_recovery.py",
+      "sha256": "68efadd736e64c286d9fe5d3fb5118ddedcafa6f4a1544baad199493bb91de29"
+    },
+    {
+      "path": "tests/identity_demo/probe_mcp.py",
+      "sha256": "cfa2edce8e0f283db0ca287bb9b2e9a8115520ab2d709d0aae54e6578d3187ee"
+    },
+    {
+      "path": "tests/identity_demo/probe_native_exchange.py",
+      "sha256": "1200f8b2277c831386e74ec3ab3da0f11bebb4e92942ef55035c838f35b6e75d"
+    },
+    {
+      "path": "tests/identity_demo/probe_native_identity.py",
+      "sha256": "038740feebdde1ab7ce6d4911f8a0e48f9783ec5d7c610681edebecc33504625"
+    },
+    {
+      "path": "tests/identity_demo/probe_native_interop.py",
+      "sha256": "68a10a65820e1eb93c8cc1e6e0d6b430d5b694dc21b76f0ebe41fc91e3509aa6"
+    },
+    {
+      "path": "tests/identity_demo/probe_network.py",
+      "sha256": "711b9553f4e73bef7529390f8221e87ad9c8484116c04340b6aaaa9c9163d741"
+    },
+    {
+      "path": "tests/identity_demo/probe_protected_adapter.py",
+      "sha256": "435d5673444cc087bd8e4fa3599594ea7fd316ddf244643328b41799279392dd"
+    },
+    {
+      "path": "tests/identity_demo/probe_runtime_management.py",
+      "sha256": "ae0c1421efdf446af359dd499ce1318fecdfa12f50a46b10f6019583f671552d"
+    },
+    {
+      "path": "tests/identity_demo/probe_spiffe_exchange.py",
+      "sha256": "43bf7a61c4daa6adb5bf0ee76855c997398817c9a3bd175bda963717a80da180"
+    },
+    {
+      "path": "tests/identity_demo/probe_token_exchange.py",
+      "sha256": "2dac6282e93282d85fe4a80a19d7ec1a37bc81f8785768d112ce99d26cf8e93f"
+    },
+    {
+      "path": "tests/identity_demo/read_security_flow.py",
+      "sha256": "d3c1c4fd2ba6f4d064d74d267f091f61061c72091d2cda10a47876cfb3583ce1"
+    },
+    {
+      "path": "tests/identity_demo/recovery_flow.py",
+      "sha256": "0ef6a9a2e8819f63caa6c4ea684bebda018395b66fd9e209a6e1d4acd6de49a8"
+    },
+    {
+      "path": "tests/identity_demo/rehearse_walkthrough.py",
+      "sha256": "6865227ae9bc5a4593e7304500865a930bd336938e98e988359d3919be5e7923"
+    },
+    {
+      "path": "tests/identity_demo/requirements-lock.txt",
+      "sha256": "a2ba2a3abd26ff2fdd86ac915543f68ec06512a4fa514d8bf6af19f8bb44b7e6"
+    },
+    {
+      "path": "tests/identity_demo/requirements-operator.txt",
+      "sha256": "f77508327cfb3fd38a6189615f2a891b25cf24bcc582eb7712d65f06d07f4b47"
+    },
+    {
+      "path": "tests/identity_demo/requirements.txt",
+      "sha256": "aeaf860b23af752952375189d94afff970c6cd182886abe955de7b5cf1e9d068"
+    },
+    {
+      "path": "tests/identity_demo/response_evidence.py",
+      "sha256": "6eb50471aeb9c4e6043c55b506adf351106e69e7777df2d65e11000f68f2f4ee"
+    },
+    {
+      "path": "tests/identity_demo/run_binding.py",
+      "sha256": "c7fa054788309397765dc027009a9b6a4ca315e59e72ecb7c15ad15ddce7a69b"
+    },
+    {
+      "path": "tests/identity_demo/sender_listener.py",
+      "sha256": "ce3a42c00be2774a0fc0400c4a9a67b3195e9e60a7cb94e45589d767760b25d9"
+    },
+    {
+      "path": "tests/identity_demo/service_request_flow.py",
+      "sha256": "89f25ba8aac97a76ae6ad65591c86c08040d43e553e4ce494d9f29d3f0c5cc3a"
+    },
+    {
+      "path": "tests/identity_demo/start_jira_fixture.py",
+      "sha256": "83fe002d0e6d10b62ed1ea178fcf7a687a26a9ca91694c19ab4810d517f47478"
+    },
+    {
+      "path": "tests/identity_demo/start_protected_adapter.py",
+      "sha256": "97dc55fadf9e6c8022c851d549aa15348b0666a9ed1b692db9b67e9f9556eded"
+    },
+    {
+      "path": "tests/identity_demo/tools/README.md",
+      "sha256": "86030a28e3d74565a7cb0bf5764727b4a1ef197c35ce9bda61968581ceb809dc"
+    },
+    {
+      "path": "tests/identity_demo/tools/inputs.lock.json",
+      "sha256": "4af33c62f3873be86538c5c9651b9215523700765eac0626917679e5a0d4d9ab"
+    },
+    {
+      "path": "tests/identity_demo/tools/read_native_projection.go",
+      "sha256": "7f565c9afcb01bdfc6ba909166793622530565ef73cd6cf83bb4d7a43b8bb674"
+    },
+    {
+      "path": "tests/identity_demo/tools/read_native_projection_test.go",
+      "sha256": "809929e4d3c29119389bd9406630db0e7f6b89ab90728264416c142866412e53"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/Dockerfile",
+      "sha256": "9da059a9d17819e57c958ababdba667d24e5ad9790bbeb2102c34f66b2f18ab1"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/Makefile",
+      "sha256": "1f79925dc39c6adb86573e03eefc620c872b4fb39800e9f8094e1b33542fb18e"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/README.md",
+      "sha256": "cf84d5b6857fad7c63b2d7285fe6c6032cb31643b0c826dc5a5b7f27a248c4ac"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/agent-config.yaml",
+      "sha256": "7aa4764f9bf92e43de2ea62846acadbf1f5de5a6bc0b0ef5d543ea6de6bea363"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/src/agent_loop.py",
+      "sha256": "c9ca415d7db461b881e590d19d6187a82b5e32864ae1819ec49bc0d0f6099a68"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/src/client.py",
+      "sha256": "8e7c59740eeba14278fc8cb05d5d0f071fada38d56a6b85065644f9b3a869c53"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/src/inference.py",
+      "sha256": "786ec35ba2f9ab99e0beb952b05dee856170ac3ed1249e4137d06e2cd9bcadbc"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/src/remediation.json",
+      "sha256": "4348f9441cb1f5193640ae8e227dbbf0385c5ab516606dca62d5919271f4592d"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/tests/test_agent_loop.py",
+      "sha256": "8431662fdc15f030145a1e07b365ba21afd00e2033f65fa079bfb077dc5a5795"
+    },
+    {
+      "path": "workloads/agents/service-request-demo/tests/test_client.py",
+      "sha256": "4526cebd39e2db4d9a610182f9f2f78eaf8b2f8ffd93c61455bdb86ebd0975aa"
+    }
+  ]
+}

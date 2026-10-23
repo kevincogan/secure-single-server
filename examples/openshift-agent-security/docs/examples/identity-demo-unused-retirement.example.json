@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "decision": "retire_verified_unused",
+  "profile": {
+    "schema_version": 1,
+    "installation_id": "demo-eval",
+    "owner": "demo-team",
+    "expected_server": "https://api.cluster.example.org:6443",
+    "core_namespace": "demo-eval-core",
+    "identity_namespace": "demo-eval-identity",
+    "triage_namespace": "demo-eval-triage",
+    "reader_namespace": "demo-eval-reader",
+    "route_domain": "apps.cluster.example.org",
+    "trust_domain": "agents.example.org",
+    "cluster_name": "evaluation-cluster",
+    "storage_class": "approved-storage"
+  },
+  "reviewed_by": "your-platform-installer-user",
+  "reservation": "replace-with-new-uuid4-hex",
+  "context": {
+    "sandbox_name": "demo-s56-reader-q1",
+    "sandbox_id": "11111111-1111-4111-8111-111111111111",
+    "role": "reader",
+    "service_account": "fixture-openshell-sandbox",
+    "registration_name": "identity-demo-step56-demo-eval-reader-q1",
+    "provider_prefix": "demo-s56-reader-q1-exchange",
+    "namespace": "demo-eval-reader",
+    "workspace": "demo-eval-reader"
+  },
+  "pool_context_sha256": "replace-with-hash-of-exact-stored-context",
+  "resources": {
+    "driver": "replace-with-driver-deployment-uid",
+    "code": "replace-with-current-immutable-code-configmap-uid",
+    "sandbox": "replace-with-native-sandbox-uid",
+    "workload": "replace-with-workload-pod-uid",
+    "supervisor": "replace-with-supervisor-pod-uid",
+    "registration": null
+  },
+  "evidence": {
+    "namespace_creation": {
+      "path": "/absolute/private/identity-demo/access-apply/setup.summary.json",
+      "sha256": "replace-with-namespace-creation-receipt-hash"
+    },
+    "backup": {
+      "path": "/absolute/private/identity-demo/backup/backup.private.json",
+      "sha256": "replace-with-backup-manifest-hash"
+    },
+    "fencing": {
+      "path": "/absolute/private/identity-demo/worker-fencing.json",
+      "sha256": "replace-with-worker-fencing-receipt-hash"
+    }
+  }
+}

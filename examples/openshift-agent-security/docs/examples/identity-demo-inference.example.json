@@ -1,0 +1,17 @@
+{
+  "chat": {
+    "base_url": "https://inference.example.test/v1",
+    "request_url": "https://inference.example.test/v1/messages",
+    "model": "approved-chat-model",
+    "http_method": "POST",
+    "credential_file": "/absolute/private/identity-demo/enmaas.key",
+    "authentication": {
+      "header_name": "x-api-key",
+      "value_source": "credential_file",
+      "credential_file_format": "raw text"
+    },
+    "ca_file": null,
+    "tls_verify": true,
+    "follow_redirects": false
+  }
+}
