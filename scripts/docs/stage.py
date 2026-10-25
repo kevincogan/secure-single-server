@@ -56,6 +56,16 @@ def markdown_files(source: Path) -> list[Path]:
     return sorted(source.rglob("*.md"))
 
 
+def static_pages() -> list[Path]:
+    """Return each scenario's rendered visual demo.
+
+    These self-contained HTML pages are published next to their scenario
+    write-up. Staging them keeps them in the MkDocs file set, so links to them
+    stay relative. The ``visual-demo.src.html`` sources are not published.
+    """
+    return sorted((ROOT / "docs/examples").glob("*/visual-demo.html"))
+
+
 def navigation_paths() -> set[str]:
     document = yaml.compose(
         (ROOT / "mkdocs.yml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader
@@ -129,6 +139,11 @@ def stage_docs(destination: Path = STAGE) -> int:
             shutil.copy2(path, target)
             staged_paths.add(relative_key)
             copied += 1
+
+    for source in static_pages():
+        target = destination / source.relative_to(ROOT)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
 
     nav_paths = navigation_paths()
     if not nav_paths.issubset(staged_paths):

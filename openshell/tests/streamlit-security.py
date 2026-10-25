@@ -251,28 +251,35 @@ class StreamlitSecurityTests(unittest.TestCase):
 
     def test_documentation_explains_where_to_run_the_demo(self):
         guide = (ROOT / "docs/examples/streamlit-security/README.md").read_text()
-        self.assertIn("dedicated RHEL 9 x86_64 Linux host", guide)
-        self.assertIn("/opt/secure-single-server", guide)
-        self.assertIn("Landlock ABI 3", guide)
-        self.assertIn("not a supported OpenShell host", guide)
-        self.assertIn("manual.md#4-choose-model-access", guide)
-        self.assertIn("model-access.md#local-openai-compatible-service", guide)
-        self.assertIn("--name streamlit-demo-openai", guide)
-        self.assertIn("--type streamlit-openai-compatible", guide)
+        normalized = " ".join(guide.split())
+        self.assertIn("dedicated RHEL 9 x86_64 Linux host", normalized)
+        self.assertIn("/opt/secure-single-server", normalized)
+        self.assertIn("Landlock ABI 3", normalized)
+        self.assertIn("not a supported OpenShell host", normalized)
+        self.assertIn("manual.md#4-choose-model-access", normalized)
+        self.assertIn(
+            "model-access.md#local-openai-compatible-service",
+            normalized,
+        )
+        self.assertIn("--name streamlit-demo-openai", normalized)
+        self.assertIn("--type streamlit-openai-compatible", normalized)
 
     def test_documentation_links_manual_setup_before_demo_commands(self):
         guide = (ROOT / "docs/examples/streamlit-security/README.md").read_text()
-        setup_link = "../../quickstarts/openshell-single-server/manual.md"
+        setup_link = "../../../openshell/docs/README.md#manual-gateway-setup-on-rhel"
         self.assertIn(setup_link, guide)
+        setup_page = setup_link.split("#", 1)[0]
         self.assertTrue(
-            (ROOT / "docs/examples/streamlit-security" / setup_link).is_file()
+            (ROOT / "docs/examples/streamlit-security" / setup_page).is_file()
         )
         self.assertLess(guide.index(setup_link), guide.index("## Run the unsafe version"))
-        self.assertIn("steps 1 and 2", guide)
-        self.assertIn("in that same Bash session", guide)
-        self.assertIn("a new shell will not have the", guide)
-        self.assertIn("does not need a harness or Praxis", guide)
-        self.assertIn("os_run openshell profile import", guide)
+        normalized = " ".join(guide.split())
+        self.assertIn("/opt/secure-single-server", normalized)
+        self.assertIn("Landlock ABI 3 or newer", normalized)
+        self.assertIn("define the `repo` and `os_run` shell helper", normalized)
+        self.assertIn("same Bash session", normalized)
+        self.assertIn("does not need a harness or Praxis", normalized)
+        self.assertIn("os_run openshell profile import", normalized)
         self.assertIn('bash "$repo/openshell/demos/streamlit-security/run-safe.sh"', guide)
         self.assertIn("rootless Podman context", guide)
 

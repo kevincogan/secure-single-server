@@ -49,6 +49,36 @@ The navigation is declared explicitly in [`mkdocs.yml`](../../mkdocs.yml).
 Add a new documentation page to the `nav` section so it appears in the site
 sidebar.
 
+Self-contained HTML pages, such as the document-exfiltration
+[visual walkthrough](../examples/document-exfiltration/visual-demo.html), are
+published from each scenario's `visual-demo.html`. The build copies every
+`docs/examples/*/visual-demo.html` next to its scenario page and MkDocs
+publishes it unchanged, so Markdown links to it stay relative. The
+`visual-demo.src.html` sources are not published. These pages are not in
+`nav`: link them from the scenario page. They use the site's Red Hat red,
+Roboto fonts, favicon, and light and dark colors, but not the Material layout.
+A header button switches the theme. The page starts in the theme you chose on
+the site. Without a site choice, it uses the theme its own button saved, then
+your operating system's theme.
+
+To add a visual demo to another scenario, use the project skill in
+[`.claude/skills/visual-demo/`](../../.claude/skills/visual-demo/SKILL.md). It
+holds the page template, the branding values, and the render and check steps.
+
+## Red Hat branding
+
+The theme uses Red Hat red (`#ee0000`, with `#a60000` and `#f56e6e` as the dark
+and light variants from the Red Hat Design System tokens) and the white fedora
+logo in the header. The theme keeps the Material default fonts. Branding assets
+live in [`overrides/`](../../overrides/), which `theme.custom_dir` in
+[`mkdocs.yml`](../../mkdocs.yml) publishes alongside the site:
+
+- `overrides/assets/images/redhat-fedora-white.svg` is the header logo.
+- `overrides/assets/images/redhat-favicon.svg` is the red fedora browser-tab
+  icon.
+- `overrides/assets/stylesheets/redhat.css` defines the brand colors for the
+  light and dark schemes.
+
 ## File and URL references
 
 Every guide should make it clear whether a named file, command, image, or URL

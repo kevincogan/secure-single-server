@@ -15,6 +15,9 @@ use_directory_urls: true
 theme:
   name: material
   language: en
+  custom_dir: overrides
+  logo: assets/images/redhat-fedora-white.svg
+  favicon: assets/images/redhat-favicon.svg
   features:
     - navigation.sections
     - navigation.top
@@ -29,15 +32,15 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: red
-      accent: red
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: red
-      accent: red
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -63,6 +66,7 @@ nav:
           - Install: docs/quickstarts/openshell-praxis/install.md
           - OpenClaw bounded tasks: docs/quickstarts/openshell-praxis/openclaw.md
           - Integration matrix: docs/quickstarts/openshell-praxis/users.md
+      - Experimental llm-d-sc semantic routing: docs/quickstarts/llm-d-sc/README.md
       - Common gateway configuration:
           - Overview: docs/quickstarts/common/README.md
           - Harness configuration: docs/quickstarts/common/harness-configuration.md
@@ -102,6 +106,9 @@ nav:
       - Compatibility matrix: docs/testing/compatibility.md
       - Validation records: bootc/VALIDATION.md
       - vLLM validation: bootc/VLLM-VALIDATION.md
+
+extra_css:
+  - assets/stylesheets/redhat.css
 
 not_in_nav: |
   bootc/README.md

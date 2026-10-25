@@ -142,6 +142,7 @@ policy_roots=(
   "${ROOT}/configs/openshell-praxis"
   "${ROOT}/configs/vllm/harness"
   "${ROOT}/configs/vllm/openclaw"
+  "${ROOT}/configs/llm-d-sc"
 )
 for policy_root in "${policy_roots[@]}"; do
   [[ -d "${policy_root}" ]] || fail "policy root missing: ${policy_root}"

@@ -1,0 +1,32 @@
+/* Red Hat brand colors from the Red Hat Design System tokens:
+   red-50 #ee0000, red-60 #a60000, red-40 #f56e6e. */
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #ee0000;
+  --md-primary-fg-color--light: #f56e6e;
+  --md-primary-fg-color--dark: #a60000;
+  --md-primary-bg-color: #fff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+}
+
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #a60000;
+  --md-accent-fg-color--transparent: rgba(166, 0, 0, 0.1);
+  --md-accent-bg-color: #fff;
+  --md-accent-bg-color--light: rgba(255, 255, 255, 0.7);
+}
+
+/* Plain #ee0000 text on the dark background is below 4.5:1 contrast, so use
+   the lighter brand red for links and accents in dark mode. */
+[data-md-color-scheme="slate"][data-md-color-primary="custom"] {
+  --md-typeset-a-color: #f56e6e;
+}
+
+[data-md-color-scheme="slate"][data-md-color-accent="custom"] {
+  --md-accent-fg-color: #f56e6e;
+  --md-accent-fg-color--transparent: rgba(245, 110, 110, 0.1);
+}
+
+.md-header__button.md-logo img {
+  height: 1.6rem;
+  width: auto;
+}

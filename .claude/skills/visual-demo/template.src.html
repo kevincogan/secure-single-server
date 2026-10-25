@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en" data-register="blueprint">
+<head>
+<title>The takeaway as a headline for this scenario</title>
+<link rel="stylesheet" href="kit.css" data-ve-kit>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTEuMzUgMTQ1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJlZCBIYXQiPjx0aXRsZT5SZWQgSGF0PC90aXRsZT48cGF0aCBmaWxsPSIjZWUwMDAwIiBkPSJNMTI3LjQ3LDgzLjQ5YzEyLjUxLDAsMzAuNjEtMi41OCwzMC42MS0xNy40NmExNCwxNCwwLDAsMC0uMzEtMy40MmwtNy40NS0zMi4zNmMtMS43Mi03LjEyLTMuMjMtMTAuMzUtMTUuNzMtMTYuNkMxMjQuODksOC42OSwxMDMuNzYuNSw5Ny41MS41LDkxLjY5LjUsOTAsOCw4My4wNiw4Yy02LjY4LDAtMTEuNjQtNS42LTE3Ljg5LTUuNi02LDAtOS45MSw0LjA5LTEyLjkzLDEyLjUsMCwwLTguNDEsMjMuNzItOS40OSwyNy4xNkE2LjQzLDYuNDMsMCwwLDAsNDIuNTMsNDRjMCw5LjIyLDM2LjMsMzkuNDUsODQuOTQsMzkuNDVNMTYwLDcyLjA3YzEuNzMsOC4xOSwxLjczLDkuMDUsMS43MywxMC4xMywwLDE0LTE1Ljc0LDIxLjc3LTM2LjQzLDIxLjc3Qzc4LjU0LDEwNCwzNy41OCw3Ni42LDM3LjU4LDU4LjQ5YTE4LjQ1LDE4LjQ1LDAsMCwxLDEuNTEtNy4zM0MyMi4yNyw1MiwuNSw1NSwuNSw3NC4yMmMwLDMxLjQ4LDc0LjU5LDcwLjI4LDEzMy42NSw3MC4yOCw0NS4yOCwwLDU2LjctMjAuNDgsNTYuNy0zNi42NSwwLTEyLjcyLTExLTI3LjE2LTMwLjgzLTM1Ljc4Ii8+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTE2MCw3Mi4wN2MxLjczLDguMTksMS43Myw5LjA1LDEuNzMsMTAuMTMsMCwxNC0xNS43NCwyMS43Ny0zNi40MywyMS43N0M3OC41NCwxMDQsMzcuNTgsNzYuNiwzNy41OCw1OC40OWExOC40NSwxOC40NSwwLDAsMSwxLjUxLTcuMzNsMy42Ni05LjA2QTYuNDMsNi40MywwLDAsMCw0Mi41Myw0NGMwLDkuMjIsMzYuMywzOS40NSw4NC45NCwzOS40NSwxMi41MSwwLDMwLjYxLTIuNTgsMzAuNjEtMTcuNDZhMTQsMTQsMCwwLDAtLjMxLTMuNDJaIi8+PC9zdmc+Cg==">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+<style>
+html:root{--font-body:Roboto,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;--font-display:Roboto,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;--font-mono:"Roboto Mono",ui-monospace,Menlo,monospace}
+html:root:not([data-site]){--bg:#fff;--surface:#f5f5f5;--text:#212121;--text-dim:#666;--border:rgba(0,0,0,.07);--border-bright:#757575;--accent:#a60000;--accent-dim:rgba(166,0,0,.1)}
+@media (prefers-color-scheme:dark){html:root:not([data-site]){--bg:#1e2029;--surface:#272935;--text:#c0c0c7;--text-dim:#8c8d95;--border:rgba(255,255,255,.08);--border-bright:#8c8d95;--accent:#f56e6e;--accent-dim:rgba(245,110,110,.1)}}
+html:root[data-site="light"]{color-scheme:light;--bg:#fff;--surface:#f5f5f5;--text:#212121;--text-dim:#666;--border:rgba(0,0,0,.07);--border-bright:#757575;--accent:#a60000;--accent-dim:rgba(166,0,0,.1);--ok:#1c7443;--warn:#776300;--risk:#b0341e;--info:#145f99}
+html:root[data-site="dark"]{color-scheme:dark;--bg:#1e2029;--surface:#272935;--text:#c0c0c7;--text-dim:#8c8d95;--border:rgba(255,255,255,.08);--border-bright:#8c8d95;--accent:#f56e6e;--accent-dim:rgba(245,110,110,.1);--ok:#6fd3a0;--warn:#e8d36a;--risk:#ff7b6b;--info:#7cc0f0}
+.site-bar .end{display:flex;align-items:center;gap:var(--s-3)}
+.theme-toggle{background:none;border:0;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;width:2.4rem;height:2.4rem;border-radius:var(--r-1)}
+.theme-toggle:hover,.theme-toggle:focus-visible{background:rgba(255,255,255,.16)}
+.theme-toggle svg{width:24px;height:24px;fill:currentColor}
+.theme-toggle .to-light{display:none}
+html[data-site="dark"] .theme-toggle .to-dark{display:none}
+html[data-site="dark"] .theme-toggle .to-light{display:block}
+.site-bar{background:#ee0000;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:var(--s-4);min-height:3rem;padding:var(--s-2) var(--s-4);font-family:var(--font-body)}
+.site-bar a{color:#fff;text-decoration:none;font-weight:500;display:flex;align-items:center;gap:var(--s-3)}
+.site-bar a:hover{text-decoration:underline}
+.site-bar img{height:1.6rem;width:auto}
+.layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:var(--s-8);align-items:start}
+nav.toc{position:sticky;top:var(--s-4)}
+nav.toc a{display:block;padding:var(--s-1) 0 var(--s-1) var(--s-2);color:var(--text-dim);text-decoration:none;font-size:var(--t-small);border-left:2px solid transparent}
+nav.toc a.on{border-left-color:var(--accent);color:var(--text)}
+@media (max-width:1000px){
+.layout{display:block}
+nav.toc{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:var(--s-5);overflow-x:auto;mask-image:linear-gradient(to right,#000 92%,transparent);margin-bottom:var(--s-4)}
+nav.toc a{white-space:nowrap;border-left:0;padding:var(--s-2) 0}
+}
+section{scroll-margin-top:76px}
+.ghost .sh{stroke-dasharray:6 5}
+.wall{stroke:var(--border-bright);stroke-dasharray:6 5;fill:none;stroke-width:1.5}
+.ms{font-family:var(--font-mono,ui-monospace,Menlo,monospace)}
+svg>.sub,svg>text.ms{fill:var(--text-dim);font-weight:400}
+svg>text.cnt{fill:var(--accent)}
+.cnt{fill:var(--accent);font-weight:700}
+.okt{fill:var(--ok)}
+.ok-e{stroke:var(--ok)}
+.risk-e{stroke:var(--risk)}
+.warn-e{stroke:var(--warn)}
+.term{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:var(--t-small);background:var(--surface);border-radius:var(--r-2);padding:var(--s-4);overflow-x:auto;white-space:pre;margin:var(--s-2) 0}
+.con{font-size:var(--t-small);color:var(--text-dim);margin:var(--s-2) 0 0}
+.note{background:var(--surface);border-radius:var(--r-2);padding:var(--s-4)}
+.note ul{margin:var(--s-2) 0 0;padding-left:1.1em}
+.note li{margin:var(--s-1) 0}
+code{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:var(--t-small)}
+</style>
+<script>
+(function(){var t=null;
+try{var p=JSON.parse(localStorage.getItem('/secure-single-server/.__palette'));var s=p&&p.color&&p.color.scheme;t=s==='slate'?'dark':s==='default'?'light':null}catch(e){}
+if(!t){try{t=localStorage.getItem('site-theme')}catch(e){}}
+if(t!=='dark'&&t!=='light')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+document.documentElement.setAttribute('data-site',t)})();
+</script>
+</head>
+<body>
+<div class="site-bar">
+<a href="../../../"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTEuMzUgMTQ1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJlZCBIYXQiPjx0aXRsZT5SZWQgSGF0PC90aXRsZT48ZGVmcz48bWFzayBpZD0iYmFuZCI+PHJlY3QgeD0iLTEwIiB5PSItMTAiIHdpZHRoPSIyMjAiIGhlaWdodD0iMTcwIiBmaWxsPSIjZmZmIi8+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTE2MCw3Mi4wN2MxLjczLDguMTksMS43Myw5LjA1LDEuNzMsMTAuMTMsMCwxNC0xNS43NCwyMS43Ny0zNi40MywyMS43N0M3OC41NCwxMDQsMzcuNTgsNzYuNiwzNy41OCw1OC40OWExOC40NSwxOC40NSwwLDAsMSwxLjUxLTcuMzNsMy42Ni05LjA2QTYuNDMsNi40MywwLDAsMCw0Mi41Myw0NGMwLDkuMjIsMzYuMywzOS40NSw4NC45NCwzOS40NSwxMi41MSwwLDMwLjYxLTIuNTgsMzAuNjEtMTcuNDZhMTQsMTQsMCwwLDAtLjMxLTMuNDJaIi8+PC9tYXNrPjwvZGVmcz48cGF0aCBmaWxsPSIjZmZmIiBtYXNrPSJ1cmwoI2JhbmQpIiBkPSJNMTI3LjQ3LDgzLjQ5YzEyLjUxLDAsMzAuNjEtMi41OCwzMC42MS0xNy40NmExNCwxNCwwLDAsMC0uMzEtMy40MmwtNy40NS0zMi4zNmMtMS43Mi03LjEyLTMuMjMtMTAuMzUtMTUuNzMtMTYuNkMxMjQuODksOC42OSwxMDMuNzYuNSw5Ny41MS41LDkxLjY5LjUsOTAsOCw4My4wNiw4Yy02LjY4LDAtMTEuNjQtNS42LTE3Ljg5LTUuNi02LDAtOS45MSw0LjA5LTEyLjkzLDEyLjUsMCwwLTguNDEsMjMuNzItOS40OSwyNy4xNkE2LjQzLDYuNDMsMCwwLDAsNDIuNTMsNDRjMCw5LjIyLDM2LjMsMzkuNDUsODQuOTQsMzkuNDVNMTYwLDcyLjA3YzEuNzMsOC4xOSwxLjczLDkuMDUsMS43MywxMC4xMywwLDE0LTE1Ljc0LDIxLjc3LTM2LjQzLDIxLjc3Qzc4LjU0LDEwNCwzNy41OCw3Ni42LDM3LjU4LDU4LjQ5YTE4LjQ1LDE4LjQ1LDAsMCwxLDEuNTEtNy4zM0MyMi4yNyw1MiwuNSw1NSwuNSw3NC4yMmMwLDMxLjQ4LDc0LjU5LDcwLjI4LDEzMy42NSw3MC4yOCw0NS4yOCwwLDU2LjctMjAuNDgsNTYuNy0zNi42NSwwLTEyLjcyLTExLTI3LjE2LTMwLjgzLTM1Ljc4Ii8+PC9zdmc+Cg==" alt="" width="34" height="26">Secure single-server AI harness</a>
+<div class="end">
+<a href="./">← Scenario write-up</a>
+<button class="theme-toggle" type="button" aria-label="Switch to dark mode"><svg class="to-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg><svg class="to-light" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg></button>
+</div>
+</div>
+<main>
+<header>
+<p class="eyebrow">Security demo · scenario name</p>
+<h1>The one sentence the reader must leave with</h1>
+<p class="lead">One sentence that frames the picture. <b>One key phrase.</b></p>
+<p class="meta">secure-single-server · OpenShell sandbox · docs/examples/scenario-name</p>
+</header>
+<figure>
+<div class="frame">
+<svg class="ve-svg" viewBox="0 0 1000 300" aria-label="The sanctioned upload reaches the results server; the attempt to reach the attacker bucket is denied at the boundary.">
+<rect class="ve-bnd" x="40" y="40" width="420" height="220"/>
+<text class="ve-bnd-t" x="56" y="64">sandbox · the execution boundary</text>
+<path class="ve-e is-hot ok-e" d="M250 130H756"/>
+<text class="ve-el" x="500" y="120" text-anchor="middle">sanctioned upload</text>
+<path class="ve-e risk-e" d="M250 170H470V226H756"/>
+<text class="ve-x" x="470" y="204" text-anchor="middle">✕</text>
+<text class="ve-el" x="612" y="217" text-anchor="middle">denied at connect()</text>
+<g class="ve-n"><rect class="sh" x="80" y="110" width="170" height="80"/><text x="165" y="146" text-anchor="middle">agent</text><text class="sub" x="165" y="166" text-anchor="middle">what runs inside</text></g>
+<g class="ve-n"><rect class="sh" x="756" y="98" width="200" height="64"/><text x="856" y="126" text-anchor="middle">results server</text><text class="sub" x="856" y="146" text-anchor="middle">same level</text></g>
+<g class="ve-n is-key"><rect class="sh" x="756" y="194" width="200" height="64"/><text x="856" y="222" text-anchor="middle">attacker bucket</text><text class="sub" x="856" y="242" text-anchor="middle">0 requests</text></g>
+</svg>
+</div>
+<figcaption><span class="fig-n">Fig. 1</span>The claim of this figure in one sentence.</figcaption>
+</figure>
+<div class="layout">
+<nav class="toc" aria-label="Sections">
+<p class="ve-label caps">Contents</p>
+<a href="#story">The story</a>
+<a href="#evidence">The evidence</a>
+</nav>
+<div>
+<section id="story">
+<p class="ve-label caps">The story</p>
+<h2>A heading that states the takeaway</h2>
+<p>One to three short sentences. Put every fact in a figure first.</p>
+</section>
+<section id="evidence">
+<p class="ve-label caps">The evidence</p>
+<h2>A heading that states the takeaway</h2>
+<p>One to three short sentences.</p>
+</section>
+<section class="sources" aria-label="Sources">
+<p class="ve-label caps">Sources</p>
+<p><code>docs/examples/scenario-name/README.md</code> — the scenario</p>
+</section>
+</div>
+</div>
+</main>
+<script>
+const links=[...document.querySelectorAll('nav.toc a')];
+const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){for(const l of links)l.classList.toggle('on',l.hash==='#'+e.target.id)}},{rootMargin:'-10% 0px -80% 0px'});
+for(const l of links){const s=document.querySelector(l.hash);if(s)io.observe(s)}
+const tb=document.querySelector('.theme-toggle');
+function setTheme(t){document.documentElement.setAttribute('data-site',t);tb.setAttribute('aria-label',t==='dark'?'Switch to light mode':'Switch to dark mode')}
+setTheme(document.documentElement.getAttribute('data-site')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+tb.addEventListener('click',()=>{const t=document.documentElement.getAttribute('data-site')==='dark'?'light':'dark';setTheme(t);try{localStorage.setItem('site-theme',t)}catch(e){}});
+</script>
+</body>
+</html>

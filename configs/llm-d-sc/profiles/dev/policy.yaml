@@ -1,0 +1,53 @@
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /lib64, /etc, /proc, /dev/urandom, /opt]
+  read_write: [/sandbox, /home, /tmp, /dev/null]
+landlock: {compatibility: best_effort}
+network_policies:
+  praxis_gateway:
+    name: praxis-gateway
+    endpoints:
+      - host: host.openshell.internal
+        port: @@PRAXIS_PORT@@
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: {method: GET, path: "@@PRAXIS_API_PREFIX@@/v1/models"}
+          - allow: {method: POST, path: "@@PRAXIS_API_PREFIX@@/v1/chat/completions"}
+    binaries: [{path: /usr/bin/node-26}, {path: /usr/local/bin/opencode}]
+  opencode_registry:
+    name: opencode-registry
+    endpoints: [{host: opencode.ai, port: 443}]
+    binaries: [{path: /usr/bin/node-26}, {path: /usr/local/bin/opencode}]
+  github_api:
+    name: github-api
+    endpoints: [{host: api.github.com, port: 443, protocol: rest, enforcement: enforce, access: read-only}]
+    binaries: [{path: /usr/bin/node-26}, {path: /usr/bin/git}]
+  github_git:
+    name: github-git
+    endpoints:
+      - host: github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: {method: GET, path: "/**"}
+          - allow: {method: HEAD, path: "/**"}
+          - allow: {method: OPTIONS, path: "/**"}
+          - allow: {method: POST, path: "/**/git-upload-pack"}
+    binaries: [{path: /usr/bin/git}]
+  npm_registry:
+    name: npm-registry
+    endpoints:
+      - host: registry.npmjs.org
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: read-only
+        allow_encoded_slash: true
+    binaries: [{path: /usr/bin/node-26}, {path: /usr/bin/npm}, {path: /usr/local/bin/opencode}]
+  models_catalog:
+    name: models-catalog
+    endpoints: [{host: models.opencode.ai, port: 443, protocol: rest, enforcement: enforce, access: read-only}]
+    binaries: [{path: /usr/local/bin/opencode}]

@@ -289,6 +289,30 @@ if args[:2] == ["sandbox", "list"]:
                 self.assertEqual(provider["npm"], "@ai-sdk/openai-compatible")
                 self.assertNotIn("options", provider["models"][model])
 
+    def test_llm_d_sc_harness_uses_catalog_template_and_strict_routes(self):
+        self.env.pop("OPENSHELL_MODEL_ID", None)
+        policy = self.create("opencode", "dev", integrated=True, config_dir="configs/llm-d-sc")
+        endpoint = policy["network_policies"]["praxis_gateway"]["endpoints"][0]
+        self.assertEqual(endpoint["port"], 18080)
+        self.assertEqual([rule["allow"] for rule in endpoint["rules"]], [
+            {"method": "GET", "path": "/v1/models"},
+            {"method": "POST", "path": "/v1/chat/completions"},
+        ])
+        self.assertNotIn("access", endpoint)
+        binaries = policy["network_policies"]["praxis_gateway"]["binaries"]
+        self.assertEqual({binary["path"] for binary in binaries},
+                         {"/usr/bin/node-26", "/usr/local/bin/opencode"})
+        provider = json.loads((self.work / "capture.provider").read_text())["provider"]["praxis"]
+        self.assertEqual(provider["options"]["baseURL"], "http://host.openshell.internal:18080/v1")
+        model = provider["models"]["Semantic-Qwen"]
+        self.assertEqual(model["name"], "Semantic-Qwen (complexity routed)")
+        self.assertEqual(model["limit"], {"context": 32768, "output": 4096})
+        self.assertTrue(model["reasoning"])
+        self.assertNotIn("interleaved", model)
+        args = json.loads((self.work / "capture.args").read_text())
+        template = json.loads((self.work / "capture.templates").read_text())[args[args.index("--template") + 1]]
+        self.assertEqual(template["labels"]["backend"], "llm-d-sc")
+
     def test_explicit_model_replaces_environment_default(self):
         self.create("opencode", "pr-queue", integrated=True, model="approved/model.v2")
         config = json.loads((self.work / "capture.provider").read_text())
@@ -334,6 +358,7 @@ if args[:2] == ["sandbox", "list"]:
         sources += [ROOT / "configs/openshell-praxis/openclaw/profiles/dev/policy.yaml"]
         sources += [ROOT / "configs/vllm/harness/profiles/dev/policy.yaml"]
         sources += [ROOT / "configs/vllm/openclaw/profiles/dev/policy.yaml"]
+        sources += [ROOT / "configs/llm-d-sc/profiles/dev/policy.yaml"]
         chat = [{"method": "GET", "path": "/v1/models"},
                 {"method": "POST", "path": "/v1/chat/completions"}]
         responses = chat + [{"method": "POST", "path": "/v1/responses"}]

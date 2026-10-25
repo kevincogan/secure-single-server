@@ -38,7 +38,7 @@ class SchemaControlsTest(unittest.TestCase):
         results = []
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(AssertionError, "policies failed"):
             schema.validate_profiles(invoke, results)
-        self.assertEqual(len(results), 22)
+        self.assertEqual(len(results), 23)
         self.assertEqual(sum(item["status"] == "failed" for item in results), 1)
 
 

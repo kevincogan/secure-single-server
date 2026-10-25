@@ -20,6 +20,10 @@ the one upload that works
   → raw document to the sanctioned results server, inside the perimeter
 ```
 
+A [visual walkthrough](visual-demo.html) draws the same story as
+figures: the ladder, the policy check, and the classification
+argument. It is published on the documentation site.
+
 This is one of three examples from the same incident family; the
 others are [API key theft](../api-key-theft/README.md) and
 [model escalation](../model-escalation/README.md).

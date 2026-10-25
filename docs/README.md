@@ -41,6 +41,7 @@ and performance guides are linked from that overview.
 | Install OpenShell and harness containers separately | [Manual single-server deployment](quickstarts/openshell-single-server/manual.md) |
 | Choose a deployment method | [Deployment methods](deployment-methods.md) |
 | Combine OpenShell with Praxis | [OpenShell + Praxis guide](quickstarts/openshell-praxis/README.md) |
+| Try content-aware CPU/GPU routing with the optional Web UI | [llm-d-sc quickstart](quickstarts/llm-d-sc/README.md) |
 | Serve users from accounts on one RHEL host | [All-in-one gateway](quickstarts/all-in-one/README.md) |
 | Connect harnesses on remote client machines | [Remote HTTPS/JWT gateway](quickstarts/remote-gateway/README.md) |
 | Try a post-deployment workflow | [Example scenarios](examples/README.md) |
@@ -60,6 +61,7 @@ and performance guides are linked from that overview.
 | OpenShell gateway | Policy-controlled execution boundary and sandbox lifecycle for every harness | [OpenShell Overview](../openshell/docs/README.md) |
 | Harness sandboxes | Coding agents packaged as digest-pinned images with four profiles: [OpenCode](../openshell/harnesses/opencode/README.md), [OpenClaw](../openshell/harnesses/openclaw/README.md) | [Single-server guide](quickstarts/openshell-single-server/README.md) |
 | Praxis | Provider credential custody, model routing, and shared token quotas | [OpenShell + Praxis guide](quickstarts/openshell-praxis/README.md), [token quota reference](quickstarts/common/token-quotas.md), [quota operations scenario](examples/praxis-quotas/README.md) |
+| llm-d-sc | Experimental semantic prompt classification for CPU/GPU routing | [llm-d-sc quickstart](quickstarts/llm-d-sc/README.md) |
 | MaaS + PriceTag | Finite API keys, USD budgets, and usage metering for the experimental single-server pilot | [Pilot overview](testing/pricetag.md), [deployment runbook](testing/aws-pricetag.md), [performance procedure](testing/pricetag-perf.md) |
 | vLLM | Private local model inference on a separate CPU or GPU server | [Private vLLM workflow](quickstarts/common/vllm.md) |
 | Valkey | Durable quota ledger for the managed gateway | [All-in-one Valkey profile](quickstarts/all-in-one/valkey.md) |
@@ -92,6 +94,8 @@ For maintainers: [build and publish standalone MaaS and PriceTag images](develop
   and [sandbox overview](https://github.com/NVIDIA/OpenShell/blob/v0.1.4/docs/how-it-works/sandboxes/overview.mdx)
 - [Praxis framework](https://github.com/praxis/praxis)
 - [Praxis experimental gateway](https://github.com/praxis-proxy/experimental)
+- [llm-d-sc semantic classifier](https://github.com/llm-d-incubation/llm-d-semantic-classifier)
+  and [Praxis filter](https://github.com/cnuland/llm-d-sc-praxis-filter)
 - [Red Hat bootc](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/using_image_mode_for_rhel_to_build_deploy_and_manage_operating_systems/index)
 - [vLLM documentation](https://docs.vllm.ai/en/latest/) and
   [CPU installation](https://docs.vllm.ai/en/v0.19.0/getting_started/installation/cpu/)

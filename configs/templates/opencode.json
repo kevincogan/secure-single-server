@@ -132,6 +132,17 @@
       "environment": {},
       "config_dir": "configs/vllm/harness",
       "model_id": "Qwen/Qwen3-8B"
+    },
+    {
+      "harness": "opencode",
+      "profile": "dev",
+      "backend": "llm-d-sc",
+      "image_variable": "ODH_OPENCODE_IMAGE",
+      "cpu": "2",
+      "memory": "4Gi",
+      "environment": {},
+      "config_dir": "configs/llm-d-sc",
+      "model_id": "Semantic-Qwen"
     }
   ]
 }

@@ -106,6 +106,9 @@ checkout when trying newer examples.
   trust boundaries, and policy qualification evidence.
 - [Praxis integration](docs/quickstarts/openshell-praxis/README.md): model
   routing, quota semantics, and the experimental harness paths.
+- [llm-d-sc semantic routing](docs/quickstarts/llm-d-sc/README.md):
+  experimental content-aware CPU/GPU routing, an optional Web UI, and a
+  split-host AWS validation scenario without OpenShift or Compose.
 - [Private vLLM inference](bootc/VLLM.md): the separate CPU or GPU server used
   by the strongest validated local-model path.
 - [Published bootc images](bootc/README.md): available OpenCode and OpenClaw

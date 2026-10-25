@@ -104,6 +104,33 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  llm-d-sc-routing:
+    name: llm-d-sc semantic routing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check offline llm-d-sc contracts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
+          python3 -B tests/llm-d-sc/unit.py
+      - name: Exercise semantic routing without OpenShift or Compose
+        env:
+          CONTAINER_ENGINE: docker
+          TEST_EVIDENCE_DIR: evidence/llm-d-sc
+        run: python3 tests/llm-d-sc/integration.py
+      - name: Upload redacted routing evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: llm-d-sc-routing
+          path: evidence/llm-d-sc/*.json
+          if-no-files-found: warn
+          retention-days: 7
+
   # Executable/configuration contracts run without a sandbox gateway.
   # The manual disposable-RHEL runtime lane remains separate.
   openshell-regressions:

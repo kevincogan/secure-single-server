@@ -80,8 +80,8 @@ elif a[0]=='get':
         second=self.run_tool('sync'); self.assertEqual(second.returncode,0,second.stderr)
         self.assertEqual(first.stdout,second.stdout)
         records=json.loads(self.state.read_text())
-        self.assertEqual(len(records),24)
-        self.assertEqual(len([call for call in self.calls() if call[0]=='create']),24)
+        self.assertEqual(len(records),25)
+        self.assertEqual(len([call for call in self.calls() if call[0]=='create']),25)
         self.assertTrue(any('--page-token' in call for call in self.calls()))
         for record in records.values():
             self.assertLessEqual(len(record['name']),19)

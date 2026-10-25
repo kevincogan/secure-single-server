@@ -10,3 +10,4 @@ __pycache__/
 .playwright-cli/
 .worktrees/
 .DS_Store
+docs/examples/*/visual-demo.sheet*.png

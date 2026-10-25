@@ -28,6 +28,26 @@ class StageTests(unittest.TestCase):
         self.assertNotIn("docs/testing/aws.md", staged_paths)
         self.assertNotIn("docs/testing/rhel-real.md", staged_paths)
 
+    def test_published_static_pages_are_staged(self):
+        destination = stage.STAGE / "test-static-stage"
+        try:
+            stage.stage_docs(destination)
+            staged_paths = {
+                path.relative_to(destination).as_posix()
+                for path in destination.rglob("*.html")
+            }
+        finally:
+            shutil.rmtree(destination)
+
+        self.assertIn(
+            "docs/examples/document-exfiltration/visual-demo.html",
+            staged_paths,
+        )
+        self.assertTrue(
+            all(path.endswith("/visual-demo.html") for path in staged_paths),
+            staged_paths,
+        )
+
     def test_roadmap_is_not_staged(self):
         destination = stage.STAGE / "test-roadmap-stage"
         try:

@@ -1,0 +1,6 @@
+{
+  "inference": "gpu",
+  "arch": "amd64",
+  "instance_type": "g6.8xlarge",
+  "volume_gib": 300
+}
