@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -26,18 +27,42 @@ class Stages:
 
     def run(self, name: str, script: str, words: list[str], *,
             allow_failure: bool = False, create_output: bool = False,
-            summary_name: str = "setup.summary.json") -> tuple[dict, Path]:
+            summary_name: str = "setup.summary.json", timeout: int = 1800) -> tuple[dict, Path]:
         """Run one existing helper with argv paths, withholding all raw output."""
         out = self.args.output_dir / name
         log = self.args.output_dir / (name + ".private.log")
         setup.write(self.args.output_dir / (name + ".pending.json"), {"stage": name})
-        command = [sys.executable, str(setup.ROOT / script), *words]
+        source_root = getattr(self.args, 'stage_root', setup.ROOT)
+        command = [sys.executable, str(source_root / script), *words]
         if create_output:
             out.mkdir(mode=0o700)
         with log.open("x") as stream:
             os.chmod(log, 0o600)
-            result = subprocess.run(command, cwd=setup.ROOT, env=self.env,
-                                    stdout=stream, stderr=subprocess.STDOUT, timeout=1800)
+            fence=getattr(self.args,'stage_fence',None)
+            if fence is None:
+                result = subprocess.run(command, cwd=source_root, env=self.env,
+                                        stdout=stream, stderr=subprocess.STDOUT, timeout=timeout)
+            else:
+                # Only the installer parent owns/renews the lease. It fences the
+                # entire helper group on loss; pending writes remain uncertain.
+                fence()
+                process=subprocess.Popen(command,cwd=source_root,env=self.env,stdout=stream,
+                    stderr=subprocess.STDOUT,start_new_session=True)
+                deadline=time.monotonic()+timeout
+                try:
+                    while process.poll() is None:
+                        fence()
+                        if time.monotonic()>=deadline:raise TimeoutError('Installer stage deadline reached')
+                        time.sleep(.5)
+                    fence()
+                except BaseException:
+                    if process.poll() is None:
+                        os.killpg(process.pid,signal.SIGTERM)
+                        try:process.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            os.killpg(process.pid,signal.SIGKILL);process.wait(timeout=5)
+                    raise
+                result=subprocess.CompletedProcess(command,process.returncode)
         setup.write(self.args.output_dir / (name + ".receipt.json"), {
             "stage": name, "exit": result.returncode, "log_sha256": setup.sha(log)})
         if result.returncode and not allow_failure:
@@ -95,8 +120,11 @@ def wait_controllers(args: argparse.Namespace, objects: list[dict]) -> None:
                 raise ValueError("Installed controller disappeared")
             setup.owned(current, args.profile)
             status = current.get("status", {})
+            replicas = current["spec"].get("replicas", 1)
             if (status.get("observedGeneration", 0) < current["metadata"].get("generation", 1)
-                    or status.get("readyReplicas", 0) < current["spec"].get("replicas", 1)):
+                    or status.get("readyReplicas", 0) < replicas
+                    or (current["kind"] == "Deployment"
+                        and status.get("updatedReplicas", 0) < replicas)):
                 pending.append(current["metadata"]["name"])
         if not pending:
             return
@@ -138,13 +166,15 @@ def connected_install(args: argparse.Namespace) -> dict:
     config_path = setup.private_file(args.installation_config)
     profile, _, _, _ = load_inputs(config_path)
     args.profile = profile
+    if getattr(args, 'activate_cluster_runtime', False):
+        cluster_runtime_inputs(args)
     if (args.expected_server != profile.expected_server
             or not isinstance(args.readiness_timeout, int)
             or not 30 <= args.readiness_timeout <= 1800):
         raise ValueError("Exact server and bounded readiness timeout required")
-    if not isinstance(args.installer_user, str) or args.installer_user in (
-            "admin", "kubeadmin", "cluster-admin"):
-        raise ValueError("Explicit non-admin installer user required")
+    setup.installer_subject(args, profile)
+    identity_args = (['--installer-service-account',args.installer_service_account]
+                     if getattr(args,'installer_service_account',None) else ['--installer-user',args.installer_user])
     setup.private_file(args.kubeconfig)
     cli = None
     if args.apply or getattr(args, "resume_installation", None):
@@ -158,6 +188,8 @@ def connected_install(args: argparse.Namespace) -> dict:
     # Never allow an inherited lab profile to redirect a customer installation.
     env.pop("IDENTITY_DEMO_CONFIG", None)
     env.pop("IDENTITY_DEMO_ARTIFACTS", None)
+    if getattr(args, 'activate_cluster_runtime', False):
+        env['IDENTITY_DEMO_REGISTRATION_MODE'] = 'controller'
     env["PYTHONPATH"] = os.pathsep.join(str(setup.ROOT / p) for p in (
         "scripts/identity_demo", "tests/identity_demo"))
     if inference_path:
@@ -172,6 +204,11 @@ def connected_install(args: argparse.Namespace) -> dict:
     stages = Stages(args, env)
     common = ["--kubeconfig", args.kubeconfig, "--expected-server", args.expected_server,
               "--oc", args.oc]
+    if getattr(args, 'administrator_receipt', None):
+        common += ['--administrator-receipt', args.administrator_receipt,
+                   '--administrator-receipt-sha256', args.administrator_receipt_sha256]
+    if getattr(args,'installer_service_account',None):
+        common += ['--installer-service-account',args.installer_service_account]
     installer = "scripts/identity_demo/identity_demo_setup.py"
 
     def run(name: str, action: str, extra: list[str], *, allow_failure: bool = False) -> tuple[dict, Path]:
@@ -179,7 +216,12 @@ def connected_install(args: argparse.Namespace) -> dict:
                           "--output-dir", str(args.output_dir / name)], allow_failure=allow_failure)
 
     if getattr(args, "resume_installation", None):
-        return resume_discovery(args, env, stages, run, config_path, cli, inference_path)
+        result = resume_discovery(args, env, stages, run, config_path, cli, inference_path)
+        if getattr(args, 'activate_cluster_runtime', False) and args.apply:
+            handoff = read_json(args.output_dir/'operator-paths.private.json')
+            return activate_cluster_services(args, env, stages, Path(handoff['profile']).parent,
+                                             cli, inference_path, result)
+        return result
     run("01-preflight", "preflight", ["--installation-config", str(config_path)])
     config_path = resolve_ingress(args, config_path)
     _, rendered = run("02-render", "render", ["--installation-config", str(config_path),
@@ -195,13 +237,13 @@ def connected_install(args: argparse.Namespace) -> dict:
     env["IDENTITY_DEMO_CONFIG"] = str(rendered / "installation-profile.json")
     env["IDENTITY_DEMO_ARTIFACTS"] = str(setup.private_file(read_json(config_path)["artifacts_file"]))
     pinned = ["--bundle", str(bundle_path), "--bundle-sha256", setup.sha(bundle_path)]
-    run("03-access-plan", "prepare-access", [*pinned, "--installer-user", args.installer_user])
+    run("03-access-plan", "prepare-access", [*pinned, *identity_args])
     if not args.apply:
         planned, _ = run("04-application-plan", "plan", [*pinned, "--server-dry-run"])
         return {"ready": planned["ready_for_create"], "applied": False, "cluster_changed": False,
                 "access_preparation_required_before_admission": True,
                 "render_directory": str(rendered), "functional_scenarios_proven": False}
-    run("04-access-apply", "prepare-access", [*pinned, "--installer-user", args.installer_user, "--apply"])
+    run("04-access-apply", "prepare-access", [*pinned, *identity_args, "--apply"])
     permissions, _ = run("05-permissions", "permissions", pinned)
     if not permissions.get("ready"):
         raise ValueError("Missing application permissions")
@@ -212,8 +254,11 @@ def connected_install(args: argparse.Namespace) -> dict:
     for name, action in (("08-runtime", "runtime-permissions"), ("09-discovery", "discovery-access")):
         run(name + "-plan", action, pinned)
         run(name + "-apply", action, [*pinned, "--apply"])
-    return finish_installation(args, env, stages, run, rendered, objects, cli,
-                               suggested_presenter, inference_path)
+    result = finish_installation(args, env, stages, run, rendered, objects, cli,
+                                 suggested_presenter, inference_path)
+    if getattr(args, 'activate_cluster_runtime', False):
+        return activate_cluster_services(args, env, stages, rendered, cli, inference_path, result)
+    return result
 
 
 def finish_installation(args, env, stages, run, rendered, objects, cli,
@@ -258,9 +303,13 @@ def finish_execution_setup(args, env, stages, rendered, objects, cli,
         "--credentials-file", credentials_path,
         "--cli", str(cli), "--cli-config-dir", str(args.output_dir / "cli-config"),
         "--ca-file", str(rendered / "runtime-gateway-ca.pem")]
+    seed_mode = read_json(setup.private_file(args.installation_config)).get("fixture_seed_mode", "synthetic")
+    if seed_mode not in ("synthetic", "none"):
+        raise ValueError("Explicit synthetic or none fixture seed mode required")
+    project_options = ["--project-only"] if seed_mode == "none" else []
     for name, action, extra in (("12-workspaces", "prepare-workspaces", []),
-                               ("13-project", "provision-project", ["--project", "SERVICE"]),
-                               ("13-incident-project", "provision-project", ["--project", "OPS"])):
+                               ("13-project", "provision-project", ["--project", "SERVICE", *project_options]),
+                               ("13-incident-project", "provision-project", ["--project", "OPS", *project_options])):
         stages.run(name, "scripts/identity_demo/identity_demo_execution_setup.py",
             ["--action", action, *execution, *extra, "--apply",
              "--output-dir", str(args.output_dir / name)])
@@ -358,7 +407,7 @@ def resume_discovery(args, env, stages, run, config_path, cli, inference_path):
     args.ledger = str(ledger_path)
     args.bundle_sha256 = setup.sha(bundle_path)
     verified = setup.reconcile_creation(args, objects)  # Reads and verifies exact UIDs/fingerprints.
-    if len(verified["created"]) != sum(o["kind"] != "Namespace" for o in objects):
+    if len(verified["created"]) + len(verified.get('retained_prerequisites', [])) != sum(o["kind"] != "Namespace" for o in objects):
         raise ValueError("Incomplete or changed creation ledger")
     env["IDENTITY_DEMO_CONFIG"] = str(rendered / "installation-profile.json")
     env["IDENTITY_DEMO_ARTIFACTS"] = str(setup.private_file(read_json(config_path)["artifacts_file"]))
@@ -409,3 +458,147 @@ def resolve_ingress(args, config_path):
         'uid':service['metadata']['uid'],'namespace':'openshift-ingress','name':'router-default',
         'cluster_ip':address,'retained':True,'resource_changed':False})
     return resolved
+
+
+def activate_cluster_services(args, env, stages, rendered, cli, inference_path, application):
+    """Join existing console/gateway helpers after the application is installed.
+
+    Public prerequisite grants stay outside this operation. Each child keeps its
+    original admission, ownership, idle and exact-receipt checks. No readiness
+    claim here substitutes for subsequent workflow/security acceptance.
+    """
+    if not args.apply or application.get('application_installation_completed') is not True:
+        raise ValueError('Successful applied application installation required before worker activation')
+    if not inference_path:
+        raise ValueError('Explicit private inference configuration required for cluster operation')
+    for field in ('namespace_creation_receipt', 'namespace_creation_sha256',
+                  'runtime_publication_receipt', 'runtime_publication_sha256'):
+        if not getattr(args, field, None):
+            raise ValueError('Original namespace and completed runtime publication receipts required')
+    publication_path = setup.private_file(args.runtime_publication_receipt)
+    publication = read_json(publication_path)
+    if (setup.sha(publication_path) != args.runtime_publication_sha256
+            or publication.get('published') is not True
+            or publication.get('build_phases') != {'runtime': 'Complete'}):
+        raise ValueError('Exact completed immutable runtime publication required')
+    root = args.output_dir
+    common = ['--kubeconfig', args.kubeconfig, '--expected-server', args.expected_server, '--oc', args.oc]
+    if getattr(args, 'administrator_receipt', None):
+        common += ['--administrator-receipt', args.administrator_receipt,
+                   '--administrator-receipt-sha256', args.administrator_receipt_sha256]
+    if getattr(args,'installer_service_account',None):
+        common += ['--installer-service-account', args.installer_service_account]
+    installer = 'scripts/identity_demo/identity_demo_setup.py'
+    prerequisites = ['--installation-profile', str(rendered/'installation-profile.json'),
+        '--namespace-creation-receipt', args.namespace_creation_receipt,
+        '--namespace-creation-sha256', args.namespace_creation_sha256]
+    ledger = setup.private_file(read_json(root/'operator-paths.private.json')['creation_ledger'])
+    ledger_args = ['--ledger', str(ledger), '--console-ledger-sha256', setup.sha(ledger)]
+    credentials = rendered/'fixture-credentials.private.json'
+    certificate = (['--managed-certificate-config', args.installation_config]
+        if read_json(rendered/'stack.private.json').get('certificate_management', {}).get('mode') == 'managed' else [])
+
+    def console(name, stage, extra=()):
+        result, out = stages.run(name, installer, ['console-runtime-prepare', *common,
+            *prerequisites, '--credentials-file', str(credentials), '--console-runtime-stage', stage, *extra,
+            '--output-dir', str(root/name), '--apply'])
+        return result, out
+
+    console('20-runtime-permissions', 'permissions')
+    console('21-workload-policies', 'policies', ['--artifacts-file', env['IDENTITY_DEMO_ARTIFACTS']])
+    console('22-realm-permissions', 'realm-permissions', [*ledger_args])
+    _, configuration = console('23-console-configuration', 'configure', [*ledger_args,
+        '--bundle', str(rendered/'stack.private.json'), '--bundle-sha256', setup.sha(rendered/'stack.private.json')])
+    # Configuration replaces the driver/adapter Pods. Observe that rollout
+    # before the next helper reads durable idle state through the driver.
+    wait_controllers(args, [o for o in read_json(rendered/'stack.private.json').get('objects', [])
+        if o['kind'] == 'Deployment' and o['metadata']['name'] in (
+            'fixture-identity-driver', 'fixture-protected-adapter')])
+    # Long builds can span SPIRE CA overlap changes. Reconcile only the owned
+    # public copies while the execution lane is still closed, before observing.
+    ca_args = []
+    if certificate:
+        from managed_certificates import SPIRE_TRUST
+        records = [v for v in read_json(ledger)['created'] if v['kind'] == 'Secret'
+            and v.get('namespace') == args.profile.core_namespace
+            and v['metadata']['name'] == SPIRE_TRUST]
+        if len(records) != 1:
+            raise ValueError('Original separate public SPIRE trust identity required')
+        ca_args = ['--public-trust-ca-uid', records[0]['metadata']['uid']]
+    stages.run('23a-public-trust-reconcile', 'scripts/identity_demo/identity_demo_sender_trust.py', [
+        '--kubeconfig', args.kubeconfig, '--expected-server', args.expected_server,
+        '--namespace', args.profile.core_namespace, '--credentials-file', str(credentials),
+        *ca_args, '--output-dir', str(root/'23a-public-trust-reconcile'), '--apply'],
+        create_output=True, summary_name='sender-trust.summary.json')
+    wait_controllers(args, [o for o in read_json(rendered/'stack.private.json').get('objects', [])
+        if o['kind'] == 'Deployment' and o['metadata']['name'] == 'fixture-keycloak-upstream'])
+    _, trust = console('24-trust-observation', 'trust-observation', [*ledger_args, *certificate])
+    configuration_args = ['--console-configuration-receipt', str(configuration/'setup.summary.json'),
+        '--console-configuration-sha256', setup.sha(configuration/'setup.summary.json')]
+    _, gateway = stages.run('25-persistent-gateway', 'scripts/identity_demo/identity_demo_execution_setup.py', [
+        '--action', 'gateway-install', '--kubeconfig', args.kubeconfig,
+        '--expected-server', args.expected_server, '--credentials-file', str(credentials),
+        '--cli', str(cli), '--cli-config-dir', str(root/'cli-config'),
+        '--ca-file', str(rendered/'runtime-gateway-ca.pem'),
+        '--catalog-credential-file', str(root/'catalog-credential.private.json'),
+        '--output-dir', str(root/'25-persistent-gateway'), '--apply'])
+    _, observation = console('26-gateway-observation', 'gateway-observation', [
+        '--runtime-gateway-receipt', str(gateway/'persistent-gateway.receipt.private.json')])
+    gateway_args = ['--runtime-gateway-receipt', str(observation/'persistent-gateway.receipt.private.json')]
+    publication_args = ['--runtime-publication-receipt', str(publication_path),
+                        '--runtime-publication-sha256', args.runtime_publication_sha256]
+    _, workers = console('27-cluster-workers', 'workloads', [*certificate, *configuration_args,
+        *publication_args, *gateway_args, '--installation-config', args.installation_config,
+        '--artifacts-file', env['IDENTITY_DEMO_ARTIFACTS'],
+        '--console-management-ca', str(rendered/'runtime-gateway-ca.pem'),
+        '--console-catalog-credential', str(root/'catalog-credential.private.json'),
+        '--console-trust-observation-receipt', str(trust/'sender-trust.receipt.json'),
+        '--inference-config', inference_path])
+    wait_controllers(args, read_json(workers/'runtime-workloads.plan.private.json')['objects'])
+    worker_args = ['--console-worker-receipt', str(workers/'setup.summary.json'),
+                   '--console-worker-sha256', setup.sha(workers/'setup.summary.json')]
+    _, refreshed = console('28-public-trust-refresh', 'update-workloads', [*ledger_args,
+        *configuration_args, *worker_args, *publication_args, *gateway_args,
+        '--refresh-sender-trust', '--enable-public-trust-refresh'])
+    # Trust refresh replaces both workers. Observe the replacement Pods before
+    # their exact management-profile and lease checks authorize scheduling.
+    wait_controllers(args, read_json(workers/'runtime-workloads.plan.private.json')['objects'])
+    _, enabled = console('29-automatic-preparation', 'automatic-enable', [*configuration_args,
+        '--console-worker-receipt', str(refreshed/'setup.summary.json'),
+        '--console-worker-sha256', setup.sha(refreshed/'setup.summary.json'),
+        '--pool-mode', args.pool_mode,
+        *(['--workload-image', args.workload_image] if getattr(args, 'workload_image', None) else []),
+        *(['--pool-profile-configuration', args.pool_profile_configuration]
+          if getattr(args, 'pool_profile_configuration', None) else [])])
+    return {**application, 'cluster_runtime_activated': True, 'pool_mode': args.pool_mode,
+        'automatic_preparation_receipt': str(enabled/'setup.summary.json'),
+        'functional_scenarios_proven': False,
+        'next_action': 'Wait for verified capacity; perform browser and security acceptance before migration'}
+
+
+def cluster_runtime_inputs(args):
+    """Reject missing cluster handoff inputs before any application mutation."""
+    for name, digest_name in (
+            ('namespace_creation_receipt', 'namespace_creation_sha256'),
+            ('administrator_receipt', 'administrator_receipt_sha256'),
+            ('runtime_publication_receipt', 'runtime_publication_sha256')):
+        path, expected = getattr(args, name, None), getattr(args, digest_name, None)
+        if not path or not expected or setup.sha(setup.private_file(path)) != expected:
+            raise ValueError('Exact namespace, administrator and runtime-publication handoffs required')
+    publication = read_json(Path(args.runtime_publication_receipt))
+    image = publication.get('images', {}).get('console_runtime', '')
+    from deployment_artifacts import IMAGE_REFERENCE
+    if (publication.get('published') is not True
+            or publication.get('build_phases') != {'runtime': 'Complete'}
+            or publication.get('packaged_checks_passed') is not True
+            or not IMAGE_REFERENCE.fullmatch(image)
+            or not image.startswith('image-registry.openshift-image-registry.svc:5000/' + args.profile.core_namespace + '/')):
+        raise ValueError('Verified owned cluster runtime publication required')
+    if (getattr(args, 'pool_mode', 'legacy') == 'profiles'
+            and not getattr(args, 'pool_profile_configuration', None)
+            and (not isinstance(getattr(args, 'workload_image', None), str)
+                 or not IMAGE_REFERENCE.fullmatch(args.workload_image)
+                 or args.workload_image.endswith('0' * 64))):
+        raise ValueError('Reviewed digest-pinned workload image required for default profiles')
+    if not getattr(args, 'inference_config', None):
+        raise ValueError('Private inference configuration required for cluster operation')

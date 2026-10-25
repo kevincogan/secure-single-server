@@ -37,13 +37,14 @@ class WorkerLease:
     def __init__(self, args, role, *, client=None, monotonic=time.monotonic, now=time.time):
         from deployment_profile import active_profile
         self.profile = active_profile()
-        if role not in ('coordinator', 'preparer'):
+        names={'coordinator':'fixture-console-coordinator','preparer':'fixture-console-preparer','installer':'fixture-installer','installer-build':'fixture-installer-build-operator'}
+        if role not in names:
             raise ValueError('Exact runtime role required')
         if (not args.service_account_token_file or args.service_account_namespace != self.profile.core_namespace
-                or args.service_account_name != 'fixture-console-' + role or not args.pod_uid):
+                or args.service_account_name != names[role] or not args.pod_uid):
             raise ValueError('Pod-bound role authentication required for worker lease')
         self.token = Path(args.service_account_token_file)
-        self.name = 'fixture-console-' + role
+        self.name = names[role]
         self.path = '/apis/coordination.k8s.io/v1/namespaces/' + self.profile.core_namespace + '/leases/' + self.name
         self.holder = args.pod_uid + '/' + uuid4().hex
         self.client = client or httpx.Client(base_url=self.profile.expected_server,

@@ -89,6 +89,8 @@ def write(path: Path, value: object) -> None:
 
 def kube(args: argparse.Namespace, *words: str, value: dict | list | None = None) -> dict:
     """Keep API bodies, Secrets and failure details out of stdout/stderr."""
+    from identity_demo_worker_lease import assert_current
+    assert_current()
     result = subprocess.run([args.oc, "--kubeconfig", args.kubeconfig,
         "--request-timeout=20s", *words], input=json.dumps(value) if value else None,
         text=True, capture_output=True, timeout=45)
@@ -438,6 +440,16 @@ def get(args: argparse.Namespace, obj: dict) -> dict:
         "--ignore-not-found", "-o", "json")
 
 
+
+def retained_application_prerequisite(args, obj):
+    """Only reviewed access grants and workspace isolation may be retained."""
+    return obj["kind"] in {"ServiceAccount", "Role", "RoleBinding"} or (
+        obj["kind"] == "NetworkPolicy"
+        and obj["metadata"].get("namespace")
+            in getattr(args, "profile", LEGACY).application_namespaces[1:]
+    )
+
+
 def permissions(args: argparse.Namespace, objects: list[dict]) -> dict:
     """Check the caller's create privileges without creating application state.
 
@@ -447,6 +459,11 @@ def permissions(args: argparse.Namespace, objects: list[dict]) -> dict:
     """
     checked, denied = set(), []
     for obj in objects:
+        if (getattr(args, 'administrator_receipt', None)
+                and (obj['kind'] == 'Namespace' or retained_application_prerequisite(args, obj))):
+            current = get(args, obj)
+            if current and administrator_prepared(args, obj, current):
+                continue
         group = obj['apiVersion'].split('/')[0] if '/' in obj['apiVersion'] else ''
         resource = RESOURCES[obj['kind']].split('.')[0]
         namespace = obj['metadata'].get('namespace', '')
@@ -468,25 +485,90 @@ def permissions(args: argparse.Namespace, objects: list[dict]) -> dict:
             'admission_and_read_permissions_proven': False}
 
 
-def prepare_access(args: argparse.Namespace, objects: list[dict]) -> dict:
-    """Prepare owned namespaces and explicit caller access to application routes.
 
-    Never grants an agent access, changes an existing grant or uses admin
-    fallback. API authorization and RBAC escalation/binding checks still apply.
-    Keep these prerequisite receipts separate from application rollback.
+
+def administrator_prepared(args, desired, current):
+    """Verify a retained prerequisite against its original administrator receipt.
+
+    No application controller, data volume or Secret can be adopted this way.
+    The source contract and exact created UID/configuration must both match.
     """
-    profile = getattr(args, "profile", LEGACY)
-    user = getattr(args, "installer_user", None)
-    if (not isinstance(user, str) or not re.fullmatch(r"[A-Za-z0-9@._-]{1,128}", user)
-            or user in ("admin", "kubeadmin", "cluster-admin")):
-        raise ValueError("Explicit non-admin installer username required")
-    authenticated = kube(args, "create", "-f", "-", "-o", "json", value={
-        "apiVersion": "authentication.k8s.io/v1", "kind": "SelfSubjectReview"})
-    if authenticated.get("status", {}).get("userInfo", {}).get("username") != user:
-        raise ValueError("Authenticated installer username mismatch")
-    namespaces = [deepcopy(obj) for obj in objects if obj["kind"] == "Namespace"]
-    if {o["metadata"]["name"] for o in namespaces} != set(profile.application_namespaces):
-        raise ValueError("Exact three application namespaces required")
+    filename=getattr(args,'administrator_receipt',None)
+    expected=getattr(args,'administrator_receipt_sha256',None)
+    if not filename and not expected:return False
+    if not filename or not expected:raise ValueError('Administrator receipt and hash are both required')
+    path=private_file(filename)
+    if not expected or sha(path)!=expected:raise ValueError('Exact administrator receipt hash required')
+    from source_render import read_json
+    receipt=read_json(path)
+    profile=getattr(args,'profile',LEGACY)
+    if (receipt.get('schema_version')!=1 or receipt.get('installation_profile')!=profile.to_dict()
+            or receipt.get('expected_server')!=profile.expected_server):
+        raise ValueError('Administrator receipt belongs to another installation')
+    permitted={'Namespace','ClusterRole','ClusterRoleBinding','ClusterSPIFFEID','Role','RoleBinding',
+               'ServiceAccount','Lease','LimitRange','ResourceQuota','NetworkPolicy',
+               'ValidatingAdmissionPolicy','ValidatingAdmissionPolicyBinding'}
+    if desired['kind'] not in permitted:raise ValueError('Application state cannot be adopted as an administrator prerequisite')
+    meta=desired['metadata']
+    found=[r for r in receipt.get('created',[]) if r['object']['kind']==desired['kind']
+           and r['object']['metadata']['name']==meta['name']
+           and r['object']['metadata'].get('namespace')==meta.get('namespace')]
+    if len(found)!=1:return False
+    record=found[0]
+    owned(current,profile)
+    if (record.get('declared_fingerprint')!=fingerprint(desired)
+            or current['metadata']['uid']!=record.get('uid') or current['metadata'].get('deletionTimestamp')
+            or fingerprint(controller_projection(args,current,record['object']))!=record['fingerprint']):
+        raise ValueError('Administrator prerequisite identity or configuration changed')
+    return True
+
+def administrator_observation(args, desired):
+    """Use a recent administrator observation for one fixed shared RBAC pair.
+
+    This is installation evidence, not a live API observation. The scoped
+    installer has no shared RBAC read/write rights; runtime access and actual
+    SVID issuance must still pass acceptance before activation is accepted.
+    """
+    import time
+    from source_render import read_json
+    profile=args.profile
+    if (getattr(args,'installer_service_account',None) != profile.core_namespace+':fixture-installer'
+            or desired['metadata'].get('namespace') != profile.identity_namespace
+            or not ((desired['kind'] in ('Role','RoleBinding') and desired['metadata']['name'] == 'fixture-console-coordinator-public-trust-'+profile.installation_id)
+                or (desired['kind']=='NetworkPolicy' and desired['metadata']['name']=='identity-demo-'+profile.installation_id+'-discovery-access'))):
+        raise ValueError('Exact scoped installer shared prerequisite required')
+    path=private_file(args.administrator_receipt)
+    if sha(path)!=args.administrator_receipt_sha256:
+        raise ValueError('Exact administrator receipt required')
+    receipt=read_json(path)
+    when=receipt.get('verified_at')
+    if type(when) is not int or not -60 <= time.time()-when <= 7200:
+        raise ValueError('Reverify the administrator handoff before scoped installation')
+    rows=[v for v in receipt.get('created',[]) if v['object']['kind']==desired['kind']
+          and v['object']['metadata'].get('namespace')==profile.identity_namespace
+          and v['object']['metadata']['name']==desired['metadata']['name']]
+    if len(rows)!=1 or not administrator_prepared(args,desired,rows[0]['object']):
+        raise ValueError('Original administrator-observed shared prerequisite required')
+    return deepcopy(rows[0]['object'])
+
+
+def installer_subject(args, profile):
+    """Distinguish an explicitly selected ServiceAccount from a human login."""
+    account=getattr(args,'installer_service_account',None)
+    user=getattr(args,'installer_user',None)
+    if account is not None:
+        if (user is not None or not isinstance(account,str)
+                or account!=profile.core_namespace+':fixture-installer'):
+            raise ValueError('Exact owned installer ServiceAccount required')
+        return 'system:serviceaccount:'+account, {
+            'kind':'ServiceAccount','name':'fixture-installer','namespace':profile.core_namespace}
+    if (not isinstance(user,str) or not re.fullmatch(r'[A-Za-z0-9@._-]{1,128}',user)
+            or user in ('admin','kubeadmin','cluster-admin')):
+        raise ValueError('Explicit non-admin installer username required')
+    return user, {'apiGroup':'rbac.authorization.k8s.io','kind':'User','name':user}
+
+def installer_routing_grants(profile, objects, subject):
+    """Render only the existing exact Gateway/HTTPRoute installation grant."""
     rules = []
     for kind in ("Gateway", "HTTPRoute"):
         selected = [o for o in objects if o["kind"] == kind]
@@ -503,7 +585,27 @@ def prepare_access(args: argparse.Namespace, objects: list[dict]) -> dict:
     role = {"apiVersion": APIS["Role"], "kind": "Role", "metadata": deepcopy(meta), "rules": rules}
     binding = {"apiVersion": APIS["RoleBinding"], "kind": "RoleBinding", "metadata": deepcopy(meta),
         "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": name},
-        "subjects": [{"apiGroup": "rbac.authorization.k8s.io", "kind": "User", "name": user}]}
+        "subjects": [subject]}
+    return [role, binding]
+
+
+def prepare_access(args: argparse.Namespace, objects: list[dict]) -> dict:
+    """Prepare owned namespaces and explicit caller access to application routes.
+
+    Never grants an agent access, changes an existing grant or uses admin
+    fallback. API authorization and RBAC escalation/binding checks still apply.
+    Keep these prerequisite receipts separate from application rollback.
+    """
+    profile = getattr(args, "profile", LEGACY)
+    user, subject = installer_subject(args, profile)
+    authenticated = kube(args, "create", "-f", "-", "-o", "json", value={
+        "apiVersion": "authentication.k8s.io/v1", "kind": "SelfSubjectReview"})
+    if authenticated.get("status", {}).get("userInfo", {}).get("username") != user:
+        raise ValueError("Authenticated installer username mismatch")
+    namespaces = [deepcopy(obj) for obj in objects if obj["kind"] == "Namespace"]
+    if {o["metadata"]["name"] for o in namespaces} != set(profile.application_namespaces):
+        raise ValueError("Exact three application namespaces required")
+    role, binding = installer_routing_grants(profile, objects, subject)
     desired = validate({"schema_version": 2, "expected_server": profile.expected_server,
                        "installation_profile": profile.to_dict(), "objects": [*namespaces, role, binding]})
     inspected = []
@@ -516,6 +618,9 @@ def prepare_access(args: argparse.Namespace, objects: list[dict]) -> dict:
             fields = {"Namespace": (), "Role": ("rules",), "RoleBinding": ("roleRef", "subjects")}[obj["kind"]]
             if any(current.get(field) != obj.get(field) for field in fields):
                 raise ValueError("Installer prerequisite collision; existing grants are never rewritten")
+            if (getattr(args, 'administrator_receipt', None)
+                    and not administrator_prepared(args, obj, current)):
+                raise ValueError("Installer grant missing from original administrator receipt")
         inspected.append((obj, current))
     write(args.output_dir / "access.plan.private.json", {"objects": desired, "installer_user": user,
         "create_permission_cannot_be_resource_name_restricted": True})
@@ -562,7 +667,9 @@ def plan(args: argparse.Namespace, objects: list[dict]) -> dict:
         current = get(args, obj)
         if current:
             owned(current, getattr(args, "profile", LEGACY))
-            if obj["kind"] != "Namespace":
+            if (obj["kind"] != "Namespace" and not (
+                    retained_application_prerequisite(args, obj)
+                    and administrator_prepared(args, obj, current))):
                 collisions.append({"kind": obj["kind"], "name": obj["metadata"]["name"],
                                    "namespace": obj["metadata"].get("namespace")})
         if args.server_dry_run and not current:
@@ -613,8 +720,8 @@ def install(args: argparse.Namespace, objects: list[dict]) -> dict:
     # scopes before the first persisted write, rather than discovering a missing
     # Gateway/API grant after credentials and controllers have been created.
     # Existing owned namespaces are retained, not recreated or adopted.
-    permission_objects = [obj for obj in remaining
-                          if obj["kind"] != "Namespace" or not get(args, obj)]
+    # Existing names are exempt only after exact receipt verification in plan.
+    permission_objects = [obj for obj in remaining if not get(args, obj)]
     permission_result = permissions(args, permission_objects)
     write(args.output_dir / "installation-permissions.json", permission_result)
     if not permission_result["ready"]:
@@ -628,6 +735,7 @@ def install(args: argparse.Namespace, objects: list[dict]) -> dict:
               "installation_profile": profile.to_dict(),
               "installation_marker": marker,
               "bundle_sha256": args.bundle_sha256, "created": [], "pending": None, "completed": False}
+    ledger.setdefault('retained_prerequisites', [])
     ledger["completed"] = False
     # The ledger is updated atomically; desired Secrets never appear in it.
     def save() -> None:
@@ -638,7 +746,20 @@ def install(args: argparse.Namespace, objects: list[dict]) -> dict:
         os.replace(temporary, path)
     save()
     for obj in remaining:
-        if obj["kind"] == "Namespace" and get(args, obj):
+        current = get(args, obj)
+        if obj["kind"] == "Namespace" and current:
+            continue
+        if current:
+            # Recheck immediately before every operation; a name present during
+            # planning cannot authorize a replacement or a broader grant.
+            if not retained_application_prerequisite(args, obj) or not administrator_prepared(args, obj, current):
+                raise ValueError('Application target appeared or prerequisite identity changed')
+            record = {'kind': obj['kind'], 'namespace': obj['metadata'].get('namespace'),
+                      'name': obj['metadata']['name'], 'uid': current['metadata']['uid'],
+                      'declared_fingerprint': fingerprint(obj)}
+            if record not in ledger['retained_prerequisites']:
+                ledger['retained_prerequisites'].append(record)
+                save()
             continue
         desired = deepcopy(obj)
         if desired['kind'] in CONTROLLERS and getattr(args, 'certificate_management', {}).get('mode') == 'managed':
@@ -692,6 +813,16 @@ def reconcile_creation(args: argparse.Namespace, objects: list[dict]) -> dict:
             or not re.fullmatch(r"[a-f0-9]{32}", marker)):
         raise ValueError("Exact resumable installation ledger and bundle required")
     desired_by_id = {identity(obj, profile): obj for obj in objects}
+    for retained in ledger.get('retained_prerequisites', []):
+        key = (retained['kind'], retained.get('namespace'), retained['name'])
+        desired = desired_by_id.get(key)
+        if (desired is None or not retained_application_prerequisite(args, desired)
+                or retained.get('declared_fingerprint') != fingerprint(desired)):
+            raise ValueError('Unknown retained administrator prerequisite')
+        current = get(args, desired)
+        if (not current or current['metadata']['uid'] != retained.get('uid')
+                or not administrator_prepared(args, desired, current)):
+            raise ValueError('Retained administrator prerequisite changed')
     desired_ids = set(desired_by_id)
     seen = set()
     entries = ledger.get("created", []) + ([ledger["pending"]] if ledger.get("pending") else [])
@@ -834,6 +965,21 @@ def runtime_image_grants(profile: DeploymentProfile, objects: list[dict]) -> lis
                            'namespace': namespace} for namespace in profile.application_namespaces[1:]]}]
 
 
+def runtime_rules(profile, objects):
+    """Use the actual workspace rules; the legacy core copy is optional."""
+    workspaces = [o for o in objects if o['kind'] == 'Role'
+        and o['metadata'].get('namespace') in profile.application_namespaces[1:]
+        and o['metadata']['name'] == 'identity-demo-runtime']
+    if workspaces:
+        if (len(workspaces) != 2 or {o['metadata']['namespace'] for o in workspaces}
+                != set(profile.application_namespaces[1:]) or workspaces[0]['rules'] != workspaces[1]['rules']):
+            raise ValueError('Two exact equivalent native workspace rule sets required')
+        return deepcopy(workspaces[0]['rules'])
+    return deepcopy(next(o['rules'] for o in objects if o['kind'] == 'Role'
+        and o['metadata']['namespace'] == profile.core_namespace
+        and o['metadata']['name'] == 'fixture-openshell-sandbox'))
+
+
 def runtime_permissions(args: argparse.Namespace, objects: list[dict]) -> dict:
     """Prepare exact native runtime and optional internal-repository pull grants.
 
@@ -851,9 +997,7 @@ def runtime_permissions(args: argparse.Namespace, objects: list[dict]) -> dict:
     for kind in ('serviceaccount', 'statefulset'):
         current = kube(args, 'get', kind, 'fixture-openshell', '-n', profile.core_namespace, '-o', 'json')
         owned(current, profile)
-    rules = next(o['rules'] for o in objects if o['kind'] == 'Role'
-                 and o['metadata']['namespace'] == profile.core_namespace
-                 and o['metadata']['name'] == 'fixture-openshell-sandbox')
+    rules = runtime_rules(profile, objects)
     grants = [*desired(), *[o for o in render(rules)
                            if o['kind'] in ('ClusterRole', 'ClusterRoleBinding')]]
     if len(grants) != 4:
@@ -883,6 +1027,8 @@ def runtime_permissions(args: argparse.Namespace, objects: list[dict]) -> dict:
                     or current['metadata'].get('namespace') != grant['metadata'].get('namespace')):
                 raise ValueError('Exact runtime grant kind and scope required')
             check_existing(current, grant)
+            if getattr(args,'administrator_receipt',None) and not administrator_prepared(args,grant,current):
+                raise ValueError('Runtime grant missing from administrator creation receipt')
         inspected.append((grant, current))
     write(args.output_dir / 'runtime-permissions.plan.json', {
         'grants': grants, 'existing': [{'kind': o['kind'], 'name': o['metadata']['name'],
@@ -920,6 +1066,20 @@ def runtime_permissions(args: argparse.Namespace, objects: list[dict]) -> dict:
             'shared_foundation_modified': False}
 
 
+def discovery_policy(profile):
+    """Render one additive issuer-to-discovery attachment; no shared replacement."""
+    selector = {"app": "fixture-keycloak-upstream", "identity-demo-owner": profile.owner}
+    return {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {
+        "name": "identity-demo-" + profile.installation_id + "-discovery-access",
+        "namespace": profile.identity_namespace,
+        "labels": {**profile.labels, "identity-demo-installation": profile.installation_id}},
+        "spec": {"podSelector": {"matchLabels": {"app": "identity-demo-oidc-discovery"}},
+                 "policyTypes": ["Ingress"], "ingress": [{"from": [{
+                     "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": profile.core_namespace}},
+                     "podSelector": {"matchLabels": selector}}],
+                     "ports": [{"protocol": "TCP", "port": 8443}]}]}}
+
+
 def discovery_access(args: argparse.Namespace, objects: list[dict]) -> dict:
     """Connect an owned issuer to owned discovery with a new exact ingress rule.
 
@@ -927,6 +1087,18 @@ def discovery_access(args: argparse.Namespace, objects: list[dict]) -> dict:
     Retain separate receipts: application cleanup does not own this attachment.
     """
     profile = getattr(args, "profile", LEGACY)
+    if getattr(args,'installer_service_account',None):
+        policy=discovery_policy(profile)
+        current=administrator_observation(args,policy)
+        issuer=kube(args,'get','deployment.apps','fixture-keycloak-upstream','-n',profile.core_namespace,'-o','json')
+        owned(issuer,profile)
+        expected={'app':'fixture-keycloak-upstream','identity-demo-owner':profile.owner}
+        if any(issuer['spec']['template']['metadata']['labels'].get(k)!=v for k,v in expected.items()):
+            raise ValueError('Exact owned issuer source required')
+        write(args.output_dir/'discovery-access.administrator-observed.json',current)
+        return {'applied':False,'policy_present':True,'policy_name':policy['metadata']['name'],
+                'shared_rbac_observation':'administrator-receipt','live_shared_foundation_read':False,
+                'existing_foundation_resources_modified':False,'live_discovery_and_delegation_validation_required':True}
     for namespace in (profile.core_namespace, profile.identity_namespace):
         owned(kube(args, "get", "namespace", namespace, "-o", "json"), profile)
     discovery = kube(args, "get", "deployment.apps", "identity-demo-oidc-discovery",
@@ -940,15 +1112,7 @@ def discovery_access(args: argparse.Namespace, objects: list[dict]) -> dict:
     selector = {"app": "fixture-keycloak-upstream", "identity-demo-owner": profile.owner}
     if any(issuer["spec"]["template"]["metadata"]["labels"].get(k) != v for k, v in selector.items()):
         raise ValueError("Exact owned issuer source required")
-    policy = {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {
-        "name": "identity-demo-" + profile.installation_id + "-discovery-access",
-        "namespace": profile.identity_namespace,
-        "labels": {**profile.labels, "identity-demo-installation": profile.installation_id}},
-        "spec": {"podSelector": {"matchLabels": {"app": "identity-demo-oidc-discovery"}},
-                 "policyTypes": ["Ingress"], "ingress": [{"from": [{
-                     "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": profile.core_namespace}},
-                     "podSelector": {"matchLabels": selector}}],
-                     "ports": [{"protocol": "TCP", "port": 8443}]}]}}
+    policy = discovery_policy(profile)
     current = kube(args, "get", "networkpolicy", policy["metadata"]["name"],
                    "-n", profile.identity_namespace, "--ignore-not-found", "-o", "json")
     write(args.output_dir / "discovery-access.plan.json", policy)
@@ -957,6 +1121,8 @@ def discovery_access(args: argparse.Namespace, objects: list[dict]) -> dict:
         if (current["spec"] != policy["spec"] or current["metadata"]["labels"].get(
                 "identity-demo-installation") != profile.installation_id):
             raise ValueError("Discovery access collision; existing policy is never rewritten")
+        if getattr(args,'administrator_receipt',None) and not administrator_prepared(args,policy,current):
+            raise ValueError('Discovery attachment missing from administrator creation receipt')
         write(args.output_dir / "discovery-access.existing.json", current)
     else:
         kube(args, "create", "--dry-run=server", "-f", "-", "-o", "json", value=policy)
@@ -1042,7 +1208,7 @@ print(json.dumps({'safe':d.execute('SELECT count(*) FROM runs WHERE active<>0').
 def main() -> None:
     """All inputs/outputs are paths or sanitized status; no shell/config execution."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("certificate-status", "console-runtime-prepare", "console-runtime-publish", "native-repackage", "console-runtime-build", "cluster-runtime-plan", "security-plan", "security-check", "security-tls-plan", "runtime-check", "connected-install", "render", "native-build", "native-publish", "native-publish-resume", "native-publication-status", "diagnostic-build", "preflight", "snapshot", "prepare-access", "permissions", "plan", "install", "resume", "verify", "runtime-permissions", "discovery-access", "backup-data", "verify-backup", "restart-data", "cleanup"))
+    parser.add_argument("action", choices=("installer-administrator-receipt", "installer-bootstrap-plan", "native-cluster-complete", "installer-application-session", "installer-build-session", "installer-prerequisites", "native-cluster-build", "certificate-status", "console-runtime-prepare", "console-runtime-publish", "native-repackage", "console-runtime-cluster-build", "console-runtime-build", "cluster-runtime-plan", "security-plan", "security-check", "security-tls-plan", "runtime-check", "connected-install", "render", "native-build", "native-publish", "native-publish-resume", "native-publication-status", "diagnostic-build", "preflight", "snapshot", "prepare-access", "permissions", "plan", "install", "resume", "verify", "runtime-permissions", "discovery-access", "backup-data", "verify-backup", "restart-data", "cleanup"))
     parser.add_argument("--security-network", help="Private API/worker host-CIDR JSON for guided security rendering")
     parser.add_argument("--oc-archive", help="Exact pinned public Linux oc archive for console-runtime-build")
     parser.add_argument("--cli-archive", help="Exact pinned public Linux OpenShell archive for console-runtime-build")
@@ -1075,15 +1241,20 @@ def main() -> None:
     parser.add_argument("--runtime-build-sha256", help="Exact console build receipt hash")
     parser.add_argument("--runtime-configuration-receipt", help="Completed fixed-provider source configuration receipt for console-runtime-build")
     parser.add_argument("--runtime-check-target", choices=("local", "cluster"), default="local")
-    parser.add_argument("--workload-image", help="Approved digest-pinned CVE workload image for runtime-check")
+    parser.add_argument("--workload-image", help="Approved digest-pinned workload image for runtime checks and default pool profiles")
     parser.add_argument("--kubeconfig")
     parser.add_argument("--expected-server")
+    parser.add_argument("--administrator-plan-sha256", help="Original public administrator plan hash")
+    parser.add_argument("--installer-ingress-address", help="Verified internal ingress Service address")
+    parser.add_argument("--installer-image", help="Reviewed owned immutable scoped-installer image")
+    parser.add_argument("--installer-configuration", help="Versioned public scoped-installer configuration")
     parser.add_argument("--installation-config", help="Private source-render configuration; never executable code")
     parser.add_argument("--installation-profile", help="Rendered profile for a local target-bound native build")
     parser.add_argument("--native-cache-receipt", help="Optional completed build receipt for private dependency cache; workspace binaries are discarded")
     parser.add_argument("--native-cache-sha256", help="Explicit hash of prior dependency cache receipt")
     parser.add_argument("--compiler-cache-receipt", help="Optional completed private compiler build receipt; native binaries are still rebuilt")
     parser.add_argument("--compiler-cache-sha256", help="Explicit hash of prior compiler receipt")
+    parser.add_argument("--native-builder-image", help="Optional registry mirror preserving the pinned AMD64 builder manifest digest")
     parser.add_argument("--source-archive", help="Exact pinned OpenShell source archive; local file only")
     parser.add_argument("--spire-archive", help="Exact pinned public SPIRE diagnostic archive; local file only")
     parser.add_argument("--native-ca-bundle", help="Rendered canonical public CA bundle; never private keys")
@@ -1094,6 +1265,13 @@ def main() -> None:
     parser.add_argument("--publication-plan", help="Exact prior binary-build publication plan for status/cleanup")
     parser.add_argument("--publication-plan-sha256", help="Explicit expected publication plan hash")
     parser.add_argument("--artifacts-file", help="Existing five-role private artifact lock for publication output")
+    parser.add_argument("--pool-mode", choices=("legacy", "profiles"), default="legacy", help="Explicit opt-in to profile capacity; never reinterpret legacy contexts")
+    parser.add_argument("--pool-profile-configuration", help="Private reviewed profile configuration; omit for supported Jira defaults")
+    parser.add_argument("--native-build-directory", help="Original private cluster native build output for explicit completion")
+    parser.add_argument("--administrator-receipt", help="Original exact created prerequisite objects from administrator preparation")
+    parser.add_argument("--administrator-receipt-sha256", help="Reviewed administrator preparation receipt hash")
+    parser.add_argument("--installer-service-account", help="Explicit namespace:fixture-installer identity; excludes --installer-user")
+    parser.add_argument("--activate-cluster-runtime", action="store_true", help="After successful connected installation, join guarded console/gateway activation using explicit namespace/runtime receipts")
     parser.add_argument("--cli", help="Pinned OpenShell CLI for connected installation")
     parser.add_argument("--readiness-timeout", type=int, default=600)
     parser.add_argument("--engine", choices=("docker", "podman"), default="podman")
@@ -1141,6 +1319,14 @@ def main() -> None:
             print(json.dumps(result))
             return
         local_actions = {
+            'installer-administrator-receipt': ('cluster_installer_receipts','run'),
+            'installer-bootstrap-plan': ('cluster_installer_resources','plan'),
+            "console-runtime-cluster-build": ("cluster_console_build", "run"),
+            "installer-application-session": ("cluster_installer_session", "application_session"),
+            "installer-build-session": ("cluster_installer_session", "build_session"),
+            "installer-prerequisites": ("cluster_installer_prerequisites", "run"),
+            "native-cluster-build": ("identity_demo_cluster_build", "start"),
+            "native-cluster-complete": ("identity_demo_cluster_build", "complete"),
             "cluster-runtime-plan": ("cluster_console_plan", "run"),
             "console-runtime-build": ("console_runtime_build", "run"),
             "console-runtime-prepare": ("cluster_console_install", "run"),

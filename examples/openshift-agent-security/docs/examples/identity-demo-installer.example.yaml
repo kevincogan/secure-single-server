@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copy outside Git; replace example values and zero digests before installation.
+# The native base images are build inputs, not the final deployed native images.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fixture-installer-inputs
+  namespace: demo-eval-core
+  labels:
+    identity-demo-owner: demo-team
+    identity-demo-installation: demo-eval
+data:
+  installation.json: |
+    {
+      "schema_version": 1,
+      "profile": {
+        "schema_version": 1,
+        "installation_id": "demo-eval",
+        "owner": "demo-team",
+        "expected_server": "https://api.cluster.example.org:6443",
+        "core_namespace": "demo-eval-core",
+        "identity_namespace": "demo-eval-identity",
+        "triage_namespace": "demo-eval-triage",
+        "reader_namespace": "demo-eval-reader",
+        "route_domain": "apps.cluster.example.org",
+        "trust_domain": "agents.example.org",
+        "cluster_name": "evaluation-cluster",
+        "storage_class": "approved-storage"
+      },
+      "artifacts": {
+        "schema_version": 1,
+        "images": {
+          "jira_runtime": "registry.example.test/evaluation/jira_runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "keycloak_management": "registry.example.test/evaluation/keycloak_management@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "keycloak_exchange": "registry.example.test/evaluation/keycloak_exchange@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "openshell_gateway": "ghcr.io/nvidia/openshell/gateway@sha256:ea14aa4db0980fab4769fb6b5509ac42ae3dc8495e645b1ba1fe1ada49892fa6",
+          "openshell_supervisor": "ghcr.io/nvidia/openshell/supervisor@sha256:4ab2b970cdb02c7518ba4ccbbadb4861ae9a8d0b8770e5b160697f0453b0a8e4"
+        }
+      },
+      "application": {
+        "chat_request_url": "https://inference.example.test/v1/messages",
+        "chat_model": "approved-model",
+        "workload_image": "registry.example.test/evaluation/agent@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "diagnostic_runtime_image": "registry.example.test/evaluation/diagnostics@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "public_trust": {
+        "service_ca": "service-ca.pem",
+        "spire_ca": "spire-ca.pem",
+        "upstream_ca_bundle": "upstream-ca.pem",
+        "kubernetes_ca": "kubernetes-ca.pem"
+      },
+      "kubernetes_api_cidrs": [
+        "192.0.2.1/32"
+      ],
+      "certificate_management": {
+        "mode": "managed",
+        "issuer_ref": {
+          "group": "cert-manager.io",
+          "kind": "ClusterIssuer",
+          "name": "approved-application-issuer"
+        },
+        "issuer_uid": "00000000-0000-0000-0000-000000000000",
+        "ca_file_ref": "application-ca.pem"
+      },
+      "credentials": {
+        "inference": {
+          "secret_name": "fixture-installer-inference",
+          "key": "api-key"
+        }
+      }
+    }

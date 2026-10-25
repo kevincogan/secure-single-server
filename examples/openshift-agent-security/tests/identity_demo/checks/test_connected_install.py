@@ -43,7 +43,8 @@ def harness(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleNamespace:
 
     def read(path: Path) -> dict:
         if path.name == "config.json":
-            return {"artifacts_file": str(tmp_path / "artifacts.json")}
+            return {"artifacts_file": str(tmp_path / "artifacts.json"),
+                    "fixture_seed_mode": getattr(state, "seed_mode", "synthetic")}
         return original_read(path)
     monkeypatch.setattr(connected, "read_json", read)
 
@@ -266,3 +267,117 @@ def test_retained_ingress_is_discovered_without_reusing_captured_addresses(tmp_p
     assert len(calls)==1 and calls[0][0]=='get'
     value=json.loads(source.read_text());value['ingress_cluster_ip']='192.0.2.88';source.write_text(json.dumps(value))
     with pytest.raises(ValueError,match='differs'):connected.resolve_ingress(args,source)
+
+
+
+def test_cluster_activation_missing_handoffs_stops_before_first_stage(harness):
+    harness.args.activate_cluster_runtime = True
+    with pytest.raises(ValueError, match='handoffs required'):
+        connected.connected_install(harness.args)
+    assert harness.state.events == []
+
+
+@pytest.mark.parametrize('fault', [None, 'unverified', 'foreign-repository', 'digest', 'no-inference'])
+def test_cluster_activation_requires_exact_verified_input_handoffs(tmp_path, fault):
+    args = SimpleNamespace(profile=LEGACY, inference_config='private-path')
+    tmp_path.chmod(0o700)
+    for name, content in (
+        ('namespace_creation', {}), ('administrator', {}), ('runtime_publication', {
+            'published': True, 'build_phases': {'runtime': 'Complete'}, 'packaged_checks_passed': True,
+            'images': {'console_runtime': 'image-registry.openshift-image-registry.svc:5000/' + LEGACY.core_namespace + '/runtime@sha256:' + 'a'*64}})):
+        path = tmp_path/(name+'.json')
+        if name == 'runtime_publication':
+            if fault == 'unverified': content['packaged_checks_passed'] = False
+            if fault == 'foreign-repository': content['images']['console_runtime'] = 'registry.example/foreign@sha256:'+'a'*64
+        path.write_text(json.dumps(content)); path.chmod(0o600)
+        setattr(args, name+'_receipt', str(path))
+        setattr(args, name+'_sha256' if name != 'administrator' else 'administrator_receipt_sha256', connected.setup.sha(path))
+    if fault == 'digest': args.runtime_publication_sha256 = '0'*64
+    if fault == 'no-inference': args.inference_config = None
+    if fault:
+        with pytest.raises(ValueError): connected.cluster_runtime_inputs(args)
+    else:
+        connected.cluster_runtime_inputs(args)
+
+
+
+def test_joined_cluster_services_forward_credentials_wait_and_keep_gateway_parser_compatible(tmp_path, monkeypatch):
+    root = tmp_path/'install'; root.mkdir()
+    rendered = root/'02-render'; rendered.mkdir()
+    (rendered/'stack.private.json').write_text(json.dumps({'objects':[{'kind':'Deployment','metadata':{'name':name}} for name in ('fixture-identity-driver','fixture-protected-adapter','fixture-keycloak-upstream')]}))
+    ledger = tmp_path/'original-ledger.json'; ledger.write_text('{}'); ledger.chmod(0o600)
+    (root/'operator-paths.private.json').write_text(json.dumps({'creation_ledger':str(ledger)}))
+    publication = tmp_path/'publication.json'; publication.write_text(json.dumps({
+        'published':True, 'build_phases':{'runtime':'Complete'}})); publication.chmod(0o600)
+    args = SimpleNamespace(output_dir=root, apply=True, kubeconfig='private-kubeconfig',
+        expected_server=LEGACY.expected_server, oc='oc', namespace_creation_receipt='namespace-receipt',
+        namespace_creation_sha256='namespace-hash', runtime_publication_receipt=str(publication),
+        runtime_publication_sha256=connected.setup.sha(publication), installation_config='private-config',
+        pool_mode='profiles', pool_profile_configuration=None, profile=LEGACY)
+    events=[]
+    class Stages:
+        def run(self, name, script, words, **kwargs):
+            events.append((name,script,words))
+            output=root/name; output.mkdir()
+            (output/'setup.summary.json').write_text('{}')
+            if name in ('25-persistent-gateway','26-gateway-observation'):
+                (output/'persistent-gateway.receipt.private.json').write_text('{}')
+            if name=='27-cluster-workers':
+                (output/'runtime-workloads.plan.private.json').write_text('{"objects":[]}')
+            return {},output
+    def wait(args, objects):
+        names = {o['metadata']['name'] for o in objects}
+        event = ('wait-configured' if names == {'fixture-identity-driver','fixture-protected-adapter'}
+                 else 'wait-issuer' if names == {'fixture-keycloak-upstream'} else 'wait-workers')
+        events.append((event,None,[]))
+    monkeypatch.setattr(connected,'wait_controllers', wait)
+    result=connected.activate_cluster_services(args, {'IDENTITY_DEMO_ARTIFACTS':'private-artifacts'},
+        Stages(),rendered,Path('openshell'),'private-inference',{'application_installation_completed':True})
+    names=[e[0] for e in events]
+    assert names.index('23-console-configuration') < names.index('wait-configured') < names.index('23a-public-trust-reconcile')
+    assert names.index('23a-public-trust-reconcile') < names.index('wait-issuer') < names.index('24-trust-observation')
+    assert names.index('27-cluster-workers') < names.index('wait-workers') < names.index('28-public-trust-refresh')
+    waits = [i for i, name in enumerate(names) if name == 'wait-workers']
+    assert len(waits) == 2
+    assert names.index('28-public-trust-refresh') < waits[1] < names.index('29-automatic-preparation')
+    for name,script,words in events:
+        if name in ('wait-configured','wait-workers','wait-issuer'):continue
+        assert '--credentials-file' in words
+        if name=='25-persistent-gateway':
+            assert '--oc' not in words and '--administrator-receipt' not in words
+        if name=='29-automatic-preparation':
+            assert words[words.index('--pool-mode')+1]=='profiles'
+    assert result['cluster_runtime_activated'] and not result['functional_scenarios_proven']
+
+
+@pytest.mark.parametrize("mode", ["synthetic", "none"])
+def test_project_only_setup_uses_existing_guarded_provisioner(harness, mode):
+    harness.state.seed_mode = mode
+    result = connected.connected_install(harness.args)
+    assert result["application_installation_completed"] is True
+    for stage in ("13-project", "13-incident-project"):
+        assert ("--project-only" in harness.state.commands[stage]) == (mode == "none")
+    assert "--project-only" not in harness.state.commands["12-workspaces"]
+
+
+@pytest.mark.parametrize("status", [
+    {"observedGeneration": 1, "readyReplicas": 1, "updatedReplicas": 1},
+    {"observedGeneration": 2, "readyReplicas": 1, "updatedReplicas": 0},
+    {"observedGeneration": 2, "readyReplicas": 0, "updatedReplicas": 1},
+])
+def test_configured_rollout_waits_for_current_ready_replacement(tmp_path, monkeypatch, status):
+    """An old ready Pod or a newly scheduled Pod cannot satisfy the idle-read gate."""
+    args = SimpleNamespace(profile=LEGACY, readiness_timeout=30, output_dir=tmp_path)
+    desired = {"kind": "Deployment", "metadata": {"name": "fixture-identity-driver"}}
+    live = {**desired, "metadata": {"name": "fixture-identity-driver", "generation": 2},
+            "spec": {"replicas": 1}, "status": status}
+    replacement = {**live, "status": {
+        "observedGeneration": 2, "readyReplicas": 1, "updatedReplicas": 1}}
+    reads = iter([live, replacement]); sleeps = []
+    monkeypatch.setattr(connected.setup, "get", lambda *args: next(reads))
+    monkeypatch.setattr(connected.setup, "owned", lambda *args: None)
+    monkeypatch.setattr(connected.time, "sleep", sleeps.append)
+    connected.wait_controllers(args, [desired])
+    assert sleeps == [5]
+    with pytest.raises(StopIteration):
+        next(reads)

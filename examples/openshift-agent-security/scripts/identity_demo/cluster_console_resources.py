@@ -21,6 +21,12 @@ def resource(profile, api, kind, name, namespace=None, **fields):
     return {'apiVersion': api, 'kind': kind, 'metadata': meta, **fields}
 
 
+def ingress_peer():
+    """Select default router Pods after Service-address translation."""
+    return {'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': 'openshift-ingress'}},
+            'podSelector': {'matchLabels': {'ingresscontroller.operator.openshift.io/deployment-ingresscontroller': 'default'}}}
+
+
 def permissions(profile, catalog_name):
     dns_name(catalog_name, namespace=True)
     if not catalog_name.startswith('fixture-') or not catalog_name.endswith('-catalog'):
@@ -156,8 +162,7 @@ def workloads(profile, image, api_cidrs, ingress_address=None):
                      'ports': [{'protocol': protocol, 'port': port} for protocol in ('TCP','UDP') for port in (53,5353)]},
                     {'to': [{'podSelector': {'matchLabels': {'app': 'fixture-identity-driver'}}}],
                      'ports': [{'protocol': 'TCP', 'port': 8444}]},
-                    {'to': [{'namespaceSelector': {'matchLabels': {'kubernetes.io/metadata.name': 'openshift-ingress'}},
-                             'podSelector': {'matchLabels': {'ingresscontroller.operator.openshift.io/deployment-ingresscontroller': 'default'}}}],
+                    {'to': [ingress_peer()],
                      'ports': [{'protocol': 'TCP', 'port': 443}]},
                 ]}))
     return result
@@ -218,7 +223,11 @@ def private_network(profile, isolation):
 
 def capacity(profile):
     """Initial bounded budgets; acceptance must measure active and maximum use."""
-    result=[]
+    # Admission defaults also bound the operator-created MCP broker. Explicit
+    # application/build budgets remain unchanged; no shared controller is edited.
+    result=[resource(profile, 'v1', 'LimitRange', 'fixture-application-default-resources', profile.core_namespace,
+        spec={'limits': [{'type': 'Container', 'defaultRequest': {'cpu': '100m', 'memory': '128Mi'},
+                         'default': {'cpu': '1', 'memory': '512Mi'}}]})]
     for namespace in (profile.triage_namespace, profile.reader_namespace):
         result.append(resource(profile, 'v1', 'LimitRange', 'fixture-context-resources', namespace,
             spec={'limits': [{'type': 'Container', 'defaultRequest': {'cpu': '25m', 'memory': '128Mi'},

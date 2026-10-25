@@ -87,3 +87,16 @@ def test_alive_competitor_is_not_displaced(tmp_path):
     obj['spec'].update(holderIdentity='old-pod/process', renewTime=datetime.fromtimestamp(clock['now'], timezone.utc).isoformat())
     with pytest.raises(lease.LeaseUnavailable): worker.renew(acquire=True)
     assert [m for m, _ in seen] == ['GET']
+
+
+def test_installer_uses_the_same_fencing_with_an_explicit_dedicated_identity(tmp_path,monkeypatch):
+    worker,obj,clock,token,seen=setup(tmp_path)
+    args=argparse.Namespace(service_account_token_file=str(token),service_account_namespace=LEGACY.core_namespace,
+        service_account_name='fixture-installer',pod_uid='installer-pod')
+    obj['metadata']['name']='fixture-installer'
+    installer=lease.WorkerLease(args,'installer',client=worker.client,monotonic=lambda:clock['mono'],now=lambda:clock['now'])
+    installer.renew(acquire=True)
+    assert installer.name=='fixture-installer' and obj['spec']['holderIdentity'].startswith('installer-pod/')
+    installer.assert_current()
+    clock['mono']=installer.freshness
+    with pytest.raises(lease.LeaseUnavailable):installer.assert_current()

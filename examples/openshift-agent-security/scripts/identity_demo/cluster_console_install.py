@@ -25,6 +25,15 @@ def namespaces(args, profile):
             raise ValueError('Owned namespace was replaced or is terminating')
 
 
+def prerequisite_observation(args, profile, obj):
+    if (getattr(args,'installer_service_account',None)
+            and obj['metadata'].get('namespace')==profile.identity_namespace):
+        return setup.administrator_observation(args,obj)
+    meta=obj['metadata']
+    scope=['-n',meta['namespace']] if meta.get('namespace') else []
+    return setup.kube(args,'get',obj['kind'],meta['name'],*scope,'--ignore-not-found','-o','json')
+
+
 def run(args):
     profile = DeploymentProfile.from_dict(read_json(setup.private_file(args.installation_profile)))
     args.profile = profile
@@ -66,11 +75,18 @@ def run(args):
     missing_roles = {(o['kind'], o['metadata'].get('namespace'), o['metadata']['name'])
                      for o in proposed if o['kind'] in ('Role', 'ClusterRole')}
     deferred = []
+    retained = []
     for obj in proposed:
         meta = obj['metadata']
         scope = ['-n', meta['namespace']] if meta.get('namespace') else []
-        if setup.kube(args, 'get', obj['kind'], meta['name'], *scope, '--ignore-not-found', '-o', 'json'):
-            raise ValueError('Runtime prerequisite collision; inspect prior receipts')
+        current=prerequisite_observation(args,profile,obj)
+        if current:
+            if not setup.administrator_prepared(args,obj,current):
+                raise ValueError('Runtime prerequisite collision; inspect prior receipts')
+            retained.append({'kind':obj['kind'],'name':meta['name'],'namespace':meta.get('namespace'),
+                             'uid':current['metadata']['uid']})
+            missing_roles.discard((obj['kind'],meta.get('namespace'),meta['name']))
+            continue
         key = (obj.get('roleRef', {}).get('kind'), meta.get('namespace'), obj.get('roleRef', {}).get('name'))
         if obj['kind'] in ('RoleBinding','ClusterRoleBinding') and key in missing_roles:
             deferred.append(meta['name'])
@@ -82,8 +98,11 @@ def run(args):
             namespaces(args, profile)
             meta = obj['metadata']
             scope = ['-n', meta['namespace']] if meta.get('namespace') else []
-            if setup.kube(args, 'get', obj['kind'], meta['name'], *scope, '--ignore-not-found', '-o', 'json'):
-                raise ValueError('Runtime prerequisite appeared during installation')
+            current=prerequisite_observation(args,profile,obj)
+            if current:
+                if not setup.administrator_prepared(args,obj,current):
+                    raise ValueError('Runtime prerequisite appeared during installation')
+                continue
             setup.kube(args, 'create', '--dry-run=server', '-f', '-', '-o', 'json', value=obj)
             setup.write(args.output_dir/f'console-{index:02}.pending.json', obj)
             live = setup.kube(args, 'create', '-f', '-', '-o', 'json', value=obj)
@@ -94,7 +113,8 @@ def run(args):
             created.append(item)
     return {'applied': args.apply, 'stage': args.console_runtime_stage, 'created': created,
             'bindings_deferred': deferred if not args.apply else [],
-            'runtime_workloads_activated': False, 'existing_resources_modified': False}
+            'runtime_workloads_activated': False, 'existing_resources_modified': False, 'retained':retained,
+            'shared_rbac_observation': 'administrator-receipt' if getattr(args,'installer_service_account',None) else 'live-api'}
 
 
 def updated_web_code(args, profile, name):
@@ -442,9 +462,11 @@ def trust_observation(args, profile, previous=None):
     managed_ca = None
     if getattr(args, 'managed_certificate_config', None):
         from certificate_operations import configure
-        from cluster_console_operator import receipt
-        from managed_certificates import SPIRE_TRUST
         configure(args, profile)
+    if getattr(args, 'certificate_management', {}).get('mode') == 'managed':
+        from managed_certificates import validate_contract, SPIRE_TRUST
+        from cluster_console_operator import receipt
+        validate_contract(args.certificate_management, args.certificate_authority_pem)
         ledger = receipt(args.ledger, args.console_ledger_sha256)
         records = [v for v in ledger.get('created', []) if v['kind'] == 'Secret'
             and v.get('namespace') == profile.core_namespace and v['metadata']['name'] == SPIRE_TRUST]
@@ -473,6 +495,10 @@ def trust_observation(args, profile, previous=None):
     for obj in (trust,listener,issuer):
         records = [v for v in ledger['created'] if v['kind']==obj['kind']
                    and v['metadata']['name']==obj['metadata']['name'] and v.get('namespace')==profile.core_namespace]
+        if managed_ca is not None and obj is listener and not records:
+            from certificate_operations import recorded_secret
+            recorded_secret(args, profile, ledger, listener)
+            continue
         if len(records)!=1 or records[0]['metadata']['uid']!=obj['metadata']['uid']:
             raise ValueError('Exact original trust/issuer identity required')
     public = read('configmap','spire-bundle', profile.identity_namespace)

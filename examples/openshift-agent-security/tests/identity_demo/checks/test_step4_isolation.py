@@ -56,3 +56,108 @@ def test_unknown_base_policy_is_not_rewritten() -> None:
     with pytest.raises(ValueError):
         isolation.exclude_protected({"spec": {"podSelector": {"matchLabels": {"app": "other"}},
                                              "ingress": []}})
+
+
+@pytest.mark.parametrize("mode", ["legacy", "cluster"])
+def test_native_gateway_accepts_exact_supported_isolation_modes(monkeypatch, mode):
+    from types import SimpleNamespace
+    from copy import deepcopy
+    import native_backend
+    from cluster_console_resources import private_network
+    from deployment_profile import active_profile
+    from identity_demo_step4_isolation import policies, exclude_protected
+
+    broad = {
+        "metadata": {
+            "name": "fixture-isolation",
+            "namespace": active_profile().core_namespace,
+        },
+        "spec": {"podSelector": {}, "ingress": [{"from": [{"podSelector": {}}]}]},
+    }
+    broad["spec"] = exclude_protected(broad)
+    expected = {v["metadata"]["name"]: v for v in policies()}
+    if mode == "cluster":
+        resources, broad = private_network(active_profile(), broad)
+        expected.update(
+            {
+                v["metadata"]["name"]: v
+                for v in resources
+                if v["kind"] == "NetworkPolicy"
+            }
+        )
+    expected["fixture-isolation"] = broad
+    expected["fixture-mcp-route-ingress"] = {"spec": {"ingress": []}}
+    monkeypatch.setattr(
+        native_backend.shared,
+        "owned",
+        lambda args, kind, name: deepcopy(expected[name]),
+    )
+    native_backend.require_isolation(SimpleNamespace())
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "operator_port",
+        "operator_peer",
+        "business_peer",
+        "extra_app",
+        "public_gateway",
+        "extra_selector",
+    ],
+)
+def test_native_gateway_refuses_drift_before_any_backend_write(monkeypatch, fault):
+    from types import SimpleNamespace
+    from copy import deepcopy
+    import native_backend
+    from cluster_console_resources import private_network
+    from deployment_profile import active_profile
+    from identity_demo_step4_isolation import policies, exclude_protected
+
+    broad = {
+        "metadata": {
+            "name": "fixture-isolation",
+            "namespace": active_profile().core_namespace,
+        },
+        "spec": {"podSelector": {}, "ingress": [{"from": [{"podSelector": {}}]}]},
+    }
+    broad["spec"] = exclude_protected(broad)
+    resources, broad = private_network(active_profile(), broad)
+    expected = {
+        v["metadata"]["name"]: v
+        for v in policies() + resources
+        if v["kind"] == "NetworkPolicy"
+    }
+    expected["fixture-isolation"] = broad
+    expected["fixture-mcp-route-ingress"] = {"spec": {"ingress": []}}
+    if fault == "operator_port":
+        expected["fixture-identity-operator"]["spec"]["ingress"][0]["ports"][0][
+            "port"
+        ] = 8443
+    if fault == "operator_peer":
+        expected["fixture-identity-operator"]["spec"]["ingress"][0]["from"] = [
+            {"podSelector": {}}
+        ]
+    if fault == "business_peer":
+        expected["fixture-driver-business"]["spec"]["ingress"][0]["from"] = [
+            {"podSelector": {}}
+        ]
+    if fault == "extra_app":
+        broad["spec"]["podSelector"]["matchExpressions"][2]["values"].append(
+            "another-app"
+        )
+    if fault == "public_gateway":
+        expected["fixture-mcp-route-ingress"]["spec"]["ingress"] = [
+            {"from": [{"podSelector": {}}]}
+        ]
+    if fault == "extra_selector":
+        broad["spec"]["podSelector"]["matchLabels"] = {"app": "unexpected"}
+    monkeypatch.setattr(
+        native_backend.shared,
+        "owned",
+        lambda args, kind, name: deepcopy(expected[name]),
+    )
+    backend = native_backend.NativeBackend(SimpleNamespace())
+    with pytest.raises(ValueError):
+        backend.prepare("unused-ca", "unused-secret", None, "must-not-read-credential")
+    assert backend.ledger == []
