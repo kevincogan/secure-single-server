@@ -58,7 +58,7 @@ def diagnostics(args, profile, created, objects):
 
 
 def probe_objects(profile, images, probes, nonce):
-    labels = {**profile.labels, 'identity-demo-runtime-probe': nonce}
+    labels = {**profile.labels, 'identity-demo-runtime-probe': nonce, 'identity-demo-installer-child': 'true'}
     def obj(api, kind, name, spec):
         return {'apiVersion': api, 'kind': kind, 'metadata': {'name': name,
                 'namespace': profile.core_namespace, 'labels': dict(labels)}, 'spec': spec}
@@ -73,7 +73,7 @@ def probe_objects(profile, images, probes, nonce):
                 'restartPolicy': 'Never', 'automountServiceAccountToken': False,
                 'securityContext': {'runAsNonRoot': True, 'seccompProfile': {'type': 'RuntimeDefault'}},
                 'containers': [{'name': 'probe', 'image': image, 'imagePullPolicy': 'IfNotPresent',
-                    'command': ['python', '-c', wrapped_probe(probes[role])],
+                    'command': ['python3.12' if role == 'console_runtime' else 'python', '-c', wrapped_probe(probes[role])],
                     'env': [{'name': 'PYTHONDONTWRITEBYTECODE', 'value': '1'}],
                     'securityContext': {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True,
                                         'capabilities': {'drop': ['ALL']}},
@@ -151,5 +151,6 @@ def run(args, images, probes):
     cleanup(args, profile, created)
     return {'runtime_interface_checks_passed': all(results.values()), 'executed': True,
             'temporary_resources_delete_requested': True, 'cluster_changed': True,
-            'credentials_mounted': False, 'network_access': False,
+            # Namespace allow rules are additive; this probe does not certify isolation.
+            'credentials_mounted': False, 'network_access': None, 'network_isolation_verified': False,
             'source_and_redistribution_approved': False, 'functional_scenarios_proven': False}

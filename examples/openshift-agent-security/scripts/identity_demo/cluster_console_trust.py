@@ -44,6 +44,11 @@ def recorded(args,profile):
         setup.owned(live,profile)
         matches = [v for v in ledger['created'] if v['kind']==kind and v['metadata']['name']==name
                    and v.get('namespace')==profile.core_namespace]
+        if name == 'fixture-mcp-bound-mutual' and not matches and getattr(args, 'certificate_management', {}).get('mode') == 'managed':
+            from certificate_operations import recorded_secret
+            recorded_secret(args, profile, ledger, live)
+            result.append(live)
+            continue
         if len(matches)!=1 or matches[0]['metadata']['uid']!=live['metadata']['uid'] or live['metadata'].get('deletionTimestamp'):
             raise ValueError('Exact original owned trust resource required')
         result.append(live)
@@ -57,6 +62,12 @@ def prepare(args,profile,inputs):
     observed = json.loads(live['data']['observation.json'])
     if observed.get('listener_ca_uid'):
         args.public_trust_ca_uid = observed['listener_ca_uid']
+    if 'certificate-management.json' in inputs['data']:
+        import managed_certificates
+        policy = json.loads(base64.b64decode(inputs['data']['certificate-management.json'], validate=True))
+        managed_certificates.validate_contract(policy['contract'], policy['authority'])
+        args.certificate_management = policy['contract']
+        args.certificate_authority_pem = policy['authority']
     targets = recorded(args,profile)
     setup.write(args.output_dir/'trust-resources-before.private.json',targets)
     setup.write(args.output_dir/'trust-observation-before.private.json',live)

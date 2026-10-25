@@ -112,3 +112,31 @@ def test_explicit_resume_preserves_history_only_after_exact_retirement(
     else:
         with pytest.raises(ValueError): control.run(args, LEGACY)
         assert not sent
+
+
+def test_default_profiles_require_configured_images_and_share_only_compatible_capacity(tmp_path,monkeypatch):
+    from pathlib import Path
+    from deployment_profile import LEGACY
+    import cluster_console_operator as control
+    from deployment_artifacts import IMAGE_ROLES
+    path=tmp_path/'artifacts.json'
+    path.write_text(json.dumps({'schema_version':1,'images':{k:'registry.example.test/'+k+'@sha256:'+'a'*64 for k in IMAGE_ROLES},
+        'native_build_contract':LEGACY.native_build_contract,'native_ca_bundle_sha256':'b'*64}))
+    path.chmod(0o600);monkeypatch.setenv('IDENTITY_DEMO_ARTIFACTS',str(path))
+    image='registry.example.test/workload@sha256:'+'c'*64
+    value=control.demo_configuration(image)
+    assert [(p['role'],p['target']) for p in value['profiles']]==[('triage',6),('reader',2)]
+    assert len({w['profile'] for w in value['workflows'] if w['workflow'] in ('incident-triage','service-request')})==1
+    assert not value['profiles'][1]['write_actions']
+    assert all(p['workload_image']==image for p in value['profiles'])
+
+
+@pytest.mark.parametrize("image", ["registry.example.test/workload:latest", "registry.example.test/workload@sha256:" + "0" * 64])
+def test_default_profiles_reject_unpinned_or_placeholder_workload(image, monkeypatch):
+    import cluster_console_operator as control
+    import deployment_artifacts
+    from identity_demo_connector import Denied
+    monkeypatch.setattr(deployment_artifacts, "configured_native_image", lambda role:
+                        "registry.example.test/supervisor@sha256:" + "a" * 64)
+    with pytest.raises(Denied, match="pool_profile"):
+        control.demo_configuration(image)

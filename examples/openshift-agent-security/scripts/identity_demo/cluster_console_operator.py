@@ -160,8 +160,16 @@ def run(args,profile):
     proof_path=args.output_dir/'pool-activation.receipt.private.json'
     setup.write(proof_path,{'enabled':enable,'target':8,'limit':12,'worker_checks':proof,
         'resume_retired_pool':resume,'checked_at':int(time.time())})
-    payload={'action':'automatic','enabled':enable,'receipt_sha256':setup.sha(proof_path),
-             'retired_workloads':[], 'initial_empty':enable and not resume}
+    mode=getattr(args,'pool_mode','legacy')
+    if enable and mode=='profiles':
+        from identity_demo_pool_profiles import validate
+        filename=getattr(args,'pool_profile_configuration',None)
+        configuration=validate(read_json(setup.private_file(filename))) if filename else demo_configuration(getattr(args, "workload_image", None))
+        setup.write(args.output_dir/'pool-profile-configuration.private.json',configuration)
+        payload={'action':'profiles','configuration':configuration,'receipt_sha256':setup.sha(proof_path)}
+    else:
+        payload={'action':'automatic','enabled':enable,'receipt_sha256':setup.sha(proof_path),
+                 'retired_workloads':[], 'initial_empty':enable and not resume}
     if args.apply:
         setup.write(args.output_dir/'pool-activation.pending.json',payload)
         after=private_request(args,profile,'pool',payload)
@@ -169,7 +177,7 @@ def run(args,profile):
     return {'applied':args.apply,'automatic_pool_enabled':enable if args.apply else False,
             'scoped_worker_profiles_verified':len(proof),'target_ready':8,'managed_limit':12,
             'existing_legacy_inventory_adopted':False,'retired_history_preserved':resume,
-            'mutation_replayed':False}
+            'mutation_replayed':False,'pool_mode':mode if enable else 'disabled'}
 
 
 def wait_ready(args, profile):
@@ -185,3 +193,69 @@ def wait_ready(args, profile):
         if time.monotonic()>=deadline:
             raise ValueError('Coordinator readiness observation timed out; no activation sent')
         time.sleep(1)
+
+def demo_configuration(workload_image=None):
+    """The supported Jira demo uses shared capacity; its scopes bind at allocation."""
+    import yaml
+    from deployment_artifacts import configured_native_image
+    from identity_demo_spire_registration import CVE_IMAGE
+    from identity_demo_jira_contract import JIRA
+    from identity_demo_connector import Denied
+
+    from deployment_profile import active_profile
+    from identity_demo_pool_profiles import validate
+    installation = active_profile()
+    supervisor = configured_native_image("openshell_supervisor")
+    if not supervisor:
+        raise Denied("pool_native_artifacts")
+    policy = yaml.safe_load(
+        (
+            setup.ROOT / "tests/identity_demo/cve-runtime-policy.yaml"
+        ).read_text()
+    )
+    base = {
+        "service_account": "fixture-openshell-sandbox",
+        "workload_image": CVE_IMAGE if workload_image is None else workload_image,
+        "supervisor_image": supervisor,
+        "policy": policy,
+        "trust_domain": installation.trust_domain,
+        "issuer": installation.native_build_contract["OPENSHELL_DEMO_JWT_AUDIENCE"],
+        "tools": ["jira.issue.read", "jira.issue.create"],
+    }
+    value = {
+        "schema_version": 2,
+        "profiles": [
+            dict(
+                base,
+                id="triage-v1",
+                role="triage",
+                namespace=installation.triage_namespace,
+                write_actions=["jira.issue.create"],
+                target=6,
+            ),
+            dict(
+                base,
+                id="reader-v1",
+                role="reader",
+                namespace=installation.reader_namespace,
+                tools=["jira.issue.read"],
+                write_actions=[],
+                target=2,
+            ),
+        ],
+        "workflows": [
+            {
+                "workflow": workflow,
+                "profile": profile,
+                "project": project,
+                "connector": JIRA.identifier,
+            }
+            for workflow, profile, project in [
+                ("cve", "triage-v1", "TEST"),
+                ("cve", "reader-v1", "TEST"),
+                ("incident-triage", "triage-v1", "OPS"),
+                ("service-request", "triage-v1", "SERVICE"),
+            ]
+        ],
+    }
+    return validate(value)

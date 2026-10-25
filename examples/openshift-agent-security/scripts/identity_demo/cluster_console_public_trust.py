@@ -56,12 +56,16 @@ def prepare(args,profile,targets):
     issuer_reload(after['spec'])
     patch(args,profile,issuer,after,dry=True)
     retained_ca = None
+    retained_prerequisites = []
     for obj in proposed:
         meta = obj['metadata'];scope = ['-n',meta['namespace']] if meta.get('namespace') else []
         current = setup.kube(args,'get',obj['kind'],meta['name'],*scope,'--ignore-not-found','-o','json')
         if current:
             if obj['kind'] != 'Secret':
-                raise ValueError('Automatic public trust resource collision; no adoption')
+                if not setup.administrator_prepared(args, obj, current):
+                    raise ValueError('Automatic public trust resource collision; no adoption')
+                retained_prerequisites.append(current)
+                continue
             from cluster_console_operator import receipt
             ledger = receipt(args.ledger, args.console_ledger_sha256)
             recorded = [v for v in ledger.get('created', []) if v['kind'] == 'Secret'
@@ -77,7 +81,7 @@ def prepare(args,profile,targets):
         if obj['kind']!='RoleBinding':
             setup.kube(args,'create','--dry-run=server','-f','-','-o','json',value=obj)
     setup.write(args.output_dir/'automatic-trust.plan.private.json',{'objects':proposed,'issuer_after':after})
-    return {'objects':proposed,'issuer':after,'bundle':bundle,'retained_ca':retained_ca}
+    return {'objects':proposed,'issuer':after,'bundle':bundle,'retained_ca':retained_ca,'retained_prerequisites':retained_prerequisites}
 
 
 def apply(args,profile,planned):
@@ -96,11 +100,16 @@ def apply(args,profile,planned):
         namespaces(args,profile)
         meta=obj['metadata'];scope=['-n',meta['namespace']] if meta.get('namespace') else []
         current = setup.kube(args,'get',obj['kind'],meta['name'],*scope,'--ignore-not-found','-o','json')
-        retained = planned.get('retained_ca') if obj['kind'] == 'Secret' else None
+        retained = planned.get('retained_ca') if obj['kind'] == 'Secret' else next((v
+            for v in planned.get('retained_prerequisites', []) if v['kind'] == obj['kind']
+            and v['metadata']['name'] == meta['name']
+            and v['metadata'].get('namespace') == meta.get('namespace')), None)
         if retained is not None:
             if (current['metadata']['uid'] != retained['metadata']['uid']
                     or setup.fingerprint(current) != setup.fingerprint(retained)):
                 raise ValueError('Recorded public trust Secret changed during maintenance')
+            if obj['kind'] != 'Secret' and not setup.administrator_prepared(args, obj, current):
+                raise ValueError('Administrator public trust prerequisite changed')
             made.append(current)
             continue
         if current:

@@ -77,6 +77,39 @@ def observe(args):
             'ca_rollover_automatic': False}
 
 
+def recorded_secret(args, profile, ledger, secret):
+    """Trace a controller-issued leaf through the original Certificate identity.
+
+    Fresh managed installs record the Certificate, not its controller-created
+    Secret. Renewed leaf bytes must still satisfy the approved issuer contract.
+    """
+    name = secret['metadata']['name']
+    contract, pem = args.certificate_management, args.certificate_authority_pem
+    managed.validate_contract(contract, pem)
+    if (contract.get('mode') != 'managed' or name not in managed.SECRETS
+            or not ledger.get('completed') or ledger.get('installation_profile') != profile.to_dict()):
+        raise ValueError('Recorded managed certificate contract required')
+    managed.issuer(lambda *words: read(args, *words), profile, contract)
+    certificate = read(args, 'certificates.cert-manager.io', name, profile.core_namespace)
+    setup.owned(certificate, profile)
+    records = [v for v in ledger['created'] if v['kind'] == 'Certificate'
+        and v.get('namespace') == profile.core_namespace and v['metadata']['name'] == name]
+    desired = next(v for v in managed.resources(profile, contract) if v['metadata']['name'] == name)
+    annotations = secret['metadata'].get('annotations', {})
+    if (len(records) != 1 or certificate['metadata']['uid'] != records[0]['metadata']['uid']
+            or certificate['metadata'].get('deletionTimestamp') or not matches(certificate, desired)
+            or not setup.reconciled(certificate) or secret['metadata'].get('deletionTimestamp')
+            or secret['metadata'].get('namespace') != profile.core_namespace
+            or secret.get('type') != 'kubernetes.io/tls'
+            or annotations.get('cert-manager.io/certificate-name') != name
+            or annotations.get('cert-manager.io/issuer-name') != contract['issuer_ref']['name']
+            or any(owner.get('kind') != 'Certificate' or owner.get('uid') != certificate['metadata']['uid']
+                   for owner in secret['metadata'].get('ownerReferences', []))):
+        raise ValueError('Original managed Certificate and issued Secret required')
+    setup.owned(secret, profile)
+    return managed.public_secret(secret, managed.targets(profile)[name], pem, check_key=True)
+
+
 def matches(live, desired):
     """Permit only cert-manager's documented revision-history default."""
     spec = deepcopy(live.get('spec', {}))

@@ -157,3 +157,41 @@ def test_installer_protocol_uses_real_transactions_and_verified_live_source(tmp_
     with driver.store.read_transaction() as db:
         assert not db.execute('SELECT 1 FROM runs WHERE workload=?', (context.workload,)).fetchone()
         assert db.execute('SELECT state FROM console_pool_items WHERE workload=?', (context.workload,)).fetchone()[0] == 'retired'
+
+
+@pytest.mark.parametrize('condition', ['valid', 'wrong-original-reservation', 'remaining-scratch'])
+def test_disposable_unused_retirement_binds_original_reservation_before_finish(tmp_path, monkeypatch, condition):
+    from dataclasses import asdict
+    import identity_demo_workspace_retention as workspace
+    args, context = arguments(tmp_path)
+    args.resume_unused_retirement = condition == 'remaining-scratch'
+    profile = active_profile();original = 'b' * 32
+    proof = {'kind': 'new-synthetic-pool-scratch', 'context': asdict(context),
+        'reservation': 'c' * 32 if condition == 'wrong-original-reservation' else original,
+        'sandbox_uid': 'sandbox-uid', 'installation': profile.installation_id,
+        'owner': profile.owner, 'claims': [{'name': 'scratch', 'uid': 'original-scratch-uid'}]}
+    path = tmp_path / 'scratch.json';path.write_text(json.dumps(proof));path.chmod(0o600)
+    args.disposable_workspace_receipt = str(path)
+    monkeypatch.setattr(execution, 'guard', lambda a: None)
+    monkeypatch.setattr(execution, 'resolve_context', lambda *a: context)
+    monkeypatch.setattr(execution, 'read', lambda *a, **kw: None)
+    monkeypatch.setattr(unused, 'review', lambda *a: {'reservation': 'a' * 32,
+        'resources': {'sandbox': 'sandbox-uid'}})
+    phases = [];native = []
+    def state(a, c, value, phase, *extra):
+        phases.append(phase);return {'item_id': original, 'eligible': True}
+    monkeypatch.setattr(unused, 'state', state)
+    def retire(a):
+        assert a.disposable_workspace_reservation == original
+        native.append(True);return {}
+    monkeypatch.setattr(execution, 'retire', retire)
+    def absent(a, c, claims, read):
+        assert claims == proof['claims']
+        if condition == 'remaining-scratch':raise ValueError('Scratch deletion unconfirmed')
+    monkeypatch.setattr(workspace, 'verify_absent', absent)
+    if condition == 'valid':
+        assert unused.run(args)['unused_identity_retired']
+        assert native == [True] and phases == ['plan', 'begin', 'finish']
+    else:
+        with pytest.raises(ValueError):unused.run(args)
+        assert not native and phases == ['eligible' if args.resume_unused_retirement else 'plan']

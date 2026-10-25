@@ -53,12 +53,8 @@ def patch(current: dict, field: str, desired: Any) -> list[dict]:
     ]
 
 
-def current(args: argparse.Namespace) -> bool:
-    """Compare owned trust copies with the operator-managed public SPIRE bundle.
-
-    Caller first verifies the selected cluster with guard(). This check changes
-    no trust and accepts neither a foreign owner nor a leaf as a CA.
-    """
+def public_bundle(args: argparse.Namespace) -> dict:
+    """Read the approved operator-managed public source; never exec SPIRE."""
     namespace = json.loads(command(args, 'get', 'namespace', SPIRE_NAMESPACE, '-o', 'json'))
     if any(namespace['metadata'].get('labels', {}).get(k) != v for k, v in LABELS.items()):
         raise ValueError('Owned SPIRE namespace required')
@@ -70,6 +66,13 @@ def current(args: argparse.Namespace) -> bool:
             or not any(v.get('kind') == 'SpireServer' and v.get('name') == 'cluster' and v.get('uid')
                        for v in metadata.get('ownerReferences', []))):
         raise ValueError('Exact operator-managed public SPIRE bundle required')
+    certificates(bundle["data"]["bundle.crt"])
+    return bundle
+
+
+def current(args: argparse.Namespace) -> bool:
+    """Verify both public trust copies without changing trust or workload state."""
+    bundle = public_bundle(args)
     expected = {v.fingerprint(hashes.SHA256()) for v in certificates(bundle['data']['bundle.crt'])}
     if os.environ.get('IDENTITY_DEMO_RUNTIME') == 'cluster':
         return public_observation(args, expected, bundle)
@@ -115,11 +118,11 @@ def refresh(args: argparse.Namespace) -> dict[str, Any]:
             raise ValueError("Exact owned resource required")
         return value
 
-    ns = json.loads(command(args, "get", "namespace", SPIRE_NAMESPACE, "-o", "json"))
-    if any(ns["metadata"].get("labels", {}).get(k) != v for k, v in LABELS.items()):
-        raise ValueError("Owned SPIRE namespace required")
-    pem = command(args, "exec", "spire-server-0", "-n", SPIRE_NAMESPACE, "-c", "spire-server",
-                  "--", "/spire-server", "bundle", "show", "-format", "pem")
+    if args.apply:
+        from identity_demo_execution_setup import inspect_state
+        if not inspect_state(args)["rollback_quiescent"]:
+            raise ValueError("Trust reconciliation requires a verified idle installation")
+    pem = public_bundle(args)["data"]["bundle.crt"]
     roots = certificates(pem)
     bundle_hash = hashlib.sha256(pem.encode()).hexdigest()
     trust = read("secret", ISSUER + "-client-trust")
@@ -189,6 +192,7 @@ def main() -> None:
     parser.add_argument("--credentials-file", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--namespace", default=NAMESPACE)
+    parser.add_argument("--public-trust-ca-uid", help="Original separate public SPIRE trust Secret UID in managed TLS mode")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     os.umask(0o077)

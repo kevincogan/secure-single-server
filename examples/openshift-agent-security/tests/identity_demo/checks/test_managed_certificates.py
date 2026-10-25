@@ -379,3 +379,160 @@ def test_live_mtls_probe_requires_completed_client_authentication(inputs,tmp_pat
             managed.served('127.0.0.1',listener.getsockname()[1],expected['dnsNames'][0],pem,expected,client=(client,client_key))
     thread.join(10);assert not thread.is_alive()
     assert bool(observed)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "certificate_uid",
+        "issuer_uid",
+        "annotation",
+        "key",
+        "foreign_owner",
+        "certificate_policy",
+        "foreign_reference",
+    ],
+)
+def test_fresh_leaf_secret_traces_original_certificate_and_approved_crypto(
+    inputs, monkeypatch, fault
+):
+    config, key, ca, pem = inputs
+    contract, _ = managed.configuration(config)
+    name = managed.SECRETS[2]
+    cert = deepcopy(managed.resources(LEGACY, contract)[2])
+    cert["metadata"].update(uid=str(uuid4()), generation=1)
+    cert["status"] = {
+        "conditions": [{"type": "Ready", "status": "True", "observedGeneration": 1}]
+    }
+    certificate, private = leaf(key, ca, managed.targets(LEGACY)[name])
+    secret = {
+        "kind": "Secret",
+        "type": "kubernetes.io/tls",
+        "metadata": {
+            "name": name,
+            "namespace": LEGACY.core_namespace,
+            "uid": str(uuid4()),
+            "labels": dict(LEGACY.labels),
+            "annotations": {
+                "cert-manager.io/certificate-name": name,
+                "cert-manager.io/issuer-name": contract["issuer_ref"]["name"],
+            },
+        },
+        "data": {
+            "tls.crt": base64.b64encode(certificate).decode(),
+            "tls.key": base64.b64encode(private).decode(),
+            "ca.crt": base64.b64encode(pem.encode()).decode(),
+        },
+    }
+    ledger = {
+        "completed": True,
+        "installation_profile": LEGACY.to_dict(),
+        "created": [
+            {
+                "kind": "Certificate",
+                "namespace": LEGACY.core_namespace,
+                "metadata": {"name": name, "uid": cert["metadata"]["uid"]},
+            }
+        ],
+    }
+    issuer = {
+        "kind": "Issuer",
+        "metadata": {
+            "name": contract["issuer_ref"]["name"],
+            "namespace": LEGACY.core_namespace,
+            "uid": contract["issuer_uid"],
+            "generation": 1,
+        },
+        "status": {
+            "conditions": [{"type": "Ready", "status": "True", "observedGeneration": 1}]
+        },
+    }
+    if fault == "certificate_uid":
+        cert["metadata"]["uid"] = str(uuid4())
+    if fault == "issuer_uid":
+        issuer["metadata"]["uid"] = str(uuid4())
+    if fault == "annotation":
+        secret["metadata"]["annotations"]["cert-manager.io/certificate-name"] = (
+            "another-target"
+        )
+    if fault == "key":
+        secret["data"]["tls.key"] = base64.b64encode(
+            leaf(key, ca, managed.targets(LEGACY)[name])[1]
+        ).decode()
+    if fault == "foreign_owner":
+        secret["metadata"]["labels"]["identity-demo-owner"] = "foreign"
+    if fault == "certificate_policy":
+        cert["spec"]["dnsNames"] = ["foreign.invalid"]
+    if fault == "foreign_reference":
+        secret["metadata"]["ownerReferences"] = [
+            {"kind": "Certificate", "uid": str(uuid4())}
+        ]
+
+    def read(args, kind, target, namespace=None):
+        assert namespace == LEGACY.core_namespace
+        return issuer if kind == "issuers.cert-manager.io" else cert
+
+    monkeypatch.setattr(operations, "read", read)
+    args = Namespace(certificate_management=contract, certificate_authority_pem=pem)
+    if fault:
+        with pytest.raises(ValueError):
+            operations.recorded_secret(args, LEGACY, ledger, secret)
+    else:
+        result = operations.recorded_secret(args, LEGACY, ledger, secret)
+        assert result["remaining_seconds"] > 29 * 86400
+        assert (
+            ledger["created"][0]["kind"] == "Certificate"
+        )  # No invented Secret creation receipt.
+
+
+@pytest.mark.parametrize("changed_authority", [False, True])
+def test_idle_trust_observation_uses_validated_worker_managed_contract(
+    inputs, tmp_path, monkeypatch, changed_authority
+):
+    import cluster_console_install as console
+    import identity_demo_execution_setup as execution
+    import identity_demo_sender_trust as sender
+
+    config, _, _, pem = inputs
+    contract, _ = managed.configuration(config)
+    names = [("Secret", managed.SPIRE_TRUST),
+             ("Secret", "fixture-keycloak-upstream-client-trust"),
+             ("Deployment", "fixture-keycloak-upstream")]
+    objects = {name: {"kind": kind, "metadata": {
+        "name": name, "namespace": LEGACY.core_namespace,
+        "uid": name + "-original", "labels": LEGACY.labels},
+        "type": "Opaque", "data": {"ca.crt": "public"}}
+        for kind, name in names}
+    listener = {"kind": "Secret", "metadata": {
+        "name": "fixture-mcp-bound-mutual", "namespace": LEGACY.core_namespace,
+        "uid": "controller-issued-leaf", "labels": LEGACY.labels}}
+    objects[listener["metadata"]["name"]] = listener
+    ledger = {"completed": True, "installation_profile": LEGACY.to_dict(),
+        "created": [{"kind": v["kind"], "namespace": LEGACY.core_namespace,
+                     "metadata": v["metadata"]} for v in objects.values() if v is not listener]}
+    path = tmp_path / "ledger.json"
+    path.write_text(json.dumps(ledger))
+    path.chmod(0o600)
+    args = Namespace(ledger=str(path), console_ledger_sha256=operations.setup.sha(path),
+        certificate_management=contract, certificate_authority_pem=pem,
+        output_dir=tmp_path, apply=False)
+    if changed_authority:
+        args.certificate_authority_pem = pki()[1].public_bytes(serialization.Encoding.PEM).decode()
+    monkeypatch.setattr(console.setup, "kube", lambda args, *words, **kwargs:
+                        deepcopy(objects[words[2]]))
+    monkeypatch.setattr(execution, "inspect_state", lambda args: {"rollback_quiescent": True})
+    monkeypatch.setattr(sender, "current", lambda args: True)
+    monkeypatch.setattr(operations, "configure", lambda *args: pytest.fail("Worker contract triggered migration"))
+
+    class RecordedLeafReached(Exception):
+        pass
+
+    def verify_recorded_leaf(actual, profile, saved, secret):
+        assert profile == LEGACY and saved == ledger and secret == listener
+        assert actual.public_trust_ca_uid == managed.SPIRE_TRUST + "-original"
+        raise RecordedLeafReached
+
+    monkeypatch.setattr(operations, "recorded_secret", verify_recorded_leaf)
+    with pytest.raises(ValueError if changed_authority else RecordedLeafReached):
+        console.trust_observation(args, LEGACY)

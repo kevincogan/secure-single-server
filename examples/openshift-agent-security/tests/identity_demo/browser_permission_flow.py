@@ -46,7 +46,7 @@ class BrowserPermissionFlow(PermissionFlow):
         self.page.locator("#password").fill(self.passwords[self.username])
         self.page.locator("#kc-login").click()
         self.page.wait_for_url(DRIVER + "/")
-        self.page.get_by_role("button", name="Account options for " + self.username, exact=True).wait_for(state="visible")
+        self.page.get_by_label("Account options for " + self.username, exact=True).wait_for(state="visible")
         if getattr(self.args, "record_video", False):
             # Move authenticated state in memory to a fresh recording context.
             # The login form and operator credentials never enter the recording.

@@ -76,3 +76,47 @@ def test_issuer_and_secrets_require_original_creation_uids(tmp_path,monkeypatch)
         return value
     monkeypatch.setattr(setup,'kube',kube)
     with pytest.raises(ValueError,match='original owned'):maintenance.recorded(args,LEGACY)
+
+def test_existing_secret_receipts_remain_valid_in_managed_mode(tmp_path, monkeypatch):
+    entries = [
+        {
+            "kind": kind,
+            "namespace": LEGACY.core_namespace,
+            "metadata": {
+                "name": name,
+                "namespace": LEGACY.core_namespace,
+                "uid": name + "-original",
+                "labels": LEGACY.labels,
+            },
+        }
+        for kind, name in (
+            ("Secret", "fixture-keycloak-upstream-client-trust"),
+            ("Secret", "fixture-mcp-bound-mutual"),
+            ("Deployment", "fixture-keycloak-upstream"),
+        )
+    ]
+    path = tmp_path / "ledger.json"
+    path.write_text(
+        json.dumps({"installation_profile": LEGACY.to_dict(), "created": entries})
+    )
+    path.chmod(0o600)
+    args = Namespace(
+        ledger=str(path),
+        console_ledger_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        certificate_management={"mode": "managed"},
+    )
+    monkeypatch.setattr(
+        setup,
+        "kube",
+        lambda args, *words, **kwargs: deepcopy(
+            next(v for v in entries if v["metadata"]["name"] == words[2])
+        ),
+    )
+    import certificate_operations
+
+    monkeypatch.setattr(
+        certificate_operations,
+        "recorded_secret",
+        lambda *args: pytest.fail("Legacy Secret receipt was reinterpreted"),
+    )
+    assert len(maintenance.recorded(args, LEGACY)) == 3

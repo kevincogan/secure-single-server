@@ -183,7 +183,7 @@ for module in (warm,runs):
 store=runs.RunStore.__new__(runs.RunStore);store.path=Path(os.environ['DRIVER_DATABASE'])
 phase=value['phase'];assert phase in ('plan','begin','eligible','finish')
 with (store.transaction() if phase in ('begin','finish') else store.read_transaction()) as db:
- row=db.execute('SELECT context FROM console_pool_items WHERE workload=?',(value['workload'],)).fetchone()
+ row=db.execute('SELECT id,context FROM console_pool_items WHERE workload=?',(value['workload'],)).fetchone()
  assert row and all(json.loads(row['context']).get(k)==v for k,v in value['identity'].items())
  if phase=='plan':
   warm.unused_retirement_gate(db);warm.unused_context(db,value['workload'],value['context_sha256'])
@@ -193,7 +193,7 @@ with (store.transaction() if phase in ('begin','finish') else store.read_transac
   target=warm.unused_retirement(db,value['reservation'],value['review_sha256'])
   assert target['workload']==value['workload'] and target['context_sha256']==value['context_sha256']
   if phase=='finish':warm.complete_unused_retirement(db,value['reservation'],value['review_sha256'],value['absence_sha256'])
-print(json.dumps({'eligible':True,'phase':phase,'reservation':value['reservation'],'business_run_created':False,'native_mutation_replayed':False}))
+print(json.dumps({'eligible':True,'phase':phase,'reservation':value['reservation'],'business_run_created':False,'native_mutation_replayed':False,'item_id':row['id']}))
 '''
     execution.native.private_write(args.output_dir/('unused-'+phase+'.pending.private.json'), payload)
     result = subprocess.run(['oc', '--kubeconfig', args.kubeconfig, '-n', active_profile().core_namespace,
@@ -219,10 +219,21 @@ def run(args):
     value = review(args, context)
     resume = getattr(args, 'resume_unused_retirement', False)
     if resume:
-        state(args, context, value, 'eligible')
+        checked = state(args, context, value, 'eligible')
     else:
         execution.resolve_context(args.context_file[0], lambda k, n, ns=None: execution.read(args, k, n, ns))
-        state(args, context, value, 'plan')
+        checked = state(args, context, value, 'plan')
+    scratch = None
+    if getattr(args, 'disposable_workspace_receipt', None):
+        scratch = strict_json(Path(args.disposable_workspace_receipt).read_bytes())
+        args.disposable_workspace_reservation = checked['item_id']
+        if (scratch.get('kind') != 'new-synthetic-pool-scratch'
+                or scratch.get('context') != asdict(context)
+                or scratch.get('reservation') != checked['item_id']
+                or scratch.get('sandbox_uid') != value['resources']['sandbox']
+                or scratch.get('installation') != active_profile().installation_id
+                or scratch.get('owner') != active_profile().owner):
+            raise ValueError('Disposable scratch must match the original pool reservation')
     if not args.apply:
         return {'applied': False, 'unused_retirement_planned': True, 'resume_is_read_only': resume}
     result = {}
@@ -239,6 +250,9 @@ def run(args):
     from identity_demo_controller_identity import enabled
     if not enabled() and execution.read(args, 'clusterstaticentries.spire.spiffe.io', context.registration_name, optional=True):
         raise ValueError('Reviewed registration remains; explicit guarded cleanup required before read-only resume')
+    if scratch is not None:
+        from identity_demo_workspace_retention import verify_absent
+        verify_absent(args, context, scratch['claims'], execution.read)
     path = args.output_dir/'unused-absence.private.json'
     execution.native.private_write(path, {'reservation': value['reservation'], 'absent': absent,
         'review_sha256': args.review_sha256, 'resources': value['resources']})
