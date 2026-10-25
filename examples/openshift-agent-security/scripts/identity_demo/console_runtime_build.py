@@ -41,7 +41,7 @@ def unpack(archive, expected, member_name, target):
     target.chmod(0o555)
 
 
-def run(args):
+def prepare_context(args):
     from identity_demo_setup import write, private_file
     if args.apply:
         configured = read_json(private_file(args.runtime_configuration_receipt))
@@ -58,8 +58,19 @@ def run(args):
     context = args.output_dir / 'context'
     context.mkdir(mode=0o700)
     (context/'tools').mkdir(mode=0o700)
-    unpack(args.oc_archive, lock['oc_archive_sha256'], 'oc', context/'tools/oc')
-    unpack(args.cli_archive, cli['sha256'], cli['archive_member'], context/'tools/openshell')
+    if getattr(args, 'packaged_installer_tools', False):
+        receipt = read_json(Path('/usr/share/installer-tools.json'))
+        if receipt.get('versions') != {'oc': lock['oc_version'], 'openshell': cli_lock['version'], 'platform': 'linux/amd64'}:
+            raise ValueError('Pinned installer tool versions required')
+        for name, expected in (('oc', lock['oc_archive_sha256']), ('openshell', cli['sha256'])):
+            source = Path('/usr/local/bin') / name
+            if receipt.get(name, {}).get('archive_sha256') != expected or digest(source) != receipt[name].get('binary_sha256'):
+                raise ValueError('Packaged installer tool bytes changed')
+            shutil.copyfile(source, context/'tools'/name)
+            (context/'tools'/name).chmod(0o555)
+    else:
+        unpack(args.oc_archive, lock['oc_archive_sha256'], 'oc', context/'tools/oc')
+        unpack(args.cli_archive, cli['sha256'], cli['archive_member'], context/'tools/openshell')
     for folder in ('scripts', 'tests', 'workloads', 'infra'):
         if any(p.is_symlink() for p in (ROOT/folder).rglob('*')):
             raise ValueError('Runtime source must contain regular repository files')
@@ -73,6 +84,12 @@ def run(args):
             'source_digest': identity, 'credentials_included': False,
             'image_tag': 'localhost/identity-console-runtime:' + identity[:16]}
     write(args.output_dir/'console-runtime-build.plan.json', plan)
+    return lock, cli_lock, plan, context
+
+
+def run(args):
+    from identity_demo_setup import write
+    lock, cli_lock, plan, context = prepare_context(args)
     if not args.apply:
         return {'runtime_build_prepared': True, 'cluster_changed': False}
     command([args.engine, 'build', '--platform=linux/amd64', '-f', str(context/'Containerfile'), '--build-arg',

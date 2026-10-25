@@ -30,6 +30,15 @@ RECIPES = ROOT / "infra/openshell/native-build"
 PATCHES = ROOT / "infra/openshell/patches"
 
 
+def verified_builder_image(image, lock):
+    """Permit an approved mirror only for the pinned AMD64 manifest bytes."""
+    from deployment_artifacts import IMAGE_REFERENCE
+    if (not isinstance(image,str) or not IMAGE_REFERENCE.fullmatch(image)
+            or image.rsplit('@',1)[-1] != lock['builder_platform_digest']):
+        raise ValueError('Builder mirror must preserve the pinned AMD64 manifest digest')
+    return image
+
+
 def digest(path: Path) -> str:
     """Hash large source/executable files without logging their contents."""
     with path.open("rb") as stream:
@@ -150,7 +159,7 @@ def runtime_recipe(lock: dict, plan: dict, role: str) -> str:
 
 
 def runtime_context(args: argparse.Namespace, lock: dict, plan: dict, role: str,
-                    builder_id: str) -> Path:
+                    builder_id: str, *, export_file=None) -> Path:
     """Create an allowlisted binary/library/public-trust context, never private state."""
     from identity_demo_setup import write
 
@@ -162,24 +171,26 @@ def runtime_context(args: argparse.Namespace, lock: dict, plan: dict, role: str,
     if not (header[:6] == b"\x7fELF\x02\x01" and header[18:20] == b"\x3e\x00"):
         raise ValueError("Linux AMD64 ELF executable required")
     library = "libz3.so.4" if role == "gateway" else "libgcc_s.so.1"
-    with (context / library).open("xb") as stream:
-        result = subprocess.run([args.engine, "run", "--rm", "--network=none", "--read-only",
-            "--cap-drop=ALL", "--security-opt=no-new-privileges", "--entrypoint", "cat", builder_id,
-            "/usr/lib/x86_64-linux-gnu/" + library], stdout=stream, stderr=subprocess.PIPE, timeout=60)
-    if result.returncode:
-        raise RuntimeError("Target runtime library export failed; details withheld")
+    def exported(source, target):
+        if export_file is not None:
+            export_file(source, target)
+        else:
+            with target.open("xb") as stream:
+                result = subprocess.run([args.engine, "run", "--rm", "--network=none", "--read-only",
+                    "--cap-drop=ALL", "--security-opt=no-new-privileges", "--entrypoint", "cat", builder_id,
+                    source], stdout=stream, stderr=subprocess.PIPE, timeout=60)
+            if result.returncode:
+                raise RuntimeError("Target runtime export failed; details withheld")
+        if not target.is_file() or not target.stat().st_size:
+            raise ValueError("Nonempty runtime export required")
+    exported("/usr/lib/x86_64-linux-gnu/" + library, context / library)
     package = "libz3-4" if role == "gateway" else "libgcc-s1"
     versions = [line.split()[1] for line in (args.output_dir / "compiled/builder-packages.txt").read_text().splitlines()
                 if line.split() and line.split()[0] == package + ":amd64"]
     if len(versions) != 1:
         raise ValueError("Exact copied-library package version required")
     copyright_file = package + ".copyright"
-    with (context / copyright_file).open("xb") as stream:
-        result = subprocess.run([args.engine, "run", "--rm", "--network=none", "--read-only",
-            "--cap-drop=ALL", "--security-opt=no-new-privileges", "--entrypoint", "cat", builder_id,
-            "/usr/share/doc/" + package + "/copyright"], stdout=stream, stderr=subprocess.PIPE, timeout=60)
-    if result.returncode or not (context / copyright_file).stat().st_size:
-        raise RuntimeError("Copied-library licence export failed; details withheld")
+    exported("/usr/share/doc/" + package + "/copyright", context / copyright_file)
     # Copying a shared library does not update the base image's dpkg database.
     # Preserve a separate truthful SPDX package record and its real licence text.
     library_hash = digest(context / library)

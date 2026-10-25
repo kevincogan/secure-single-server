@@ -943,3 +943,105 @@ def test_private_files_cannot_land_in_source_archive_without_git(tmp_path,monkey
     key=repo/'input.json';key.write_text('{}');key.chmod(0o600)
     assert setup.in_checkout(key) and not (repo/'.git').exists()
     with pytest.raises(ValueError,match='outside checkout'):setup.private_file(str(key))
+
+
+def test_administrator_prerequisites_require_original_uid_source_and_configuration(tmp_path,monkeypatch):
+    from copy import deepcopy
+    from argparse import Namespace
+    from deployment_profile import LEGACY
+    tmp_path.chmod(0o700)
+    desired={'apiVersion':'rbac.authorization.k8s.io/v1','kind':'Role','metadata':{
+        'name':'fixture-installer-scope','namespace':LEGACY.core_namespace,'labels':dict(LEGACY.labels)},
+        'rules':[{'apiGroups':[''],'resources':['pods'],'verbs':['get']}]}
+    current=deepcopy(desired);current['metadata'].update(uid='original-uid',resourceVersion='1')
+    record={'object':deepcopy(current),'uid':'original-uid','fingerprint':setup.fingerprint(current),
+            'declared_fingerprint':setup.fingerprint(desired)}
+    path=tmp_path/'administrator.receipt.json'
+    setup.write(path,{'schema_version':1,'installation_profile':LEGACY.to_dict(),
+        'expected_server':LEGACY.expected_server,'created':[record]})
+    args=Namespace(profile=LEGACY,administrator_receipt=str(path),administrator_receipt_sha256=setup.sha(path))
+    assert setup.administrator_prepared(args,desired,current)
+    for mutated in (dict(current,metadata=dict(current['metadata'],uid='replacement')),
+                    dict(current,rules=[{'apiGroups':[''],'resources':['secrets'],'verbs':['get']}])):
+        with pytest.raises(ValueError,match='identity or configuration'):setup.administrator_prepared(args,desired,mutated)
+    with pytest.raises(ValueError,match='Application state'):
+        setup.administrator_prepared(args,dict(desired,kind='Secret'),current)
+    args.administrator_receipt_sha256='0'*64
+    with pytest.raises(ValueError,match='receipt hash'):setup.administrator_prepared(args,desired,current)
+
+
+@pytest.mark.parametrize('drift', [None, 'uid', 'rules'])
+def test_install_retains_only_exact_prepared_grants_and_never_recreates_them(tmp_path, monkeypatch, drift):
+    from deployment_profile import LEGACY
+    tmp_path.chmod(0o700)
+    api = API()
+    monkeypatch.setattr(setup, 'kube', api.call)
+    desired = obj('Role', 'fixture-reviewed', rules=[{
+        'apiGroups': [''], 'resources': ['pods'], 'verbs': ['get']}])
+    original = api.call(None, 'create', value=desired)
+    receipt = tmp_path / 'administrator.json'
+    setup.write(receipt, {'schema_version': 1, 'expected_server': LEGACY.expected_server,
+        'installation_profile': LEGACY.to_dict(), 'created': [{
+            'object': original, 'uid': original['metadata']['uid'],
+            'fingerprint': setup.fingerprint(original),
+            'declared_fingerprint': setup.fingerprint(desired)}]})
+    options = args(tmp_path, profile=LEGACY, administrator_receipt=str(receipt),
+                   administrator_receipt_sha256=setup.sha(receipt))
+    api.events.clear()
+    api.denied_resources.add('roles')
+    if drift == 'uid':
+        api.objects[('Role', 'fixture-reviewed')]['metadata']['uid'] = 'replacement'
+    elif drift == 'rules':
+        api.objects[('Role', 'fixture-reviewed')]['rules'][0]['resources'] = ['secrets']
+    if drift:
+        with pytest.raises(ValueError, match='identity or configuration'):
+            setup.install(options, [desired])
+        assert not (tmp_path / 'creation-ledger.private.json').exists()
+    else:
+        assert setup.permissions(options, [desired])['ready']
+        assert setup.install(options, [desired])['completed']
+        ledger = json.loads((tmp_path / 'creation-ledger.private.json').read_text())
+        assert ledger['created'] == [] and len(ledger['retained_prerequisites']) == 1
+        assert ledger['retained_prerequisites'][0]['uid'] == original['metadata']['uid']
+        options.ledger = str(tmp_path / 'creation-ledger.private.json')
+        assert setup.reconcile_creation(options, [desired]) == ledger
+        api.objects[('Role', 'fixture-reviewed')]['metadata']['uid'] = 'replacement'
+        with pytest.raises(ValueError, match='prerequisite changed'):
+            setup.reconcile_creation(options, [desired])
+    assert not any(words[0] == 'create' and (body or {}).get('kind') == 'Role'
+                   for words, body in api.events)
+
+
+@pytest.mark.parametrize("fault", [None, "uid", "selector", "receipt", "core"])
+def test_workspace_isolation_retention_never_grants_policy_creation(tmp_path, monkeypatch, fault):
+    from deployment_profile import LEGACY
+    tmp_path.chmod(0o700)
+    api = API()
+    monkeypatch.setattr(setup, "kube", api.call)
+    desired = obj("NetworkPolicy", "identity-demo-default-deny", spec={"podSelector": {}, "policyTypes": ["Ingress", "Egress"]})
+    desired["metadata"]["namespace"] = LEGACY.core_namespace if fault == "core" else LEGACY.triage_namespace
+    original = api.call(None, "create", value=desired)
+    path = tmp_path / "administrator.json"
+    setup.write(path, {"schema_version": 1, "expected_server": LEGACY.expected_server, "installation_profile": LEGACY.to_dict(), "created": [{"object": original, "uid": original["metadata"]["uid"], "fingerprint": setup.fingerprint(original), "declared_fingerprint": setup.fingerprint(desired)}]})
+    options = args(tmp_path, profile=LEGACY, administrator_receipt=str(path), administrator_receipt_sha256=setup.sha(path))
+    api.events.clear()
+    api.denied_resources.add("networkpolicies")
+    if fault == "uid":
+        api.objects[("NetworkPolicy", desired["metadata"]["name"])]["metadata"]["uid"] = "replacement"
+    elif fault == "selector":
+        api.objects[("NetworkPolicy", desired["metadata"]["name"])]["spec"]["podSelector"] = {"matchLabels": {"other": "true"}}
+    elif fault == "receipt":
+        options.administrator_receipt = None
+        options.administrator_receipt_sha256 = None
+    if fault:
+        with pytest.raises(ValueError):
+            setup.install(options, [desired])
+        assert not (tmp_path / "creation-ledger.private.json").exists()
+    else:
+        assert setup.permissions(options, [desired])["ready"]
+        assert setup.install(options, [desired])["completed"]
+        ledger = json.loads((tmp_path / "creation-ledger.private.json").read_text())
+        assert ledger["created"] == [] and ledger["retained_prerequisites"][0]["uid"] == original["metadata"]["uid"]
+        options.ledger = str(tmp_path / "creation-ledger.private.json")
+        assert setup.reconcile_creation(options, [desired]) == ledger
+    assert not any(words[0] == "create" and (value or {}).get("kind") == "NetworkPolicy" for words, value in api.events)

@@ -9,7 +9,13 @@
   "source_or_distribution_approved": false,
   "python_rpms": [
     "python3.12-3.12.15-1.el9_8",
-    "python3.12-pip-23.2.1-5.el9"
+    "python3.12-pip-23.2.1-5.el9",
+    "python3.12-libs-3.12.15-1.el9_8",
+    "python3.12-pip-wheel-23.2.1-5.el9",
+    "expat-2.5.0-6.el9_8.7",
+    "mpdecimal-2.5.1-3.el9",
+    "libnsl2-2.0.0-1.el9",
+    "libtirpc-1.3.3-9.el9"
   ],
-  "rpm_manifest_sha256": "6219587605b03d93b82f4c80a4240bf86a68c4458b0f370e7140ec43d22508cf"
+  "rpm_manifest_sha256": "979b6a42fa625742c6c1eb0267994a486cbae2175d62e617be2bf9a987968c92"
 }

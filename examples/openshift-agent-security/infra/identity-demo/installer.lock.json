@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "runtime_lock": "infra/identity-demo/console-runtime.lock.json",
+  "extra_rpms": [
+    "cracklib-2.9.6-28.el9",
+    "cracklib-dicts-2.9.6-28.el9",
+    "git-core-2.52.0-1.el9",
+    "gzip-1.12-2.el9_8",
+    "less-590-6.el9",
+    "libcbor-0.7.0-5.el9",
+    "libdb-5.3.28-57.el9_6",
+    "libeconf-0.4.1-7.el9_8",
+    "libedit-3.1-39.20210216cvs.el9",
+    "libfdisk-2.37.4-25.el9",
+    "libfido2-1.13.0-2.el9",
+    "libpwquality-1.4.4-8.el9",
+    "libutempter-1.2.1-6.el9",
+    "openssh-9.9p1-13.el9_8",
+    "openssh-clients-9.9p1-13.el9_8",
+    "openssl-3.5.8-2.el9_8",
+    "pam-1.5.1-28.el9_8.1",
+    "util-linux-2.37.4-25.el9",
+    "util-linux-core-2.37.4-25.el9"
+  ],
+  "rpm_manifest_sha256": "c80669c37882c82ce55785a19f0cadf0447b55a652d297b21f7039cb35c7a1c6"
+}

@@ -36,5 +36,6 @@
       "sha256": "0758e2c604d20d009f6afb31fb3a880feb2fc48b32b73bf4d2d382d7d63e0c06"
     }
   ],
-  "support_boundary": "Development evaluation; vendor support, scans and live acceptance remain separate."
+  "support_boundary": "Development evaluation; vendor support, scans and live acceptance remain separate.",
+  "builder_platform_digest": "sha256:28846ec5a6bcfcddb93f403ba7071bd579787852b2f2ac3839965620e8bd9456"
 }
