@@ -378,6 +378,49 @@ def gateway_snapshot(args: argparse.Namespace, pod: str, timeout: float) -> dict
     return dump
 
 
+def require_isolation(args):
+    """Verify either explicit CLI or private-console isolation before any write."""
+    from identity_demo_step4_isolation import policies
+
+    for expected in policies():
+        live = shared.owned(args, "networkpolicy", expected["metadata"]["name"])
+        if live["spec"] != expected["spec"]:
+            raise ValueError("Exact private-route isolation policies required")
+    broad = shared.owned(args, "networkpolicy", "fixture-isolation")
+    expected_exclusions = {
+        "gateway.networking.k8s.io/gateway-name": ["fixture-mcp"],
+        "app.kubernetes.io/name": ["mcp-gateway"],
+        "app": ["fixture-protected-adapter", "fixture-jira"],
+    }
+    actual = broad["spec"]["podSelector"].get("matchExpressions", [])
+    app = [e.get("values") for e in actual if e.get("key") == "app"]
+    if app != [expected_exclusions["app"]]:
+        from cluster_console_resources import private_network
+
+        resources, desired = private_network(active_profile(), broad)
+        for policy in (o for o in resources if o["kind"] == "NetworkPolicy"):
+            live = shared.owned(args, "networkpolicy", policy["metadata"]["name"])
+            if live["spec"] != policy["spec"]:
+                raise ValueError("Exact private console isolation policies required")
+        (expected_exclusions["app"],) = [
+            e["values"]
+            for e in desired["spec"]["podSelector"]["matchExpressions"]
+            if e["key"] == "app"
+        ]
+    if (
+        set(broad["spec"]["podSelector"]) != {"matchExpressions"}
+        or len(actual) != 3
+        or any(
+            e["operator"] != "NotIn" or e["values"] != expected_exclusions.get(e["key"])
+            for e in actual
+        )
+        or shared.owned(args, "networkpolicy", "fixture-mcp-route-ingress")["spec"].get(
+            "ingress", []
+        )
+    ):
+        raise ValueError("Additive broad/private HTTP bypass must be closed first")
+
+
 class NativeBackend:
     """Track exact disposable owned resources and their private before-state."""
 
@@ -418,33 +461,7 @@ class NativeBackend:
             from identity_demo_gateway_persistence import verify
             self.persistent_receipt = verify(self.args, ca)
             return
-        from identity_demo_step4_isolation import policies
-
-        for expected in policies():
-            live = shared.owned(
-                self.args, "networkpolicy", expected["metadata"]["name"]
-            )
-            if live["spec"] != expected["spec"]:
-                raise ValueError("Exact private-route isolation policies required")
-        broad = shared.owned(self.args, "networkpolicy", "fixture-isolation")
-        expected_exclusions = {
-            "gateway.networking.k8s.io/gateway-name": ["fixture-mcp"],
-            "app.kubernetes.io/name": ["mcp-gateway"],
-            "app": ["fixture-protected-adapter", "fixture-jira"],
-        }
-        actual = broad["spec"]["podSelector"].get("matchExpressions", [])
-        if (
-            len(actual) != 3
-            or any(
-                e["operator"] != "NotIn"
-                or e["values"] != expected_exclusions.get(e["key"])
-                for e in actual
-            )
-            or shared.owned(self.args, "networkpolicy", "fixture-mcp-route-ingress")[
-                "spec"
-            ].get("ingress", [])
-        ):
-            raise ValueError("Additive broad/private HTTP bypass must be closed first")
+        require_isolation(self.args)
         credential = json.loads(shared.private_path(credential_file).read_text())
         if (
             not credential["token"].startswith("discovery_")

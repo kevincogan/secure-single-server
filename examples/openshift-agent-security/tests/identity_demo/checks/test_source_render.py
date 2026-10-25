@@ -319,3 +319,56 @@ def test_offline_render_never_retains_a_lab_router_address(config):
     aliases=[o['spec']['template']['spec']['hostAliases'] for o in configured['objects']
              if o['kind'] in ('Deployment','StatefulSet') and o['spec']['template']['spec'].get('hostAliases')]
     assert len(aliases)==2 and all(v[0]['ip']=='192.0.2.77' for v in aliases)
+
+
+def test_driver_mounts_only_the_public_native_artifact_contract(config):
+    raw=json.loads(config.read_text())
+    path=Path(raw['artifacts_file']);artifacts=json.loads(path.read_text())
+    artifacts['operator_note']='private-operator-metadata-must-not-be-mounted'
+    path.write_text(json.dumps(artifacts))
+    bundle,_,_=renderer.render(config)
+    mapping=next(o for o in bundle['objects'] if o['kind']=='ConfigMap' and o['metadata']['name']=='identity-demo-installation')
+    actual=json.loads(mapping['data']['artifacts.json'])
+    assert set(actual)=={'schema_version','images','native_build_contract'}
+    assert 'operator_note' not in actual
+    driver=next(o for o in bundle['objects'] if o['kind']=='Deployment' and o['metadata']['name']=='fixture-identity-driver')
+    container=driver['spec']['template']['spec']['containers'][0]
+    assert {'name':'IDENTITY_DEMO_ARTIFACTS','value':'/configuration/artifacts.json'} in container['env']
+    assert any(m.get('subPath')=='artifacts.json' and m.get('readOnly') for m in container['volumeMounts'])
+
+
+def test_invalid_build_metadata_cannot_enter_the_public_artifact_mount(config):
+    raw=json.loads(config.read_text());path=Path(raw['artifacts_file'])
+    artifacts=json.loads(path.read_text())
+    artifacts['native_build_contract']['unrecognized']='private-note'
+    artifacts['native_ca_bundle_sha256']='not-a-public-hash'
+    path.write_text(json.dumps(artifacts))
+    bundle,_,_=renderer.render(config)
+    assert not bundle['native_build_contract_matches']
+    mapping=next(o for o in bundle['objects'] if o['kind']=='ConfigMap' and o['metadata']['name']=='identity-demo-installation')
+    assert set(json.loads(mapping['data']['artifacts.json']))=={'schema_version','images'}
+
+
+
+def test_workspace_only_gateway_cannot_manage_core_pods_or_secrets(config):
+    value=json.loads(config.read_text());value['native_management_scope']='workspaces-only'
+    config.write_text(json.dumps(value))
+    bundle,_,_=renderer.render(config)
+    profile=DeploymentProfile.from_dict(bundle['installation_profile'])
+    assert bundle['native_management_scope']=='workspaces-only'
+    assert not any(o['kind'] in ('Role','RoleBinding') and o['metadata'].get('namespace')==profile.core_namespace
+                   and o['metadata']['name']=='fixture-openshell-sandbox' for o in bundle['objects'])
+    assert len([o for o in bundle['objects'] if o['kind']=='RoleBinding' and o['metadata']['name']=='identity-demo-runtime'
+                and o['metadata']['namespace'] in profile.application_namespaces[1:]])==2
+    assert setup.runtime_rules(profile,bundle['objects'])
+    assert any(o['kind']=='RoleBinding' and o['metadata']['name']=='identity-demo-workspace-ca'
+               for o in bundle['objects'])
+    assert any(o['kind']=='RoleBinding' and o['metadata']['name']=='fixture-openshell-peer'
+               for o in bundle['objects'])
+
+
+def test_unknown_native_management_scope_is_rejected(config):
+    value=json.loads(config.read_text());value['native_management_scope']='unrestricted'
+    config.write_text(json.dumps(value))
+    with pytest.raises(ValueError,match='native management scope'):
+        renderer.render(config)

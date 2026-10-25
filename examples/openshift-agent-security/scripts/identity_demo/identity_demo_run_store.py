@@ -22,193 +22,18 @@ from uuid import UUID, uuid4
 
 from deployment_profile import active_profile
 
-SCHEMA = "jira-create-v1"
-BACKEND = "pilot-jira"
-TOOL = "createJiraIssue"
+from identity_demo_connector import ConnectorContract, Denied, strict_json, tool_arguments
+from identity_demo_jira_contract import (
+    JIRA, SCHEMA, BACKEND, TOOL, normalize_create, canonical, create_call, scoped_read_jql, read_call,
+)
+
 RETIRED_WORKLOAD = "spiffe://agents.example.test/openshell/sandbox/00000000-0000-4000-8000-000000000001"
-
-
-class Denied(ValueError):
-    """A deliberate, safe authorization or lifecycle denial."""
-
-
-def strict_json(data: bytes) -> dict:
-    """Refuse incomplete, duplicate-key, oversized and non-object requests."""
-    if not data or len(data) > 65_536:
-        raise Denied("request_size")
-
-    def pairs(values: list[tuple[str, object]]) -> dict:
-        result = {}
-        for key, value in values:
-            if key in result:
-                raise Denied("duplicate_field")
-            result[key] = value
-        return result
-
-    try:
-        value = json.loads(
-            data,
-            object_pairs_hook=pairs,
-            parse_constant=lambda _: (_ for _ in ()).throw(Denied("invalid_number")),
-        )
-    except (UnicodeError, json.JSONDecodeError, RecursionError) as error:
-        raise Denied("malformed_json") from error
-    if not isinstance(value, dict):
-        raise Denied("object_required")
-    return value
-
-
-def normalize_create(arguments: dict) -> dict:
-    """Resolve and bind all permitted effectful fields; deny arbitrary Jira fields."""
-    required = {"project", "summary", "description"}
-    if (
-        not isinstance(arguments, dict)
-        or not required <= arguments.keys()
-        or arguments.keys() - required - {"issue_type", "labels"}
-    ):
-        raise Denied("unsupported_arguments")
-    project = arguments["project"]
-    if not isinstance(project, str) or not re.fullmatch(
-        r"[A-Z][A-Z0-9]{1,15}", project
-    ):
-        raise Denied("invalid_project")
-    issue_type = arguments.get("issue_type", "Task")
-    if issue_type != "Task":
-        raise Denied("unsupported_issue_type")
-    for field, limit in (("summary", 200), ("description", 8_000)):
-        value = arguments[field]
-        if (
-            not isinstance(value, str)
-            or not value.strip()
-            or len(value) > limit
-            or "\x00" in value
-        ):
-            raise Denied("invalid_" + field)
-    labels = arguments.get("labels", [])
-    if (
-        not isinstance(labels, list)
-        or len(labels) > 8
-        or any(
-            not isinstance(v, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", v)
-            for v in labels
-        )
-        or len(set(labels)) != len(labels)
-    ):
-        raise Denied("invalid_labels")
-    return {
-        "project": project,
-        "issue_type": issue_type,
-        "summary": arguments["summary"],
-        "description": arguments["description"],
-        "labels": sorted(labels),
-    }
-
-
-def canonical(arguments: dict) -> tuple[str, str]:
-    """Bind the normalized payload to the fixed tool/backend/schema contract."""
-    payload = json.dumps(
-        normalize_create(arguments),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    material = json.dumps(
-        [BACKEND, SCHEMA, TOOL, payload], separators=(",", ":"), ensure_ascii=False
-    )
-    return payload, hashlib.sha256(material.encode()).hexdigest()
-
-
-def tool_arguments(data: bytes, tool_name: str) -> object:
-    """Validate the complete MCP envelope before either read or create parsing."""
-    value = strict_json(data)
-    if (
-        value.keys() != {"jsonrpc", "id", "method", "params"}
-        or value["jsonrpc"] != "2.0"
-        or value["method"] != "tools/call"
-        or type(value["id"]) not in (str, int)
-        or len(str(value["id"])) > 128
-    ):
-        raise Denied("unsupported_rpc")
-    params = value["params"]
-    if (
-        not isinstance(params, dict)
-        or params.keys() != {"name", "arguments"}
-        or params["name"] != tool_name
-    ):
-        raise Denied("unsupported_tool")
-    return params["arguments"]
-
-
-def create_call(
-    data: bytes, *, tool_name: str = "step56_jira_createJiraIssue"
-) -> tuple[str, str, dict]:
-    """Parse the complete actual mutation body, never routing headers or hashes.
-
-    The caller supplies a trusted registered tool name. Protocol initialization
-    and reads require their own authenticated handling; they are not mutations.
-    Run/action references are selectors, not proof of user, workload or approval.
-    """
-    args = tool_arguments(data, tool_name)
-    if not isinstance(args, dict) or not {"run_id", "action_id"} <= args.keys():
-        raise Denied("missing_action")
-    for field in ("run_id", "action_id"):
-        if not isinstance(args[field], str) or not re.fullmatch(
-            r"[a-f0-9]{32}", args[field]
-        ):
-            raise Denied("invalid_action_reference")
-    effects = {k: v for k, v in args.items() if k not in ("run_id", "action_id")}
-    return args["run_id"], args["action_id"], normalize_create(effects)
-
-
-
-def scoped_read_jql(value: object, project: str) -> str | None:
-    """Independently constrain model JQL to this actual run's project and issue."""
-    if not isinstance(value, str) or len(value) > 160:
-        raise Denied("invalid_jql")
-    match = re.fullmatch(r'project\s*=\s*(?:"([A-Z][A-Z0-9]{1,15})"|([A-Z][A-Z0-9]{1,15}))'
-                         r'(?:\s+AND\s+key\s*=\s*(?:"([A-Z][A-Z0-9]{1,15}-[1-9][0-9]*)"|([A-Z][A-Z0-9]{1,15}-[1-9][0-9]*)))?', value)
-    if not match:
-        raise Denied("invalid_jql")
-    selected, issue = match[1] or match[2], match[3] or match[4]
-    if selected != project or (issue and issue.split('-', 1)[0] != project):
-        raise Denied("project_permission")
-    return issue
-
-
-def read_call(
-    data: bytes, *, tool_name: str = "step56_jira_readJiraProject"
-) -> tuple[str, str, str | None]:
-    """Accept one project-scoped read; never expose arbitrary JQL or remote URLs."""
-    args = tool_arguments(data, tool_name)
-    if (
-        not isinstance(args, dict)
-        or not {"run_id", "project"} <= args.keys()
-        or args.keys() - {"run_id", "project", "issue_key", "jql"}
-    ):
-        raise Denied("unsupported_arguments")
-    run, project, issue = args["run_id"], args["project"], args.get("issue_key")
-    if not isinstance(run, str) or not re.fullmatch(r"[a-f0-9]{32}", run):
-        raise Denied("invalid_action_reference")
-    if not isinstance(project, str) or not re.fullmatch(
-        r"[A-Z][A-Z0-9]{1,15}", project
-    ):
-        raise Denied("invalid_project")
-    if "issue_key" in args and (
-        not isinstance(issue, str)
-        or not re.fullmatch(re.escape(project) + r"-[1-9][0-9]*", issue)
-    ):
-        raise Denied("project_permission")
-    if "jql" in args:
-        if "issue_key" in args:
-            raise Denied("unsupported_arguments")
-        issue = scoped_read_jql(args["jql"], project)
-    return run, project, issue
 
 
 class RunStore:
     """Single-instance SQLite storage with short atomic claims and durable audit."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, connector: ConnectorContract = JIRA) -> None:
         """Require private persistent storage; never store tokens or signing keys."""
         if (
             path.is_symlink()
@@ -221,6 +46,9 @@ class RunStore:
         if not path.exists():
             fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             os.close(fd)
+        if not isinstance(connector, ConnectorContract):
+            raise ValueError('Trusted registered connector required')
+        self.connector = connector
         self.path = path
         with self.transaction() as db:
             db.executescript("""
@@ -239,11 +67,36 @@ class RunStore:
                 sequence INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL,
                 run_id TEXT NOT NULL, action_id TEXT, event TEXT NOT NULL,
                 detail TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS run_contracts (
+                run_id TEXT PRIMARY KEY REFERENCES runs(id), connector TEXT NOT NULL,
+                fingerprint TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS action_results (
+                action_id TEXT PRIMARY KEY REFERENCES actions(id), reference TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS security_contract_schema (
+                id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL);
+            INSERT OR IGNORE INTO security_contract_schema VALUES(1,1);
             CREATE INDEX IF NOT EXISTS actions_run ON actions(run_id);
             CREATE INDEX IF NOT EXISTS runs_user ON runs(user);
             CREATE INDEX IF NOT EXISTS audit_run_sequence ON audit(run_id,sequence);
             CREATE INDEX IF NOT EXISTS audit_run_event ON audit(run_id,event,sequence);
             """)
+            if db.execute('SELECT version FROM security_contract_schema WHERE id=1').fetchone()[0] != 1:
+                raise ValueError('Unsupported security contract state version')
+
+    def contract_binding(self, db, run):
+        recorded = db.execute('SELECT connector,fingerprint FROM run_contracts WHERE run_id=?', (run,)).fetchone()
+        if recorded is None:
+            if self.connector.fingerprint != JIRA.fingerprint:
+                raise Denied('connector_binding')
+        elif (recorded['connector'], recorded['fingerprint']) != (self.connector.identifier, self.connector.fingerprint):
+            raise Denied('connector_binding')
+
+    def result_reference(self, db, action):
+        if self.connector.result_field == 'issue_key':
+            row = db.execute('SELECT issue_key FROM actions WHERE id=?', (action,)).fetchone()
+        else:
+            row = db.execute('SELECT reference FROM action_results WHERE action_id=?', (action,)).fetchone()
+        return row[0] if row else None
 
     @contextmanager
     def read_transaction(self) -> Iterator[sqlite3.Connection]:
@@ -304,13 +157,13 @@ class RunStore:
         if (
             not issuer.startswith("https://")
             or not user
-            or user_role not in ("analyst", "viewer")
-            or workload_role not in ("triage", "reader")
+            or user_role not in self.connector.user_roles
+            or workload_role not in self.connector.workload_roles
             or not re.fullmatch(
                 r"spiffe://" + re.escape(active_profile().trust_domain) + r"/openshell/sandbox/[a-f0-9-]{36}",
                 workload,
             )
-            or not re.fullmatch(r"[A-Z][A-Z0-9]{1,15}", project)
+            or not self.connector.valid_scope(project)
             or type(expires) is not int
             or expires <= time.time()
             or not isinstance(assessment, str)
@@ -366,6 +219,11 @@ class RunStore:
                     int(time.time()),
                 ),
             )
+            if require_console_idle:
+                from identity_demo_pool_profiles import bind
+                bind(db, run, workload, console_workflow, project, workload_role, self.connector.identifier)
+            db.execute('INSERT INTO run_contracts VALUES(?,?,?)',
+                       (run, self.connector.identifier, self.connector.fingerprint))
             self.event(
                 db,
                 run,
@@ -382,9 +240,8 @@ class RunStore:
                 self.event(db, run, None, 'console_queued', {'workflow':console_workflow})
         return run
 
-    @staticmethod
     def active_run(
-        db: sqlite3.Connection, run: str, user: str, workload: str | None = None
+        self, db: sqlite3.Connection, run: str, user: str, workload: str | None = None
     ) -> sqlite3.Row:
         """Enforce owner and optional attested actor, plus current run lifetime."""
         row = db.execute("SELECT * FROM runs WHERE id=?", (run,)).fetchone()
@@ -394,6 +251,7 @@ class RunStore:
             or (workload is not None and row["workload"] != workload)
         ):
             raise Denied("run_binding")
+        self.contract_binding(db, run)
         if not row["active"] or row["expires"] <= time.time():
             raise Denied("run_inactive")
         return row
@@ -401,13 +259,8 @@ class RunStore:
     def propose(self, run: str, user: str, arguments: dict) -> dict:
         """Store a new immutable proposal; edits create a different action/approval."""
         action = uuid4().hex
-        args = normalize_create(arguments)
-        if len(args["labels"]) > 7:
-            raise Denied("marker_capacity")
-        if any(label.startswith("demo-action-") for label in args["labels"]):
-            raise Denied("reserved_marker")
-        args["labels"].append("demo-action-" + action)
-        payload, digest = canonical(args)
+        args = self.connector.proposal(arguments, action)
+        payload, digest = self.connector.canonical(args)
         with self.transaction() as db:
             self.active_run(db, run, user)
             db.execute(
@@ -457,19 +310,19 @@ class RunStore:
         claim: bool = False,
     ) -> dict:
         """Check actual arguments; claim only at the trusted adapter before dispatch."""
-        _, digest = canonical(arguments)
+        payload, digest = self.connector.canonical(arguments)
         with self.transaction() as db:
             row = self.active_run(db, run, user, workload)
             proposed = db.execute(
                 "SELECT * FROM actions WHERE id=? AND run_id=?", (action, run)
             ).fetchone()
             reason = None
-            if row["user_role"] != "analyst":
+            if row["user_role"] not in self.connector.write_user_roles:
                 reason = "user_permission"
-            elif row["workload_role"] != "triage":
+            elif row["workload_role"] not in self.connector.write_workload_roles:
                 reason = "workload_permission"
-            elif arguments["project"] != row["project"]:
-                reason = "project_permission"
+            elif self.connector.resource(json.loads(payload)) != row["project"]:
+                reason = self.connector.scope_denial
             elif proposed is None or proposed["digest"] != digest:
                 reason = "action_binding"
             elif proposed["state"] == "succeeded":
@@ -477,7 +330,7 @@ class RunStore:
                     "allowed": True,
                     "dispatch": False,
                     "state": "succeeded",
-                    "issue_key": proposed["issue_key"],
+                    self.connector.result_field: self.result_reference(db, action),
                 }
             elif proposed["state"] != "approved":
                 reason = "action_" + proposed["state"]
@@ -511,42 +364,35 @@ class RunStore:
                 "state": "executing" if claim else "approved",
             }
 
-    def finish(
-        self,
-        run: str,
-        action: str,
-        execution: str,
-        *,
-        state: str,
-        issue_key: str | None = None,
-    ) -> None:
-        """Record a verified backend outcome; uncertainty is never retryable approval."""
-        if state not in ("succeeded", "failed", "unknown") or (
-            state == "succeeded"
-            and (
-                not issue_key
-                or not re.fullmatch(r"[A-Z][A-Z0-9]{1,15}-[1-9][0-9]*", issue_key)
-            )
-        ):
-            raise ValueError("Verified bounded backend outcome required")
+    def finish(self, run: str, action: str, execution: str, *, state: str,
+               issue_key: str | None = None, result_ref: str | None = None) -> None:
+        """Record a verified result; an unknown dispatch can never be retried."""
+        if state not in ('succeeded', 'failed', 'unknown') or (issue_key is not None and result_ref is not None):
+            raise ValueError('Verified bounded backend outcome required')
+        reference = issue_key if issue_key is not None else result_ref
+        if ((issue_key is not None and self.connector.result_field != 'issue_key')
+                or (result_ref is not None and self.connector.result_field != 'result_ref')):
+            raise Denied('connector_binding')
         with self.transaction() as db:
-            if state == "succeeded":
-                owner = db.execute(
-                    "SELECT project FROM runs WHERE id=?", (run,)
-                ).fetchone()
-                if owner is None or issue_key.split("-", 1)[0] != owner["project"]:
-                    raise Denied("backend_project")
+            self.contract_binding(db, run)
+            if state == 'succeeded':
+                owner = db.execute('SELECT project FROM runs WHERE id=?', (run,)).fetchone()
+                if owner is None:
+                    raise Denied('run_binding')
+                self.connector.check_reference(owner['project'], reference)
             updated = db.execute(
                 "UPDATE actions SET state=?,issue_key=? WHERE id=? AND run_id=? AND state='executing' AND execution_id=?",
-                (state, issue_key, action, run, execution),
-            )
+                (state, reference if self.connector.result_field == 'issue_key' else None, action, run, execution))
             if updated.rowcount != 1:
-                raise Denied("execution_binding")
-            self.event(db, run, action, state, {"issue_key": issue_key})
+                raise Denied('execution_binding')
+            if reference is not None and self.connector.result_field == 'result_ref':
+                db.execute('INSERT INTO action_results VALUES(?,?)', (action, reference))
+            self.event(db, run, action, state, {self.connector.result_field: reference})
 
     def reconciliation(self, run: str, action: str) -> dict:
         """Return an uncertain dispatched action only to trusted adapter coordination."""
         with self.transaction() as db:
+            self.contract_binding(db, run)
             row = db.execute(
                 "SELECT * FROM actions WHERE id=? AND run_id=?", (action, run)
             ).fetchone()
@@ -558,41 +404,32 @@ class RunStore:
                 "arguments": json.loads(row["payload"]),
             }
 
-    def reconcile(
-        self, run: str, action: str, execution: str, issue_key: str, arguments: dict
-    ) -> None:
-        """Record a positively verified uncertain create; never reopen dispatch."""
-        _, digest = canonical(arguments)
+    def reconcile(self, run: str, action: str, execution: str, issue_key: str, arguments: dict) -> None:
+        """Keep the historical Jira adapter API while sharing result reconciliation."""
+        if self.connector.result_field != 'issue_key':
+            raise Denied('connector_binding')
+        self.reconcile_result(run, action, execution, issue_key, arguments)
+
+    def reconcile_result(self, run: str, action: str, execution: str, reference: str, arguments: dict) -> None:
+        """Record an independently verified uncertain outcome; never reopen dispatch."""
+        _, digest = self.connector.canonical(arguments)
         with self.transaction() as db:
-            row = db.execute(
-                "SELECT a.*,r.project FROM actions a JOIN runs r ON r.id=a.run_id "
-                "WHERE a.id=? AND a.run_id=?",
-                (action, run),
-            ).fetchone()
-            if (
-                row is None
-                or row["state"] != "unknown"
-                or row["execution_id"] != execution
-                or row["digest"] != digest
-                or not isinstance(issue_key, str)
-                or not re.fullmatch(
-                    re.escape(row["project"]) + r"-[1-9][0-9]*", issue_key
-                )
-                or "demo-action-" + action not in arguments["labels"]
-            ):
-                raise Denied("reconciliation_binding")
-            db.execute(
-                "UPDATE actions SET state='succeeded',issue_key=? "
-                "WHERE id=? AND run_id=? AND state='unknown' AND execution_id=?",
-                (issue_key, action, run, execution),
-            )
-            self.event(
-                db,
-                run,
-                action,
-                "reconciled",
-                {"issue_key": issue_key, "digest": digest},
-            )
+            self.contract_binding(db, run)
+            row = db.execute('SELECT a.*,r.project FROM actions a JOIN runs r ON r.id=a.run_id '
+                             'WHERE a.id=? AND a.run_id=?', (action, run)).fetchone()
+            if (row is None or row['state'] != 'unknown' or row['execution_id'] != execution
+                    or row['digest'] != digest or not self.connector.has_marker(arguments, action)):
+                raise Denied('reconciliation_binding')
+            try:
+                self.connector.check_reference(row['project'], reference)
+            except ValueError:
+                raise Denied('reconciliation_binding') from None
+            db.execute("UPDATE actions SET state='succeeded',issue_key=? WHERE id=? AND run_id=? "
+                       "AND state='unknown' AND execution_id=?",
+                       (reference if self.connector.result_field == 'issue_key' else None, action, run, execution))
+            if self.connector.result_field == 'result_ref':
+                db.execute('INSERT INTO action_results VALUES(?,?)', (action, reference))
+            self.event(db, run, action, 'reconciled', {self.connector.result_field: reference, 'digest': digest})
 
     def review_dispatch_rejection(
         self, run: str, action: str, execution: str, digest: str, receipt_sha256: str
@@ -609,6 +446,7 @@ class RunStore:
                        for v in (digest, receipt_sha256))):
             raise Denied("rejection_review_binding")
         with self.transaction() as db:
+            self.contract_binding(db, run)
             row = db.execute(
                 "SELECT a.*,r.active FROM actions a JOIN runs r ON r.id=a.run_id "
                 "WHERE a.id=? AND a.run_id=?", (action, run)
@@ -619,8 +457,8 @@ class RunStore:
             if (row is None or row["active"] or row["state"] != "unknown"
                     or row["execution_id"] != execution or row["digest"] != digest
                     or row["issue_key"] is not None
-                    or canonical(json.loads(row["payload"]))[1] != digest
-                    or "demo-action-" + action not in json.loads(row["payload"])["labels"]
+                    or self.connector.canonical(json.loads(row["payload"]))[1] != digest
+                    or not self.connector.has_marker(json.loads(row["payload"]), action)
                     or events.count("claimed") != 1 or events.count("unknown") != 1
                     or any(e in events for e in ("succeeded", "reconciled", "dispatch_rejection_reviewed"))
                     or db.execute("SELECT 1 FROM runs WHERE active<>0").fetchone()
@@ -670,6 +508,7 @@ class RunStore:
             row = db.execute("SELECT user FROM runs WHERE id=?", (run,)).fetchone()
             if row is None or row["user"] != user:
                 raise Denied("run_binding")
+            self.contract_binding(db, run)
             db.execute("UPDATE runs SET active=0 WHERE id=?", (run,))
             self.event(db, run, None, "cancelled", {})
 
@@ -681,6 +520,7 @@ class RunStore:
             ).fetchone()
             if row is None or row["user"] != user:
                 raise Denied("run_binding")
+            self.contract_binding(db, run)
             return row["assessment"]
 
     def identity_run(self, user: str, workload: str) -> dict:
@@ -701,7 +541,7 @@ class RunStore:
         with self.transaction() as db:
             row = self.active_run(db, run, user, workload)
             allowed = row["project"] == project
-            reason = "project_read" if allowed else "project_permission"
+            reason = self.connector.read_reason if allowed else self.connector.scope_denial
             self.event(
                 db,
                 run,
@@ -724,12 +564,16 @@ class RunStore:
             ).fetchone()
             if row is None:
                 raise Denied("run_binding")
+            self.contract_binding(db, run)
             actions = [
                 dict(a)
                 for a in db.execute(
                     "SELECT * FROM actions WHERE run_id=? ORDER BY rowid", (run,)
                 )
             ]
+            if self.connector.result_field == 'result_ref':
+                for action in actions:
+                    action['result_ref'] = self.result_reference(db, action['id'])
             events = [
                 dict(a)
                 for a in db.execute(

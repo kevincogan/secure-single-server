@@ -363,6 +363,18 @@
         },
         "identity_demo_warm_pool.py": {
           "$source": "scripts/identity_demo/identity_demo_warm_pool.py"
+        },
+        "identity_demo_connector.py": {
+          "$source": "scripts/identity_demo/identity_demo_connector.py"
+        },
+        "identity_demo_jira_contract.py": {
+          "$source": "scripts/identity_demo/identity_demo_jira_contract.py"
+        },
+        "identity_demo_pool_profiles.py": {
+          "$source": "scripts/identity_demo/identity_demo_pool_profiles.py"
+        },
+        "deployment_artifacts.py": {
+          "$source": "scripts/identity_demo/deployment_artifacts.py"
         }
       },
       "immutable": true,
@@ -425,6 +437,18 @@
         },
         "identity_demo_admission.py": {
           "$source": "scripts/identity_demo/identity_demo_admission.py"
+        },
+        "identity_demo_connector.py": {
+          "$source": "scripts/identity_demo/identity_demo_connector.py"
+        },
+        "identity_demo_jira_contract.py": {
+          "$source": "scripts/identity_demo/identity_demo_jira_contract.py"
+        },
+        "identity_demo_pool_profiles.py": {
+          "$source": "scripts/identity_demo/identity_demo_pool_profiles.py"
+        },
+        "deployment_artifacts.py": {
+          "$source": "scripts/identity_demo/deployment_artifacts.py"
         }
       },
       "immutable": true,
@@ -2663,6 +2687,10 @@
                   {
                     "name": "IDENTITY_DEMO_CONFIG",
                     "value": "/configuration/installation.json"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_ARTIFACTS",
+                    "value": "/configuration/artifacts.json"
                   }
                 ],
                 "image": "${image.jira_runtime}",
@@ -2754,6 +2782,12 @@
                     "name": "installation-profile",
                     "mountPath": "/configuration/installation.json",
                     "subPath": "installation.json",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/artifacts.json",
+                    "subPath": "artifacts.json",
                     "readOnly": true
                   }
                 ]
@@ -3752,6 +3786,10 @@
                   {
                     "name": "IDENTITY_DEMO_CONFIG",
                     "value": "/configuration/installation.json"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_ARTIFACTS",
+                    "value": "/configuration/artifacts.json"
                   }
                 ],
                 "image": "${image.jira_runtime}",
@@ -3803,6 +3841,12 @@
                     "name": "installation-profile",
                     "mountPath": "/configuration/installation.json",
                     "subPath": "installation.json",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/artifacts.json",
+                    "subPath": "artifacts.json",
                     "readOnly": true
                   }
                 ]
@@ -3857,6 +3901,10 @@
                   {
                     "name": "IDENTITY_DEMO_CONFIG",
                     "value": "/configuration/installation.json"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_ARTIFACTS",
+                    "value": "/configuration/artifacts.json"
                   }
                 ],
                 "image": "${image.jira_runtime}",
@@ -3908,6 +3956,12 @@
                     "name": "installation-profile",
                     "mountPath": "/configuration/installation.json",
                     "subPath": "installation.json",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/artifacts.json",
+                    "subPath": "artifacts.json",
                     "readOnly": true
                   }
                 ]
@@ -3994,6 +4048,10 @@
                   {
                     "name": "IDENTITY_DEMO_CONFIG",
                     "value": "/configuration/installation.json"
+                  },
+                  {
+                    "name": "IDENTITY_DEMO_ARTIFACTS",
+                    "value": "/configuration/artifacts.json"
                   }
                 ],
                 "image": "${image.jira_runtime}",
@@ -4065,6 +4123,12 @@
                     "name": "installation-profile",
                     "mountPath": "/configuration/installation.json",
                     "subPath": "installation.json",
+                    "readOnly": true
+                  },
+                  {
+                    "name": "installation-profile",
+                    "mountPath": "/configuration/artifacts.json",
+                    "subPath": "artifacts.json",
                     "readOnly": true
                   }
                 ]
@@ -5663,6 +5727,9 @@
       "data": {
         "installation.json": {
           "$profile": true
+        },
+        "artifacts.json": {
+          "$artifacts": true
         }
       }
     },

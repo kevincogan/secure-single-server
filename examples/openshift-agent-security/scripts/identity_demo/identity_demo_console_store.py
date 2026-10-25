@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from identity_demo_run_store import Denied, RunStore, scoped_read_jql
 import identity_demo_warm_pool as warm
+import identity_demo_pool_profiles as profiles
 
 STAGES = {"preparing_identity", "identity_verified", "assessment_running", "awaiting_approval",
           "protected_execution", "outcome_verified", "completed", "execution_failed", "inference_failed", "cancelled",
@@ -199,17 +200,18 @@ class ConsoleStore:
         """Read immutable operator mappings; historical identities remain tombstoned."""
         with self.store.read_transaction() as db:
             if active_only and warm.enabled(db):
-                return tuple(json.loads(r[0]) for r in db.execute("""SELECT c.context
+                return tuple(profiles.expand(db,[json.loads(r[0]) for r in db.execute("""SELECT c.context
                   FROM console_pool_items p JOIN console_contexts c ON c.workload=p.workload
                   WHERE p.state IN ('preparing','ready','allocated','consumed','retiring','quarantined')
-                  ORDER BY c.rowid"""))
-            return tuple(json.loads(r[0]) for r in db.execute('SELECT context FROM console_contexts ORDER BY rowid'))
+                  ORDER BY c.rowid""")]))
+            return tuple(profiles.expand(db,[json.loads(r[0]) for r in db.execute('SELECT context FROM console_contexts ORDER BY rowid')]))
 
     def context_for_workload(self, workload: str) -> dict | None:
         """Resolve a retained historical mapping by its immutable primary key."""
         with self.store.read_transaction() as db:
             row=db.execute('SELECT context FROM console_contexts WHERE workload=?',(workload,)).fetchone()
-        return json.loads(row[0]) if row else None
+            values=profiles.expand(db,[json.loads(row[0])]) if row else []
+            return values[0] if values else None
 
     @staticmethod
     def pool_contexts(db: sqlite3.Connection, configured: tuple[dict, ...]) -> list[dict]:
@@ -269,6 +271,7 @@ class ConsoleStore:
                 result['all_contexts'] = [c for c in result['all_contexts'] if c['workload'] in managed]
                 result['contexts'] = [c for c in result['contexts'] if warm.ready(db, c['workload'])]
                 result['unused'] = len(result['contexts'])
+            result['contexts'] = profiles.expand(db, result['contexts'])
             result['preparation_pending'] = bool(db.execute(
                 "SELECT 1 FROM console_preparations WHERE state IN ('preparing','blocked')").fetchone())
             worker = db.execute('SELECT * FROM console_worker WHERE id=1').fetchone()
@@ -303,6 +306,12 @@ class ConsoleStore:
             self.pool_idle(db)
             warm.configure(db, self.pool_contexts(db, configured), enable, receipt, retired, initial_empty=initial_empty)
         return self.pool_status(configured, project)
+
+    def configure_profile_pool(self, configuration: dict, receipt: str, configured: tuple[dict,...], project: str) -> dict:
+        with self.store.transaction() as db:
+            self.pool_idle(db)
+            profiles.configure(db,configuration,receipt)
+        return self.pool_status(configured,project)
 
     def context_ready(self, workload: str) -> bool:
         with self.store.read_transaction() as db:
@@ -453,6 +462,8 @@ class ConsoleStore:
                 reservation = self.reserve_preparation(db, self.pool_contexts(db, configured), owner, target)
                 warm.reserved(db, reservation)
                 return reservation
+            if warm.profiles.configuration(db):
+                return None  # Disabled profile scheduling must never fall back to legacy provisioning.
             if (not worker or worker['updated'] <= time.time() - 20 or worker['phase'] != 'ready'
                     or (worker['catalog_expires'] and worker['catalog_expires'] <= time.time() + 600)
                     or self.recovery_required(db)
@@ -531,6 +542,20 @@ class ConsoleStore:
                 warm.finish(db, row, context, receipt)
                 db.execute('UPDATE console_preparations SET state=?,receipt=?,updated=? WHERE id=?',
                            ('completed' if context is not None else 'quarantined', receipt, int(time.time()), reservation))
+                return
+            if target.get('automatic') and target.get('profile_id'):
+                if target['operation']=='verify':
+                    if context is not None and context != target['previous']:
+                        raise Denied('preparation_binding')
+                elif context is not None:
+                    if (context['sandbox_name'] != 'demo-s56-' + target['role'] + '-' + target['suffix']
+                            or db.execute('SELECT 1 FROM runs WHERE workload=?',(context['workload'],)).fetchone()):
+                        raise Denied('preparation_binding')
+                    db.execute('INSERT INTO console_contexts VALUES(?,?,?,?)',
+                               (context['workload'],json.dumps(context,sort_keys=True),context['namespace'],context['sandbox_name']))
+                warm.finish(db,row,context,receipt)
+                db.execute('UPDATE console_preparations SET state=?,receipt=?,updated=? WHERE id=?',
+                           ('completed' if context is not None else 'quarantined',receipt,int(time.time()),reservation))
                 return
             if context is not None:
                 if (context['sandbox_name'] != 'demo-s56-' + target['role'] + '-' + target['suffix']

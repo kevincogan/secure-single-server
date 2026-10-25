@@ -226,7 +226,7 @@ def automatic_settings(slots: list[dict], state: dict, *, cluster_jira: bool = F
                   if pool['states']['consumed'] or pool['states']['retiring'] else
                   'Preparation is paused at capacity. Ready workflows remain available; the operator should review quarantined contexts.')
     names = {'cve': 'CVE triage', 'service-request': 'Remediation change request', 'incident-triage': 'Incident triage'}
-    rows = ''.join('<tr><td>' + text(names[s['workflow']]) + '</td><td>' + text('Reader' if s['role'] == 'reader' else 'Triage')
+    rows = ''.join('<tr><td>' + text(names.get(s['workflow'], s['workflow'])) + '</td><td>' + text('Reader' if s['role'] == 'reader' else 'Triage')
         + '</td><td>' + text(s['available']) + ' / ' + text(s['target']) + '</td><td>'
         + badge(('Ready to start' if startable else 'Prepared') if s['available'] else 'Preparing your next run', 'good' if s['available'] else 'wait') + '</td></tr>' for s in slots)
     notice = ('<p class="notice">' + text(quarantined) + ' context(s) quarantined. The operator must review their private receipts; uncertain mutations are never replayed.</p>') if quarantined else ''

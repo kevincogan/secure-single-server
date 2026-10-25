@@ -461,6 +461,9 @@ class Driver:
             profile = active_profile()
             required = {'sandbox_name', 'sandbox_id', 'role', 'service_account', 'registration_name',
                         'provider_prefix', 'namespace', 'workspace', 'workload', 'workflow', 'project', 'console_prepared'}
+            target = json.loads(reservation['target']) if reservation else {}
+            if target.get('profile_id'):
+                required = required - {'workflow','project'} | {'profile_id','profile_fingerprint','native_policy_hash'}
             if not isinstance(context, dict) or set(context) != required:
                 raise Denied('preparation_context')
             try:
@@ -1023,7 +1026,7 @@ class Driver:
                         user=session["claims"].get("preferred_username", self.role(session["claims"])),
                         csrf=session["csrf"], session_deadline=self.session_deadline(session), status_code=409)
                 return JSONResponse({"reason": reason}, status_code=409)
-        for context in self.execution_contexts():
+        for context in self.execution_contexts(active_only=True):
             if self.config.coordinator_enabled and context.get("console_prepared") is not True:
                 continue
             if not self.console.context_ready(context["workload"]):
@@ -1249,7 +1252,9 @@ class Driver:
             self.console_operator(request, 'preparation-verifier' if verification else 'operator')
             preparer = self.config.private_operator_api and secret_matches(
                 request.headers.get('Authorization', ''), 'Bearer '+self.config.preparer_secret)
-            if set(data) in ({'action', 'enabled', 'receipt_sha256', 'retired_workloads'},
+            if set(data) == {'action','configuration','receipt_sha256'} and data['action']=='profiles':
+                result = self.console.configure_profile_pool(data['configuration'],data['receipt_sha256'],self.config.contexts,self.config.project)
+            elif set(data) in ({'action', 'enabled', 'receipt_sha256', 'retired_workloads'},
                               {'action', 'enabled', 'receipt_sha256', 'retired_workloads', 'initial_empty'}) and data['action'] == 'automatic':
                 result = self.console.configure_automatic(data['enabled'], data['receipt_sha256'], data['retired_workloads'],
                                                           self.config.contexts, self.config.project, initial_empty=data.get('initial_empty', False))

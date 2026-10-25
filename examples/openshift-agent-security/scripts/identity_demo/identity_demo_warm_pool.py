@@ -15,6 +15,7 @@ import time
 from uuid import uuid4
 
 from identity_demo_run_store import Denied, RunStore
+import identity_demo_pool_profiles as profiles
 
 LIMIT = 12
 SLOTS = (('cve', 'triage', 'TEST'), ('cve', 'reader', 'TEST'),
@@ -23,6 +24,7 @@ SLOTS = (('cve', 'triage', 'TEST'), ('cve', 'reader', 'TEST'),
 
 def initialize(db: sqlite3.Connection) -> None:
     db.executescript('''
+      BEGIN IMMEDIATE;
       CREATE TABLE IF NOT EXISTS console_pool_settings (
         id INTEGER PRIMARY KEY CHECK(id=1), enabled INTEGER NOT NULL,
         receipt TEXT NOT NULL, updated INTEGER NOT NULL);
@@ -36,7 +38,30 @@ def initialize(db: sqlite3.Connection) -> None:
         coalesce(json_extract(context,'$.workflow'),'cve'),
         json_extract(context,'$.role'),
         coalesce(json_extract(context,'$.project'),'TEST'));
+      CREATE TABLE IF NOT EXISTS console_pool_state_counts (
+        state TEXT PRIMARY KEY, n INTEGER NOT NULL CHECK(n>=0));
+      WITH states(state) AS (VALUES ('preparing'),('ready'),('allocated'),
+          ('consumed'),('retiring'),('quarantined'),('retired'))
+      INSERT OR IGNORE INTO console_pool_state_counts
+        SELECT state,(SELECT count(*) FROM console_pool_items p WHERE p.state=states.state)
+        FROM states WHERE NOT EXISTS
+          (SELECT 1 FROM console_pool_state_counts c WHERE c.state=states.state);
+      CREATE TRIGGER IF NOT EXISTS console_pool_count_insert
+        AFTER INSERT ON console_pool_items BEGIN
+          UPDATE console_pool_state_counts SET n=n+1 WHERE state=NEW.state;
+        END;
+      CREATE TRIGGER IF NOT EXISTS console_pool_count_delete
+        AFTER DELETE ON console_pool_items BEGIN
+          UPDATE console_pool_state_counts SET n=n-1 WHERE state=OLD.state;
+        END;
+      CREATE TRIGGER IF NOT EXISTS console_pool_count_update
+        AFTER UPDATE OF state ON console_pool_items WHEN OLD.state<>NEW.state BEGIN
+          UPDATE console_pool_state_counts SET n=n-1 WHERE state=OLD.state;
+          UPDATE console_pool_state_counts SET n=n+1 WHERE state=NEW.state;
+        END;
+      COMMIT;
     ''')
+    profiles.initialize(db)
 
 
 def enabled(db: sqlite3.Connection) -> bool:
@@ -67,11 +92,15 @@ def blocked_identity(db: sqlite3.Connection, workload: str) -> bool:
 def ready(db: sqlite3.Connection, workload: str) -> bool:
     if blocked_identity(db, workload):
         return False
+    if profiles.configuration(db) and not profiles.ready(db, workload):
+        return False
     return not enabled(db) or bool(db.execute(
         "SELECT 1 FROM console_pool_items WHERE workload=? AND state='ready'", (workload,)).fetchone())
 
 
 def allocate(db: sqlite3.Connection, workload: str) -> None:
+    if profiles.configuration(db) and not profiles.ready(db, workload):
+        raise Denied('context_unavailable')
     if enabled(db) and db.execute("UPDATE console_pool_items SET state='allocated',updated=? "
             "WHERE workload=? AND state='ready'", (int(time.time()), workload)).rowcount != 1:
         raise Denied('context_unavailable')
@@ -142,6 +171,8 @@ def status(db: sqlite3.Connection, *, synchronize: bool = True) -> dict | None:
         return None
     if synchronize:
         sync_closed(db)
+    if profiles.configuration(db):
+        return profiles.snapshot(db)
     rows = db.execute("SELECT * FROM console_pool_items WHERE state<>'retired'").fetchall()
     slots = []
     for workflow, role, project in SLOTS:
@@ -149,15 +180,16 @@ def status(db: sqlite3.Connection, *, synchronize: bool = True) -> dict | None:
         slots.append({'workflow': workflow, 'role': role, 'project': project, 'target': 2,
                       'available': sum(r['state'] == 'ready' for r in group),
                       'preparing': sum(r['state'] == 'preparing' for r in group)})
-    counts = {state: 0 for state in
-              ('preparing', 'ready', 'allocated', 'consumed', 'retiring', 'quarantined', 'retired')}
-    counts.update({r['state']: r['n'] for r in db.execute(
-        'SELECT state,count(*) AS n FROM console_pool_items GROUP BY state')})
+    counts = profiles.state_counts(db)
     return {'mode': 'automatic', 'target': 8, 'limit': LIMIT, 'managed': len(rows),
             'states': counts, 'slots': slots}
 
 
 def next_target(db: sqlite3.Connection) -> dict | None:
+    if not enabled(db):
+        return None
+    if profiles.configuration(db):
+        return profiles.next_target(db, closed)
     snapshot = status(db)
     if snapshot is None:
         return None
@@ -187,6 +219,8 @@ def next_target(db: sqlite3.Connection) -> dict | None:
 
 def reserved(db: sqlite3.Connection, reservation: dict) -> None:
     target = reservation['target']
+    if target['operation'] == 'verify':
+        db.execute("UPDATE console_pool_items SET state='preparing',updated=? WHERE id=? AND state='ready'", (int(time.time()),target['item_id']))
     if target['operation'] == 'prepare':
         db.execute('INSERT INTO console_pool_items VALUES(?,NULL,?,\'preparing\',1,\'\',?)',
                    (reservation['id'], json.dumps(target, sort_keys=True), int(time.time())))
@@ -195,6 +229,8 @@ def reserved(db: sqlite3.Connection, reservation: dict) -> None:
 def finish(db: sqlite3.Connection, row: sqlite3.Row, context: dict | None, receipt: str) -> None:
     target = json.loads(row['target'])
     identifier = target.get('item_id', row['id'])
+    if target.get('profile_id') and target['operation'] in ('prepare','verify'):
+        profiles.finish(db,target,context)
     state = 'retired' if target['operation'] == 'retire' and context is not None else 'ready' if context is not None else 'quarantined'
     if context is not None and target['operation'] == 'prepare':
         db.execute('UPDATE console_pool_items SET workload=?,context=?,state=?,receipt=?,updated=? WHERE id=?',
@@ -291,3 +327,42 @@ def complete_unused_retirement(db: sqlite3.Connection, reservation: str,
                (now, absence_sha256, reservation))
     RunStore.event(db, 'maintenance:'+reservation, None, 'unused_retirement_completed',
                    {'workload': target['workload'], 'absence_sha256': absence_sha256})
+
+
+def confirm_failed_creation_absent(db: sqlite3.Connection, reservation: str,
+                                  failure_sha256: str, target_sha256: str,
+                                  absence_sha256: str) -> None:
+    """Installer confirms absence after fencing and exact native/resource review.
+
+    No runtime endpoint exposes this operation. Keep the original quarantined
+    preparation, failed target and receipt; retire only its counted capacity.
+    The trusted caller verifies backup, resource UIDs and native absence first.
+    """
+    unused_retirement_gate(db)
+    if (not isinstance(reservation, str) or not re.fullmatch('[a-f0-9]{32}', reservation)
+            or any(not isinstance(v, str) or not re.fullmatch('[a-f0-9]{64}', v)
+                   for v in (failure_sha256, target_sha256, absence_sha256))):
+        raise Denied('failed_creation_receipt')
+    preparation = db.execute('SELECT * FROM console_preparations WHERE id=?', (reservation,)).fetchone()
+    item = db.execute('SELECT * FROM console_pool_items WHERE id=?', (reservation,)).fetchone()
+    if (not preparation or preparation['state'] != 'quarantined'
+            or preparation['receipt'] != failure_sha256 or not item or item['workload'] is not None
+            or item['context'] != preparation['target']
+            or hashlib.sha256(item['context'].encode()).hexdigest() != target_sha256):
+        raise Denied('failed_creation_binding')
+    target = json.loads(preparation['target'])
+    if (target.get('operation') != 'prepare' or target.get('automatic') is not True
+            or target.get('previous') is not None):
+        raise Denied('failed_creation_binding')
+    detail = {'failure_sha256': failure_sha256, 'target_sha256': target_sha256,
+              'absence_sha256': absence_sha256}
+    previous = db.execute("SELECT detail FROM audit WHERE run_id=? AND event='failed_creation_absence_confirmed'",
+                          ('maintenance:'+reservation,)).fetchall()
+    if (item['state'] == 'retired' and item['receipt'] == absence_sha256
+            and len(previous) == 1 and json.loads(previous[0]['detail']) == detail):
+        return  # Confirm a known completed outcome; never repeat native cleanup.
+    if item['state'] != 'quarantined' or item['receipt'] != failure_sha256 or previous:
+        raise Denied('failed_creation_binding')
+    db.execute("UPDATE console_pool_items SET state='retired',receipt=?,updated=? WHERE id=?",
+               (absence_sha256, int(time.time()), reservation))
+    RunStore.event(db, 'maintenance:'+reservation, None, 'failed_creation_absence_confirmed', detail)

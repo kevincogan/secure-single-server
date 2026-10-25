@@ -115,6 +115,17 @@ def prepare_workspaces(args: argparse.Namespace) -> dict:
 def provision(args: argparse.Namespace) -> dict:
     """Create one native sandbox and its exact registration; never reuse an ID."""
     context = context_template(args.role, args.suffix)
+    contract = getattr(args,'pool_profile',None)
+    workload_image = contract['workload_image'] if contract else CVE_IMAGE
+    policy_path = ROOT / 'tests/identity_demo/cve-runtime-policy.yaml'
+    if contract:
+        import yaml
+        from identity_demo_pool_profiles import fingerprint
+        require(contract['role']==args.role and contract['namespace']==context.namespace,
+                'Compatible approved preparation profile required')
+        policy_path = args.output_dir/'profile-policy.yaml'
+        native.private_write(policy_path,contract['policy'])
+        # The native CLI accepts JSON as YAML; retain the exact trusted payload.
     args.execution_context = context
     _, credentials, _ = guard(args)
     owned(read(args, "namespace", context.namespace))
@@ -129,7 +140,7 @@ def provision(args: argparse.Namespace) -> dict:
         require(labels.get("openshell.ai/gateway-id") == active_profile().gateway_id
             and labels.get("openshell.ai/managed-by") == "openshell"
             and spec.get("serviceAccountName") == context.service_account
-            and len(spec["containers"]) == 1 and spec["containers"][0]["image"] == CVE_IMAGE,
+            and len(spec["containers"]) == 1 and spec["containers"][0]["image"] == workload_image,
             "Existing sandbox is not the reviewed owned execution")
     from identity_demo_controller_identity import enabled as controller_identities
     if not controller_identities():
@@ -137,13 +148,13 @@ def provision(args: argparse.Namespace) -> dict:
                          optional=True), "Registration name already occupied")
     if not args.apply:
         return {"planned": True, "applied": False, "namespace": context.namespace,
-                "sandbox_name": context.sandbox_name, "image": CVE_IMAGE,
+                "sandbox_name": context.sandbox_name, "image": workload_image,
                 "cpu": SANDBOX_CPU, "memory": SANDBOX_MEMORY}
     with native.native_session(args, credentials) as execute:
         if not recovering:
-            made = execute(["sandbox", "create", "--name", context.sandbox_name, "--from", CVE_IMAGE,
+            made = execute(["sandbox", "create", "--name", context.sandbox_name, "--from", workload_image,
                 "--cpu", SANDBOX_CPU, "--memory", SANDBOX_MEMORY, "--policy",
-                str(ROOT / "tests/identity_demo/cve-runtime-policy.yaml"), "--detach",
+                str(policy_path), "--detach",
                 "--restart-policy", "always", "--no-tty", "--output", "json", "--",
                 "python", "-u", "-c", "import time; time.sleep(86400)"], json_output=True)
             native.private_write(args.output_dir / "native-create.private.json", made)
@@ -168,7 +179,7 @@ def provision(args: argparse.Namespace) -> dict:
         native.private_write(args.output_dir / "controller-policy.private.json", policy)
         location = args.output_dir / "context.private.json"
         native.private_write(location, asdict(context))
-        require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns)) == context,
+        require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns), contract=contract) == context,
                 "Fresh controller-derived context validation failed")
         return {"applied": True, "native_ready": True, "registration_exact": True,
                 "registration_mode": "controller", "namespace": context.namespace,
@@ -209,7 +220,7 @@ def provision(args: argparse.Namespace) -> dict:
         native.private_write(args.output_dir / (name + ".private.json"), made)
     location = args.output_dir / "context.private.json"
     native.private_write(location, asdict(context))
-    require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns)) == context,
+    require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns), contract=contract) == context,
             "Fresh native context validation failed")
     return {"applied": True, "native_ready": True, "registration_exact": True,
             "namespace": context.namespace, "sandbox_name": context.sandbox_name,
@@ -480,6 +491,46 @@ def console_model_contract(source: str) -> str:
     return models[0]
 
 
+def project_driver_artifacts(deployment: dict, data: dict) -> None:
+    """Migrate an old driver using only the explicit reviewed public image lock."""
+    filename = os.environ.get('IDENTITY_DEMO_ARTIFACTS')
+    if not filename:
+        return  # Legacy code-only updates do not opt into a new pool contract.
+    from deployment_artifacts import configured_native_image, validate_artifacts
+    approved = {role: configured_native_image(role)
+                for role in ('openshell_gateway', 'openshell_supervisor')}
+    value = validate_artifacts(json.loads(Path(filename).read_text()))
+    require(all(value['images'][role] == image for role, image in approved.items()),
+            'Native artifact lock changed during validation')
+    # Never copy extra delivery metadata or credentials into a public ConfigMap.
+    public = json.dumps({key: value[key] for key in ('schema_version', 'images',
+        'native_build_contract', 'native_ca_bundle_sha256')}, sort_keys=True)
+    pod = deployment['spec']['template']['spec']
+    require(len(pod['containers']) == 1, 'One exact driver container required')
+    container = pod['containers'][0]
+    environment = container.setdefault('env', [])
+    found = [v for v in environment if v['name'] == 'IDENTITY_DEMO_ARTIFACTS']
+    mounts = container.setdefault('volumeMounts', [])
+    projected = [v for v in mounts if v['mountPath'] == '/configuration/artifacts.json']
+    if found:
+        require(found == [{'name': 'IDENTITY_DEMO_ARTIFACTS',
+                          'value': '/configuration/artifacts.json'}]
+                and len(projected) == 1 and projected[0].get('readOnly') is True
+                and projected[0].get('subPath') == 'artifacts.json'
+                and any(v['name'] == projected[0]['name'] and 'configMap' in v
+                        for v in pod['volumes']), 'Exact read-only artifact projection required')
+        if projected[0]['name'] == 'code':
+            require(data.get('artifacts.json') == public,
+                    'Existing native lock differs; explicit artifact migration required')
+        return
+    require(not projected, 'Unbound artifact mount requires operator review')
+    data['artifacts.json'] = public
+    environment.append({'name': 'IDENTITY_DEMO_ARTIFACTS',
+                        'value': '/configuration/artifacts.json'})
+    mounts.append({'name': 'code', 'mountPath': '/configuration/artifacts.json',
+                   'subPath': 'artifacts.json', 'readOnly': True})
+
+
 def register_driver(args: argparse.Namespace) -> dict:
     """Version the sole driver's code/config while retaining its PVC and Secrets."""
     refresh = getattr(args, "action", None) == "update-console"
@@ -503,7 +554,7 @@ def register_driver(args: argparse.Namespace) -> dict:
     data = dict(current['data'])
     updates = {name: (ROOT / "scripts" / "identity_demo" / name).read_text()
                for name in ("identity_demo_driver.py", "identity_demo_run_store.py", "deployment_profile.py",
-                            "identity_demo_console.py", "identity_demo_console_store.py", "identity_demo_console_visuals.py", "identity_demo_warm_pool.py")}
+                            "identity_demo_console.py", "identity_demo_console_store.py", "identity_demo_console_visuals.py", "identity_demo_warm_pool.py", 'identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py')}
     require('identity_demo_console_store.py' in data
             and console_model_contract(data['identity_demo_console_store.py'])
                 == console_model_contract(updates['identity_demo_console_store.py']),
@@ -520,6 +571,10 @@ def register_driver(args: argparse.Namespace) -> dict:
     if getattr(args, 'presenter_subject', None):
         config['presenter_subjects'] = list(args.presenter_subject)
     data["config.json"] = json.dumps(config)
+    desired = json.loads(json.dumps(deployment))
+    desired.pop("status", None)
+    if refresh:
+        project_driver_artifacts(desired, data)
     name = "fixture-identity-driver-code-" + hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:10]
     obj = {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {
         "name": name, "namespace": native.NAMESPACE, "labels": dict(LABELS)},
@@ -528,8 +583,6 @@ def register_driver(args: argparse.Namespace) -> dict:
         return {"applied": False, "code_changed": False, "new_contexts": 0}
     require(not read(args, "configmap", name, native.NAMESPACE, optional=True),
             "Versioned driver configuration already exists")
-    desired = json.loads(json.dumps(deployment))
-    desired.pop("status", None)
     for volume in desired["spec"]["template"]["spec"]["volumes"]:
         if volume["name"] == "code":
             volume["configMap"]["name"] = name
@@ -566,8 +619,8 @@ def update_adapter(args: argparse.Namespace) -> dict:
     current = read(args, "configmap", selected[0]["configMap"]["name"], native.NAMESPACE)
     owned(current)
     data = dict(current["data"])
-    modules = ("identity_demo_jira_action_adapter.py", "identity_demo_run_store.py", "deployment_profile.py", "identity_demo_warm_pool.py")
-    require(all(name in data for name in modules if name != "identity_demo_warm_pool.py"), "Existing guarded adapter modules required")
+    modules = ("identity_demo_jira_action_adapter.py", "identity_demo_run_store.py", "deployment_profile.py", "identity_demo_warm_pool.py", 'identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py')
+    require(all(name in data for name in modules if name not in ('identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py', 'identity_demo_warm_pool.py')), "Existing guarded adapter modules required")
     data.update({name: (ROOT / "scripts" / "identity_demo" / name).read_text() for name in modules})
     if data == current["data"]:
         return {"applied": False, "code_changed": False}
@@ -764,7 +817,7 @@ from identity_demo_run_store import RunStore,Denied,canonical
 value=json.load(sys.stdin)
 profile=json.loads(Path(os.environ['IDENTITY_DEMO_CONFIG']).read_text())
 assert all(profile[k]==v for k,v in value['installation'].items())
-store=RunStore.__new__(RunStore);store.path=Path(os.environ['DRIVER_DATABASE'])
+store=RunStore.__new__(RunStore);store.path=Path(os.environ['DRIVER_DATABASE']);store.connector=getattr(__import__('identity_demo_run_store'),'JIRA',None)
 with store.read_transaction() as db:
  row=db.execute('SELECT a.*,r.active FROM actions a JOIN runs r ON r.id=a.run_id WHERE a.id=? AND a.run_id=?',(value['action_id'],value['run_id'])).fetchone()
  job=db.execute('SELECT state,evidence FROM console_jobs WHERE run_id=?',(value['run_id'],)).fetchone()

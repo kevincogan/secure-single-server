@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import re
 
-from deployment_profile import active_profile
+from deployment_profile import active_profile, LEGACY
 
 IMAGE_ROLES = {"jira_runtime", "keycloak_management", "keycloak_exchange",
                "openshell_gateway", "openshell_supervisor"}
@@ -53,3 +53,14 @@ def configured_native_image(role: str) -> str | None:
     if not re.fullmatch(r"[a-f0-9]{64}", value.get("native_ca_bundle_sha256", "")):
         raise ValueError("Recorded native public CA hash required")
     return value["images"][role]
+
+
+def native_supervisor_images() -> set[str]:
+    """One approved image set shared by pool admission and native verification."""
+    values={
+        'ghcr.io/nvidia/openshell/supervisor@sha256:4ab2b970cdb02c7518ba4ccbbadb4861ae9a8d0b8770e5b160697f0453b0a8e4',
+        'image-registry.openshift-image-registry.svc:5000/demo-core/fixture-openshell-sender@sha256:ad582fdc34c8aa1389345e0c110cc16bfdef86853e7401067ba9cb43b5d8f007',
+    } if active_profile()==LEGACY else set()
+    configured=configured_native_image('openshell_supervisor')
+    if configured:values.add(configured)
+    return values

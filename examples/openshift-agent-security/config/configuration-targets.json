@@ -9,11 +9,11 @@
   "files": [
     {
       "path": "scripts/identity_demo/identity_demo_console_store.py",
-      "sha256": "273f80fd878ce6001dd584378098205e0d5e38e62e1edc530a008fdbf8bae2da"
+      "sha256": "b610b194aeb85fa8307376327d0703efd22bf2fb8c175e7e63ba8ec34502a093"
     },
     {
       "path": "scripts/identity_demo/identity_demo_execution_setup.py",
-      "sha256": "bd2b2387742c52f323e68ae88123158ac1df76b6116a8d4da4cc59600df428c1"
+      "sha256": "4df15f02805c881d4a8e0032d321dee1b109fb993185f3c4b0645754e56c4214"
     },
     {
       "path": "scripts/identity_demo/identity_demo_spire_registration.py",

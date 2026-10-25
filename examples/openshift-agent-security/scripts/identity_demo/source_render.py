@@ -87,13 +87,17 @@ def load_inputs(path: Path) -> tuple[DeploymentProfile, dict, dict, list[str]]:
     """Validate the exact source-render configuration before generating secrets."""
     config = read_json(path)
     required = {"schema_version", "profile", "artifacts_file", "public_trust", "kubernetes_api_cidrs"}
-    if (not required <= set(config) or set(config) - required - {"ingress_cluster_ip", "certificate_management"}
+    if (not required <= set(config) or set(config) - required - {"ingress_cluster_ip", "certificate_management", "native_management_scope", "fixture_seed_mode"}
             or type(config["schema_version"]) is not int or config["schema_version"] != 1):
         raise ValueError("Exact render configuration schema required")
     if config.get('ingress_cluster_ip') is not None:
         address = ip_address(config['ingress_cluster_ip'])
         if address.is_unspecified or address.is_loopback or address.is_multicast:
             raise ValueError('Explicit unicast retained ingress Service address required')
+    if config.get('native_management_scope', 'legacy') not in ('legacy', 'workspaces-only'):
+        raise ValueError('Explicit supported native management scope required')
+    if config.get("fixture_seed_mode", "synthetic") not in ("synthetic", "none"):
+        raise ValueError("Explicit synthetic or none fixture seed mode required")
     profile = DeploymentProfile.from_dict(config["profile"])
     from managed_certificates import configuration
     configuration(config)
@@ -112,7 +116,12 @@ def load_inputs(path: Path) -> tuple[DeploymentProfile, dict, dict, list[str]]:
         if not source.is_absolute():
             raise ValueError("Absolute public-trust file required")
         certificates[name] = certificate_bundle(source)
-    cidrs = config["kubernetes_api_cidrs"]
+    cidrs = api_addresses(config['kubernetes_api_cidrs'])
+    return profile, artifacts, certificates, cidrs
+
+
+def api_addresses(cidrs):
+    """Restrict management egress to explicit API host routes, never a subnet."""
     if not isinstance(cidrs, list) or not 1 <= len(cidrs) <= 16:
         raise ValueError("Bounded explicit API endpoint CIDRs required")
     for cidr in cidrs:
@@ -121,7 +130,7 @@ def load_inputs(path: Path) -> tuple[DeploymentProfile, dict, dict, list[str]]:
         network = ip_network(cidr, strict=True)
         if str(network) != cidr or network.prefixlen != network.max_prefixlen:
             raise ValueError("Exact API host routes required, never broad network access")
-    return profile, artifacts, certificates, cidrs
+    return cidrs
 
 
 def native_build_contract(profile: DeploymentProfile) -> dict:
@@ -318,6 +327,16 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
                 return json.dumps(walk(value["$json"]))
             if set(value) == {"$profile"}:
                 return json.dumps(profile.to_dict())
+            if set(value) == {"$artifacts"}:
+                # Only public fields required for admission enter the mounted
+                # contract, never arbitrary metadata from an operator file.
+                public={'schema_version':artifacts['schema_version'],'images':artifacts['images']}
+                if artifacts.get('native_build_contract')==profile.native_build_contract:
+                    public['native_build_contract']=profile.native_build_contract
+                ca_hash=artifacts.get('native_ca_bundle_sha256')
+                if isinstance(ca_hash,str) and re.fullmatch('[a-f0-9]{64}',ca_hash):
+                    public['native_ca_bundle_sha256']=ca_hash
+                return json.dumps(public)
             if set(value) == {"$api_peers"}:
                 return [{"ipBlock": {"cidr": cidr}} for cidr in cidrs]
             return {k: walk(v) for k, v in value.items()}
@@ -338,6 +357,14 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
     selected = [o for o in source['objects'] if not (contract['mode'] == 'managed'
         and o['kind'] == 'Secret' and o['metadata']['name'] in SECRETS)]
     objects = walk(selected)
+    management_scope = config.get('native_management_scope', 'legacy')
+    if management_scope == 'workspaces-only':
+        # The gateway manages sandboxes only in the dedicated workspaces. It
+        # must not create Pods or delete Secrets beside issuer/application data.
+        # Core peer observation and the exact client-TLS read grant stay separate.
+        objects = [o for o in objects if not (o['kind'] in ('Role', 'RoleBinding')
+            and o['metadata'].get('namespace') == profile.core_namespace
+            and o['metadata']['name'] == 'fixture-openshell-sandbox')]
     if contract['mode'] == 'managed':
         objects = [openshell_trust(o) if o['kind'] == 'StatefulSet'
             and o['metadata']['name'] == 'fixture-openshell' else o for o in objects]
@@ -377,6 +404,7 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
     bundle = {"schema_version": 2, "expected_server": profile.expected_server,
               "installation_profile": profile.to_dict(), "objects": objects, "source_pins": pins,
               "source_rendered": True, "fresh_driver_contexts": True,
+              "native_management_scope": management_scope,
               "certificate_management": contract,
               **({'certificate_authority_pem': state['application_ca']} if contract['mode'] == 'managed' else {}),
               "ingress_aliases_configured": bool(ingress), "database_contents_included": False,

@@ -556,3 +556,63 @@ def test_cluster_retirement_cannot_fall_back_to_installer_pod_exec(monkeypatch, 
     with pytest.raises(ValueError, match='closed with verified console cleanup'):
         setup.retire(args)
     assert requests == [('prepare/retirement-check', {'workload': context.workload})]
+
+
+@pytest.fixture
+def driver_artifact_projection(tmp_path, monkeypatch):
+    from deployment_artifacts import IMAGE_ROLES
+    from deployment_profile import active_profile
+    value = {'schema_version': 1, 'images': {role:
+        'registry.example/security/' + role.replace('_', '-') + '@sha256:' + '1' * 64
+        for role in IMAGE_ROLES}, 'native_build_contract': active_profile().native_build_contract,
+        'native_ca_bundle_sha256': 'a' * 64, 'delivery_secret': 'must-never-be-projected'}
+    path = tmp_path / 'reviewed-artifacts.json'
+    path.write_text(json.dumps(value));path.chmod(0o600)
+    monkeypatch.setenv('IDENTITY_DEMO_ARTIFACTS', str(path))
+    deployment = {'spec': {'template': {'spec': {'volumes': [
+        {'name': 'code', 'configMap': {'name': 'old-code'}},
+        {'name': 'state', 'persistentVolumeClaim': {'claimName': 'retained-history'}}],
+        'containers': [{'name': 'driver', 'env': [{'name': 'EXISTING', 'value': 'retained'}],
+            'volumeMounts': [{'name': 'state', 'mountPath': '/state'}]}]}}}}
+    return deployment, value
+
+
+def test_old_driver_gets_reviewed_public_artifacts_without_changing_state(driver_artifact_projection):
+    from identity_demo_execution_setup import project_driver_artifacts
+    deployment, value = driver_artifact_projection
+    before = json.loads(json.dumps(deployment));data = {'support.py': '# retained'}
+    project_driver_artifacts(deployment, data)
+    lock = json.loads(data['artifacts.json'])
+    assert lock['images'] == value['images'] and 'delivery_secret' not in lock
+    assert deployment['spec']['template']['spec']['volumes'] == before['spec']['template']['spec']['volumes']
+    container = deployment['spec']['template']['spec']['containers'][0]
+    assert container['volumeMounts'][0] == before['spec']['template']['spec']['containers'][0]['volumeMounts'][0]
+    assert container['volumeMounts'][-1] == {'name': 'code', 'mountPath': '/configuration/artifacts.json',
+        'subPath': 'artifacts.json', 'readOnly': True}
+    saved = json.dumps(deployment, sort_keys=True)
+    project_driver_artifacts(deployment, data)
+    assert json.dumps(deployment, sort_keys=True) == saved and data['support.py'] == '# retained'
+
+
+@pytest.mark.parametrize('drift', ['path', 'writable', 'subpath', 'secret-volume'])
+def test_existing_artifact_projection_cannot_be_redirected(driver_artifact_projection, drift):
+    from identity_demo_execution_setup import project_driver_artifacts
+    deployment, _ = driver_artifact_projection;data = {}
+    project_driver_artifacts(deployment, data)
+    pod = deployment['spec']['template']['spec'];container = pod['containers'][0]
+    if drift == 'path':container['env'][-1]['value'] = '/credentials/foreign.json'
+    elif drift == 'writable':container['volumeMounts'][-1]['readOnly'] = False
+    elif drift == 'subpath':container['volumeMounts'][-1]['subPath'] = 'foreign.json'
+    else:pod['volumes'][0] = {'name': 'code', 'secret': {'secretName': 'foreign'}}
+    with pytest.raises(ValueError, match='Exact read-only artifact projection'):
+        project_driver_artifacts(deployment, data)
+
+
+def test_artifact_lock_from_another_installation_stops_projection(driver_artifact_projection, monkeypatch):
+    from identity_demo_execution_setup import project_driver_artifacts
+    deployment, value = driver_artifact_projection;value['native_build_contract'] = {}
+    path = Path(__import__('os').environ['IDENTITY_DEMO_ARTIFACTS']);path.write_text(json.dumps(value))
+    before = json.loads(json.dumps(deployment));data = {}
+    with pytest.raises(ValueError, match='different native build contract'):
+        project_driver_artifacts(deployment, data)
+    assert deployment == before and not data

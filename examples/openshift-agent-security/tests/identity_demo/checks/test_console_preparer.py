@@ -389,3 +389,96 @@ assert result['blocked'] and result['ambiguous_mutation_not_replayed']
     driver.console.heartbeat(worker)
     assert reserve(driver, client, owner) is None
     assert len((root / 'native-effects.jsonl').read_text().splitlines()) == 1
+
+
+def test_profile_preparation_keeps_creation_and_loaded_policy_receipts_separate(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    from dataclasses import fields
+    import identity_demo_console_preparer as helper
+    import identity_demo_runtime as runtime
+    import identity_demo_presentation as presentation
+    import identity_demo_workspace_retention as retention
+    from checks.test_pool_profiles import setup, mapping
+    from execution_context import ExecutionContext
+
+    driver, client, _ = setup(tmp_path)
+    owner = uuid4().hex
+    reservation = reserve(driver, client, owner)
+    expected = mapping(reservation['target'])
+    context = ExecutionContext(**{f.name:expected[f.name] for f in fields(ExecutionContext)})
+    root = tmp_path/'preparer'
+    root.mkdir(mode=0o700)
+    creation_directory = root/reservation['id']/'provision'
+    verification_directory = root/reservation['id']/'loaded-policy'
+
+    def provision(args):
+        assert args.pool_profile == reservation['target']['profile']
+        # Native session receipts intentionally refuse overwrites.
+        (args.output_dir/'console-preparation.portforward-log').write_text('original creation log')
+        (args.output_dir/'context.private.json').write_text(json.dumps(expected))
+        return {'native_created':True}
+
+    @contextmanager
+    def session(args, credentials):
+        with (args.output_dir/'console-preparation.portforward-log').open('x') as stream:
+            stream.write('independent loaded-policy observation')
+        def query(words, **kwargs):
+            base = ['policy','get',context.sandbox_name]
+            assert words in (base+['--base','--output','json'],base+['--rev','1','--base','--output','json'])
+            return {'scope':'sandbox','sandbox':context.sandbox_name,'policy_source':'sandbox',
+                    'status':'loaded' if '--rev' in words else 'effective',
+                    'version':1,'active_version':1,'hash':'c'*64}
+        yield query
+
+    def complete(route, value):
+        assert route == 'prepare/finish'
+        driver.console.finish_preparation(value['owner'],value['id'],value['context'],value['receipt_sha256'])
+
+    monkeypatch.setattr(presentation,'check_capacity',lambda *a,**kw:{'available':True})
+    monkeypatch.setattr(helper,'provision',provision)
+    monkeypatch.setattr(helper,'resolve_context',lambda *a,**kw:context)
+    monkeypatch.setattr(retention,'capture',lambda *a,**kw:None)
+    monkeypatch.setattr(runtime,'guard',lambda *a:(None,{},None))
+    monkeypatch.setattr(helper.native,'native_session',session)
+    result=prepare_one(SimpleNamespace(output_dir=root),SimpleNamespace(request=complete),owner,reservation)
+    assert result['prepared'] and driver.console.context_ready(context.workload)
+    assert (creation_directory/'console-preparation.portforward-log').read_text() == 'original creation log'
+    assert (verification_directory/'console-preparation.portforward-log').read_text() == 'independent loaded-policy observation'
+
+
+@pytest.mark.parametrize('fault', [None, 'global', 'wrong_sandbox', 'missing_version',
+                                  'bad_hash', 'pending', 'changed_hash', 'changed_active'])
+def test_policy_verifier_matches_effective_and_explicit_loaded_revision(fault):
+    from identity_demo_console_preparer import loaded_policy
+
+    context = SimpleNamespace(sandbox_name='demo-s56-triage-abc')
+    # Pinned CLI: the current config reports effective; an explicit revision
+    # reports loaded. They are different observations and must agree.
+    effective = {'scope':'sandbox','sandbox':context.sandbox_name,'policy_source':'sandbox',
+                 'status':'effective','version':1,'active_version':1,'hash':'c'*64}
+    revision = dict(effective,status='loaded')
+    if fault == 'global':
+        effective['policy_source']='global'
+    elif fault == 'wrong_sandbox':
+        effective['sandbox']='another-sandbox'
+    elif fault == 'missing_version':
+        effective.pop('version')
+    elif fault == 'bad_hash':
+        effective['hash']='not-a-native-policy-hash'
+    elif fault == 'pending':
+        revision['status']='pending'
+    elif fault == 'changed_hash':
+        revision['hash']='d'*64
+    elif fault == 'changed_active':
+        revision['active_version']=2
+    calls=[]
+    def execute(words, **kwargs):
+        calls.append(words)
+        return revision if '--rev' in words else effective
+    if fault:
+        with pytest.raises(ValueError):
+            loaded_policy(execute,context)
+    else:
+        assert loaded_policy(execute,context)==revision
+        assert calls==[['policy','get',context.sandbox_name,'--base','--output','json'],
+                       ['policy','get',context.sandbox_name,'--rev','1','--base','--output','json']]

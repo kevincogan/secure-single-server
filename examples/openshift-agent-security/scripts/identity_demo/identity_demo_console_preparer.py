@@ -14,6 +14,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import threading
@@ -33,11 +34,9 @@ class PreparationCapacityUnavailable(RuntimeError):
 
 
 def record(path: Path, value: dict) -> None:
-    """Atomically replace only the helper's local checkpoint, keeping receipts immutable."""
-    temporary = path.with_suffix('.tmp')
-    with open(temporary, 'w', opener=lambda p, f: os.open(p, f, 0o600)) as stream:
-        json.dump(value, stream, sort_keys=True)
-    temporary.replace(path)
+    """Keep checkpoints atomic and receipts immutable through the shared helper."""
+    from identity_demo_private_state import checkpoint
+    checkpoint(path,value)
 
 
 def retire_previous(args: argparse.Namespace, value: dict) -> dict:
@@ -59,6 +58,25 @@ def retire_previous(args: argparse.Namespace, value: dict) -> dict:
             'disposable_scratch_removed': result.get('disposable_scratch_removed', False),
             'registration_absent': result['registration_absent'],
             'registration_inactive': inactive, 'controller_managed': bool(result.get('controller_managed'))}
+
+
+
+def loaded_policy(execute, context):
+    """Match the effective sandbox policy to its explicitly loaded native revision."""
+    command = ['policy', 'get', context.sandbox_name]
+    effective = execute(command + ['--base', '--output', 'json'], json_output=True)
+    version = effective.get('version')
+    require(effective.get('scope') == 'sandbox' and effective.get('sandbox') == context.sandbox_name
+            and effective.get('status') == 'effective' and effective.get('policy_source') == 'sandbox'
+            and type(version) is int and version > 0 and effective.get('active_version') == version
+            and isinstance(effective.get('hash'), str) and re.fullmatch('[a-f0-9]{64}', effective['hash']),
+            'Exact effective sandbox policy required')
+    revision = execute(command + ['--rev', str(version), '--base', '--output', 'json'], json_output=True)
+    require(revision.get('scope') == 'sandbox' and revision.get('sandbox') == context.sandbox_name
+            and revision.get('status') == 'loaded' and revision.get('version') == version
+            and revision.get('active_version') == version and revision.get('hash') == effective['hash'],
+            'Matching loaded native policy revision required')
+    return revision
 
 
 def prepare_one(args: argparse.Namespace, control: Control, owner: str, reservation: dict) -> dict:
@@ -97,11 +115,30 @@ def prepare_one(args: argparse.Namespace, control: Control, owner: str, reservat
         request.isolated_preparation = bool(target.get('automatic'))
         request.action = 'provision'
         request.role = target['role']
+        if target.get('profile_id'):
+            request.pool_profile = target['profile']
         request.namespace = native.NAMESPACE
         request.label = 'console-preparation'
         retirement = directory / 'retirement'
         retirement.mkdir(mode=0o700)
         request.output_dir = retirement
+        if target.get('operation') == 'verify':
+            previous = target['previous']
+            context_file = directory/'verify-context.private.json'
+            native.private_write(context_file,{f.name:previous[f.name] for f in fields(ExecutionContext)})
+            context = resolve_context(str(context_file),lambda k,n,ns=None:read(request,k,n,ns),contract=target['profile'])
+            request.execution_context = context
+            _, credentials, _ = __import__('identity_demo_runtime').guard(request)
+            with native.native_session(request,credentials) as execute:
+                observed = loaded_policy(execute, context)
+            require(observed.get('hash') == previous['native_policy_hash'] and observed.get('status') == 'loaded'
+                    and observed.get('version') == observed.get('active_version'),'Prepared policy changed or is not loaded')
+            path=directory/'verification.receipt.private.json'
+            native.private_write(path,{'workload':context.workload,'policy_hash':observed['hash'],'verified':True})
+            receipt=hashlib.sha256(path.read_bytes()).hexdigest()
+            record(checkpoint,{'phase':'ready_to_commit','context':previous,'receipt_sha256':receipt})
+            control.request('prepare/finish',{**finish,'context':previous,'receipt_sha256':receipt})
+            return {'verified':True,'profile_id':target['profile_id']}
         if target.get('automatic') and target.get('operation') == 'retire':
             previous = dict(target['previous'])
             if target.get('disposable'):
@@ -124,12 +161,24 @@ def prepare_one(args: argparse.Namespace, control: Control, owner: str, reservat
         request.output_dir = output
         request.suffix = target['suffix']
         observed = provision(request)
-        context = resolve_context(str(output / 'context.private.json'), lambda k, n, ns=None: read(request, k, n, ns))
+        context = resolve_context(str(output / 'context.private.json'), lambda k, n, ns=None: read(request, k, n, ns), **({'contract': target['profile']} if target.get('profile_id') else {}))
         if target.get('automatic'):
             from identity_demo_workspace_retention import capture
             capture(request, context, reservation['id'], read)
-        value = {**asdict(context), 'workload': context.workload, 'workflow': target['workflow'],
-                 'project': target['project'], 'console_prepared': True}
+        value = {**asdict(context), 'workload': context.workload, 'console_prepared': True}
+        if target.get('profile_id'):
+            _, credentials, _ = __import__('identity_demo_runtime').guard(request)
+            verification = argparse.Namespace(**vars(request))
+            verification.execution_context = context
+            verification.output_dir = directory / 'loaded-policy'
+            verification.output_dir.mkdir(mode=0o700)
+            with native.native_session(verification, credentials) as execute:
+                policy = loaded_policy(execute, context)
+            require(policy.get('status')=='loaded' and policy.get('version')==policy.get('active_version')
+                    and isinstance(policy.get('hash'),str) and len(policy['hash'])==64,'Loaded prepared policy required')
+            value.update(profile_id=target['profile_id'],profile_fingerprint=target['profile_fingerprint'],native_policy_hash=policy['hash'])
+        else:
+            value.update(workflow=target['workflow'],project=target['project'])
         receipt = {'reservation': reservation['id'], 'retirement': retired, 'provision': observed,
                    'capacity_before': capacity,
                    'context': value, 'coordinator_stopped': False,
@@ -141,7 +190,7 @@ def prepare_one(args: argparse.Namespace, control: Control, owner: str, reservat
         digest = hashlib.sha256((directory / 'preparation.receipt.private.json').read_bytes()).hexdigest()
         record(checkpoint, {'phase': 'ready_to_commit', 'context': value, 'receipt_sha256': digest})
         control.request('prepare/finish', {**finish, 'context': value, 'receipt_sha256': digest})
-        return {'prepared': True, 'workflow': target['workflow'], 'role': target['role'], 'receipt_sha256': digest}
+        return {'prepared': True, 'workflow': target.get('workflow',target.get('profile_id')), 'role': target['role'], 'receipt_sha256': digest}
     except Exception:
         # A failed completion request may already have committed. Keep its exact
         # context/receipt for idempotent confirmation, never recreate the sandbox.
@@ -233,7 +282,9 @@ def main() -> None:
     stopping = threading.Event()
     signal.signal(signal.SIGTERM, lambda *_: stopping.set())
     signal.signal(signal.SIGINT, lambda *_: stopping.set())
+    delay=10
     while not stopping.is_set():
+        failed=False
         if lease and lease.lost.is_set():
             raise RuntimeError('Preparer lease ownership lost; recovery required')
         try:
@@ -247,12 +298,15 @@ def main() -> None:
                 if verified:
                     print(json.dumps(verified), flush=True)
         except PreparationCapacityUnavailable:
+            failed=True
             print(json.dumps({'preparation_waiting_for_capacity': True, 'mutation_attempted': False}), flush=True)
         except Exception:
+            failed=True
             # Control failures may be retried; native mutation cannot be repeated
             # because its durable checkpoint is checked before entering it again.
             print(json.dumps({'preparation_control_unavailable': True}), flush=True)
-        stopping.wait(10)
+        delay=min(delay*2,60) if failed else 10
+        stopping.wait(delay)
 
 
 if __name__ == '__main__':

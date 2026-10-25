@@ -10,18 +10,13 @@ import re
 from typing import Callable
 from uuid import UUID
 from deployment_profile import active_profile, LEGACY
-from deployment_artifacts import configured_native_image
+from deployment_artifacts import configured_native_image, native_supervisor_images
 
 RETIRED_ID = "00000000-0000-4000-8000-000000000001"
 DOMAIN = active_profile().trust_domain
 from identity_demo_spire_registration import CVE_IMAGE
 from deployment_profile import in_source_checkout
-SUPERVISOR_IMAGES = {
-    "ghcr.io/nvidia/openshell/supervisor@sha256:4ab2b970cdb02c7518ba4ccbbadb4861ae9a8d0b8770e5b160697f0453b0a8e4",
-    "image-registry.openshift-image-registry.svc:5000/demo-core/fixture-openshell-sender@sha256:ad582fdc34c8aa1389345e0c110cc16bfdef86853e7401067ba9cb43b5d8f007",
-} if active_profile() == LEGACY else set()
-if configured_native_image("openshell_supervisor"):
-    SUPERVISOR_IMAGES.add(configured_native_image("openshell_supervisor"))
+SUPERVISOR_IMAGES = native_supervisor_images()
 
 
 @dataclass(frozen=True)
@@ -69,7 +64,7 @@ def context_of(args: object) -> ExecutionContext:
     return getattr(args, "execution_context", None) or legacy_context()
 
 
-def resolve_context(path: str, read: Callable[..., dict]) -> ExecutionContext:
+def resolve_context(path: str, read: Callable[..., dict], *, contract: dict | None = None) -> ExecutionContext:
     """Validate a private fresh context against native ownership and registration."""
     location = Path(path)
     if (
@@ -79,7 +74,7 @@ def resolve_context(path: str, read: Callable[..., dict]) -> ExecutionContext:
     ):
         raise ValueError("Private owner-supplied context required")
     value = json.loads(location.read_text())
-    return validate_context(value, read)
+    return validate_context(value, read, contract=contract)
 
 
 def context_identity(value: dict) -> ExecutionContext:
@@ -105,9 +100,20 @@ def context_identity(value: dict) -> ExecutionContext:
     return context
 
 
-def validate_context(value: dict, read: Callable[..., dict]) -> ExecutionContext:
+def validate_context(value: dict, read: Callable[..., dict], *, contract: dict | None = None) -> ExecutionContext:
     """Validate an operator-supplied mapping against the same exact native resources."""
     context = context_identity(value)
+    expected_image = CVE_IMAGE
+    if contract is not None:
+        from identity_demo_pool_profiles import fingerprint
+        from deployment_artifacts import IMAGE_REFERENCE
+        if (contract.get('role') != context.role or contract.get('namespace') != context.namespace
+                or contract.get('service_account') != context.service_account
+                or not isinstance(contract.get('workload_image'),str)
+                or not IMAGE_REFERENCE.fullmatch(contract['workload_image'])
+                or contract.get('supervisor_image') not in SUPERVISOR_IMAGES):
+            raise ValueError('Approved compatible native profile required')
+        expected_image = contract['workload_image']
     namespace = read("namespace", context.namespace, None)
     if namespace["metadata"].get("labels", {}).get("identity-demo-owner") != active_profile().owner:
         raise ValueError("Owned execution namespace required")
@@ -128,7 +134,7 @@ def validate_context(value: dict, read: Callable[..., dict]) -> ExecutionContext
         workload["spec"].get("serviceAccountName") != context.service_account
         or workload["spec"].get("automountServiceAccountToken") is not False
         or len(workload["spec"].get("containers", [])) != 1
-        or workload["spec"]["containers"][0].get("image") != CVE_IMAGE
+        or workload["spec"]["containers"][0].get("image") != expected_image
         or not any(
             v.get("uid") == sandbox["metadata"]["uid"]
             for v in workload["metadata"].get("ownerReferences", [])
@@ -143,6 +149,7 @@ def validate_context(value: dict, read: Callable[..., dict]) -> ExecutionContext
         or len(supervisor["spec"].get("containers", [])) != 1
         or supervisor["spec"]["containers"][0].get("name") != "supervisor"
         or supervisor["spec"]["containers"][0].get("image") not in SUPERVISOR_IMAGES
+        or (contract is not None and supervisor['spec']['containers'][0].get('image') != contract['supervisor_image'])
         or len(statuses) != 1
         or not statuses[0].get("ready")
         or "@sha256:" not in statuses[0].get("imageID", "")
