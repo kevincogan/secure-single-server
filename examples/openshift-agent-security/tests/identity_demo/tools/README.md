@@ -7,14 +7,16 @@ the unprivileged agent. They are optional for normal native/browser workflows.
 They are not customer application services or alternative authentication paths.
 
 **Release gate:** the pinned SPIRE CLI has unresolved Critical/High dependency
-matches in the October 14 scan. This package reproduces the lab diagnostics;
-customer redistribution requires remediation or an explicit security disposition.
-See the [delivery ledger](../../../docs/identity-demo-reference.md).
+matches in the recorded evaluation scan. These optional diagnostics require
+remediation or an explicit security disposition before redistribution. See the
+[release gates](../../../docs/identity-demo-reference.md#open-release-gates) and
+[recorded verification](../../../docs/verification.json); a new release needs a
+current scan of its exact artifacts.
 
 - `spire-agent`: the exact upstream SPIRE 1.14.7 Linux AMD64 musl release binary.
   Its archive and executable hashes are pinned in `inputs.lock.json`. The
   release API's archive digest and local executable were checked independently;
-  the executable matches the one used by the historical lab probes.
+  the executable matches the recorded diagnostic build.
 - `read-native-projection`: the checked-in small Go diagnostic. It accepts no
   arguments or configurable path and reads only the supervisor's projected
   Kubernetes compute credential. It rejects empty/oversized input before output.
@@ -58,8 +60,8 @@ the shared run volume; the supervisor performs the actual diagnostic calls.
 Never grant an agent permission to read API tokens or the Workload API socket.
 
 These are evaluation diagnostics. Release checksum verification, a successful
-build and matching historical binary do not establish licence/security approval,
-bank acceptance or vendor support. Preserve source/build/scan receipts and apply
+build and matching binary do not establish licence/security approval,
+customer acceptance or vendor support. Preserve source/build/scan receipts and apply
 the package's release review to these artifacts as well.
 
 Sources: [SPIRE release](https://github.com/spiffe/spire/releases/tag/v1.14.7),

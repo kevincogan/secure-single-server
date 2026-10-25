@@ -15,7 +15,7 @@ outputs as an official OpenShell release or a supported production component.
 - The exact upstream archive identified in `inputs.lock.json`. The source URL is
   recorded there; download or obtain it from an approved artifact mirror, then
   supply the local file. A changed archive is refused even for the same commit.
-- Four checked-in patches, in recorded order. Upstream and patched Cargo locks
+- Five checked-in patches, in recorded order. Upstream and patched Cargo locks
   have **different pinned hashes**: the sender patch deliberately adds its X.509
   dependencies. No implicit dependency updates are allowed during compilation.
 - Rust 1.95.0 official multi-architecture base pinned by digest, signed Debian
@@ -33,7 +33,8 @@ customer release. Record new reviewed pins to remediate vulnerabilities.
 
 ## Prepare, then build
 
-Run from the repository root with the pinned operator dependencies installed.
+Run from the example root (or its private configured copy) with the pinned
+operator dependencies installed.
 `DEMO_PACKAGE_OUTPUT` must be an existing owner-only directory outside Git.
 
 ```bash
@@ -118,7 +119,7 @@ the internal registry can
 redirect layer transfers to its external storage. Retain the inventory URL,
 retrieval hash and selected prefixes privately. An internal hostname alone does
 not prove disconnected delivery. A customer mirror needs its own approved routes.
-Do not rely on DNS answers obtained from the operator laptop: the cluster may
+Do not rely on DNS answers obtained from the installation workstation: the cluster may
 resolve the same registry to different valid addresses. The GitHub `packages`
 list alone is insufficient for layer downloads: the blob CDN can use addresses
 inside other published GitHub ranges. Have the platform owner verify the actual
@@ -227,7 +228,7 @@ unknown licence assertions explicitly.
 Preserve raw reports; classify each material match against authoritative vendor
 advisories, actual affected code paths and available fixes. Scanner severity,
 distribution `no-dsa`/`wont-fix` status and a successful startup check cannot
-approve a risk. Do not suppress findings automatically. Bank/security reviewers
+approve a risk. Do not suppress findings automatically. Designated security reviewers
 must decide any required exception; fixed bases/rebuilt binaries require new
 packaging, scan and live acceptance evidence.
 
@@ -262,3 +263,52 @@ Docker client configuration must retain the approved Buildx plugin search path
 as well as the selected local daemon socket. An empty config without its plugin
 path can fall back to the obsolete builder, which cannot use `COPY --chmod`.
 No operator global credential configuration needs to be changed.
+
+## Docker Desktop credential-helper recovery
+
+Use this optional workaround only when Docker Desktop's credential helper
+blocks **public-image** metadata access. First verify the normal Docker context
+and approved registry access. A separate private client configuration preserves
+global logins and Buildx. It contains no private-registry authentication; do not
+use it for builds that require those credentials. Podman users skip this section.
+
+Inputs: the validated local Docker Desktop daemon and private Python environment.
+Save the current shell settings so they can be restored afterward:
+
+```bash
+DEMO_SAVED_DOCKER_CONFIG="${DOCKER_CONFIG-}"
+DEMO_SAVED_DOCKER_HOST="${DOCKER_HOST-}"
+DEMO_SAVED_DOCKER_CONTEXT="${DOCKER_CONTEXT-}"
+```
+
+```bash
+export DEMO_DOCKER_SOCKET="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
+mkdir -m 700 "$DEMO_PRIVATE_ROOT/docker-public"
+"$DEMO_PYTHON" - "$DEMO_PRIVATE_ROOT/docker-public/config.json" <<'PYCONFIG'
+import json, pathlib, sys
+paths = [pathlib.Path.home() / '.docker/cli-plugins',
+         pathlib.Path('/Applications/Docker.app/Contents/Resources/cli-plugins')]
+directories = [str(p) for p in paths if (p / 'docker-buildx').is_file()]
+if not directories:
+    raise SystemExit('Install the approved Docker Buildx plugin before continuing')
+with pathlib.Path(sys.argv[1]).open('x') as stream:
+    json.dump({'auths': {}, 'cliPluginsExtraDirs': directories}, stream)
+PYCONFIG
+export DOCKER_HOST="$DEMO_DOCKER_SOCKET"
+export DOCKER_CONFIG="$DEMO_PRIVATE_ROOT/docker-public"
+unset DOCKER_CONTEXT
+docker buildx version
+```
+
+Use this only with the validated local Docker Desktop daemon. Do not change a
+remote daemon's authentication/TLS setup. If any step fails, stop and inspect;
+never replace the existing global Docker configuration or disable TLS.
+
+Expected: `docker buildx version` succeeds and public image metadata resolves.
+After the affected builds, restore the shell's original Docker settings:
+
+```bash
+if test -n "$DEMO_SAVED_DOCKER_CONFIG"; then export DOCKER_CONFIG="$DEMO_SAVED_DOCKER_CONFIG"; else unset DOCKER_CONFIG; fi
+if test -n "$DEMO_SAVED_DOCKER_HOST"; then export DOCKER_HOST="$DEMO_SAVED_DOCKER_HOST"; else unset DOCKER_HOST; fi
+if test -n "$DEMO_SAVED_DOCKER_CONTEXT"; then export DOCKER_CONTEXT="$DEMO_SAVED_DOCKER_CONTEXT"; else unset DOCKER_CONTEXT; fi
+```

@@ -1,21 +1,22 @@
 {
   "schema_version": 3,
-  "date": "2026-10-22",
-  "scope": "Verified connected evaluation setup and OpenShift-hosted presentation runtime on a shared platform. Compatible shared controllers were retained; empty-platform bootstrap is not established.",
+  "date": "2026-10-25",
+  "scope": "Connected reusable foundation: connector proof, shared profile pooling, OpenShift builds and history-preserving presentation migration passed. Fresh setup used reviewed checkpoint recovery; an unassisted final-image walkthrough and external release approvals remain outstanding.",
   "technical_scope_passed": true,
   "customer_ready": false,
   "evidence_policy": {
     "current_summary": true,
     "raw_receipts_and_prior_checkpoint_records": "Retained privately outside the customer package.",
-    "scope_note": "Historical live acceptance is distinguished from this source-only review. Skipped integration tests are not passes."
+    "scope_note": "Earlier live evidence and the new candidate qualification are separate. Current technical completion requires candidate acceptance, history-preserving migration and final package checks. Skipped integration checks are not passes."
   },
   "source_review": {
-    "date": "2026-10-22",
+    "date": "2026-10-25",
     "runtime_behavior_changed": true,
     "deployed_resources_changed": true,
     "generic_tests": {
-      "passed": 1939,
-      "skipped": 38
+      "passed": 2211,
+      "skipped": 38,
+      "warnings": 2
     },
     "source_checks": [
       "Syntax, documentation links and shell example syntax",
@@ -23,10 +24,10 @@
       "Public source and archive private-data scan",
       "Standard-resource admission and real cryptographic/mTLS tests"
     ],
-    "live_check": "Five post-migration browser permission/workflow cases; at most three new synthetic issues; renewal and trust-overlap fixtures retained privately.",
+    "live_check": "Candidate Analyst/Viewer/Reader and live Incident/Remediation evidence, followed by migrated Reader and Viewer Incident denials and three historical owner views; only three new synthetic issues in this work.",
     "confidential_data_found": false,
     "independent_security_audit": false,
-    "scope": "Managed certificate integration and current generic delivery reviewed. Independent audit and release clearance remain separate gates.",
+    "scope": "Controlled connected evaluation acceptance and sanitized source package; independent security audit and release clearance remain separate.",
     "live_readiness": {
       "core_deployments_ready": 9,
       "openshell_statefulset_ready": true,
@@ -170,11 +171,11 @@
     "historical_issue_other_user_http": 403,
     "history_after_restart_and_retirement": true,
     "prior_installation_history_automatically_imported": false,
-    "shared_prerequisites_modified": false
+    "shared_platform_controllers_replaced_or_upgraded": false,
+    "owned_shared_kubelet_policy_correction": "One missing worker host was added through the guarded helper with exact platform-owner authorization; no automatic policy expansion."
   },
   "warm_pool": {
     "target_ready": 8,
-    "per_workflow_role": 2,
     "maximum_managed": 12,
     "maximum_executing": 1,
     "maximum_preparing_or_retiring": 1,
@@ -184,7 +185,12 @@
     "twelve_managed_boundary_observed": true,
     "replenishment_and_subsequent_run_passed": true,
     "uncertain_write_automatic_replay": false,
-    "historical_workspace_policy": "Preserved; only receipt-proven new disposable synthetic scratch is eligible for retirement deletion."
+    "historical_workspace_policy": "Preserved; only receipt-proven new disposable synthetic scratch is eligible for retirement deletion.",
+    "allocation_mode": "Trusted execution profiles; compatible Triage workflows share capacity, scope binds atomically at allocation.",
+    "ready_targets": {
+      "triage": 6,
+      "reader": 2
+    }
   },
   "recovery": {
     "driver_jira_consistent_backup_and_restored_local_copies": true,
@@ -378,6 +384,230 @@
       "local_restored_copies_verified": true,
       "live_database_restored": false,
       "complete_platform_disaster_recovery": false
+    }
+  },
+  "reusable_foundation_candidate": {
+    "date": "2026-10-25",
+    "status": "technical_acceptance_passed_with_recorded_remaining_gates",
+    "presentation_migrated": true,
+    "local_tests": {
+      "passed": 2211,
+      "skipped": 38,
+      "warnings": 2,
+      "elapsed_seconds": 70.04,
+      "scope": "Exact make test target including installer finalization, original-item scratch binding and legacy artifact projection."
+    },
+    "source_checks": "Inventory, public-data scan, documentation links, shell examples, targeted Python fatal-error checks, four shell checks and archive extraction checks passed. Existing parent repository offline checks passed; hosted container/other-architecture CI was not run.",
+    "connector_proof": "Synthetic document read and approval-controlled publication exercise shared authorization, persistent claims and audit; no non-Jira cluster service is claimed.",
+    "installer": {
+      "default_workstation_tools": [
+        "Bash",
+        "matching oc",
+        "tar",
+        "SHA-256 utility"
+      ],
+      "offline_native_release_compile_passed": true,
+      "offline_native_compile_seconds": 1364,
+      "packaged_native_binary_checks_passed": true,
+      "worker_cluster_build_and_packaged_tool_checks_passed": true,
+      "final_installer_linux_suite": {
+        "passed": 2211,
+        "skipped": 38,
+        "warnings": 2,
+        "elapsed_seconds": 99.14,
+        "scope": "Exact delivered Linux AMD64 installer contents including gateway installer-grant cleanup; packaged CLI versions and temporary-resource absence verified."
+      },
+      "application_installation": "Cluster native compilation, publication, core installation, certificates, persistent gateway and scoped workers passed. Two startup gates were recovered through reviewed existing helpers; the final source now waits for both rollouts.",
+      "reconciled_failure": "Ownership-preserving network/admission corrections and exact authorized shared kubelet-host correction were recorded. No uncertain backend mutation was replayed. A legacy driver without an artifact projection rejected profile activation; the existing updater now adds the reviewed read-only public lock.",
+      "administrator_kubelet_preflight": {
+        "missing_worker_host_rejected_before_resource_creation": true,
+        "actual_cluster_negative_test_passed": true,
+        "runtime_node_privileges_added": false,
+        "shared_policy_automatically_changed": false
+      },
+      "unassisted_final_image_job_pass_claimed": false,
+      "native_reproducibility": {
+        "cold_build_seconds": [
+          1367,
+          1364
+        ],
+        "two_pinned_linux_amd64_binary_pairs_identical": true,
+        "other_platforms_claimed": false
+      },
+      "installer_finalization": "Existing helper retires main installer bindings and the exact named gateway binding, preserving runtime grants; successful READY candidate finalization exercised. The recovered failed CHECK Job remains failed; a separate exact-receipt retirement removed its obsolete installer authority.",
+      "packaged_tool_versions": {
+        "oc": "4.21.36",
+        "openshell": "0.1.3",
+        "platform": "linux/amd64"
+      }
+    },
+    "profile_pool": {
+      "ready_targets": {
+        "triage": 6,
+        "reader": 2
+      },
+      "non_retired_limit": 12,
+      "unit_acceptance_passed": true,
+      "live_acceptance": "Eight verified ready contexts, six Triage and two Reader, with twelve-managed enforcement. Actual execution overlapped preparation without changing its binding or deadline. The presentation migrated by retiring eight old unused identities; none was reinterpreted."
+    },
+    "security_and_workflow_live_acceptance": {
+      "analyst_exact_approved_create": true,
+      "viewer_user_permission_denial": true,
+      "reader_workload_permission_denial": true,
+      "unchanged_backend_on_denial": true,
+      "incident_actual_inference_and_controlled_project_denial": true,
+      "remediation_actual_inference_and_exact_approved_task": true,
+      "candidate_projects_started_empty_without_seed_issues": true,
+      "binding_expiry_cancellation_adversarial_live_checks": "Focused automated cryptographic, process-recovery and unknown-write checks passed; the recorded live binding/expiry/cancellation boundary is retained separately."
+    },
+    "recovery_and_concurrency_live_acceptance": {
+      "new_context_creation_during_execution": true,
+      "running_binding_and_deadline_unchanged": true,
+      "application_restart_preserved_all_existing_table_contents": true,
+      "retired_expired_run_issue_access_after_restart_and_fresh_signin": true,
+      "cross_owner_run_and_issue_denied": true,
+      "interrupted_preparation_and_failed_retirement_fault_tests": "Passed offline fixtures with actual process termination, persistent checkpoints and restart; no live backend mutation replay.",
+      "original_quarantine_decisions_preserved": true,
+      "scratch_deletion_retains_historical_issue_access": true
+    },
+    "new_jira_acceptance_issues_created": 3,
+    "final_archive_inspection": "Inventory-allowlisted archive inspected, exact member bytes checked, extracted source verification and public-data scan passed; no Git metadata, symlinks, caches, credentials or private deployment state.",
+    "production_certification": false,
+    "recovery_evidence": {
+      "projected_api_token_file_rotation_observed": true,
+      "authenticated_observations": 34,
+      "rotation_observed_after_seconds": 515.3,
+      "short_token_test_scope": "API authentication only; execution minimum lifetime unchanged",
+      "failed_creations_confirmed_absent": 6,
+      "original_quarantine_decisions_retained": true,
+      "database_consistent_candidate_backup_and_restored_copies_verified": true,
+      "source_reload_history_equality": {
+        "prior_driver_tables": 19,
+        "jira_tables": 31,
+        "only_added_table": "console_pool_state_counts",
+        "live_database_restore_used": false
+      },
+      "model_contract": "An isolated maintenance reload rejected the configured model evidence before any write. The original approved model binding was restored from configured source; a fresh Remediation run then passed. Failed evidence was retained.",
+      "focused_fault_and_connector_checks": {
+        "passed": 100,
+        "scope": "Offline fixtures covering real storage, process replacement, unknown writes and cryptographic/mTLS failures; not a disruptive live fault campaign."
+      },
+      "presentation_backups": {
+        "database_consistent_sqlite_and_restored_copies_verified": true,
+        "both_issuer_data_volumes_copied_with_processes_stopped": true,
+        "cold_archive_bytes_verified": true,
+        "issuer_database_restore_rehearsed": false,
+        "configuration_and_key_recovery_inputs_retained_privately": true,
+        "live_history_restore_used": false,
+        "private_reader_state_included_credentials": true,
+        "secret_volume_or_api_token_mounted_in_reader": false,
+        "network_isolation_independently_verified": false
+      }
+    },
+    "native_policy_revision_verification": {
+      "actual_pinned_cli_and_gateway_checked": true,
+      "effective_policy_matches_explicit_loaded_revision": true,
+      "identity_version_and_hash_mismatch_tests_passed": true,
+      "replacement_runtime_activation": "Completed; fresh preparations verified effective and explicit loaded revision identity, version and hash."
+    },
+    "resource_observation": {
+      "samples": 8,
+      "observed_cpu_peak_cores": 1.381793518,
+      "observed_memory_peak_bytes": 2333736960,
+      "scope": "Running candidate application, supervisor and workload Pods during a required scenario; not a production load test or historical build peak.",
+      "unbudgeted_controller_broker_found": true,
+      "owned_namespace_default": "Standard LimitRange; exact owned broker Pod replaced during fenced idle maintenance. Admission loaded requests 100m/128Mi and limits 1 CPU/512Mi; shared controller unchanged.",
+      "native_compile": {
+        "samples": 12,
+        "cpu_peak_cores": 2.039197684,
+        "memory_peak_bytes": 3726368768,
+        "scope": "Observed required cold compile; not a production maximum."
+      }
+    },
+    "managed_certificate_acceptance": {
+      "three_existing_certificates_renewed": true,
+      "all_private_keys_rotated": true,
+      "certificate_and_issuer_uids_preserved": true,
+      "served_replacements_verified": true,
+      "fresh_client_mtls_handshake_verified": true,
+      "native_idle_pod_restart_required": true,
+      "automatic_ca_rollover_claimed": false,
+      "single_replica_peer_channel": "not exercised"
+    },
+    "fresh_walkthrough_seed_mode": "Explicit none mode used for final-guide qualification; default synthetic mode remains backward compatible. Final activation used reviewed checkpoint recovery; no unassisted final-image installation is claimed.",
+    "presentation_acceptance": {
+      "ready_profiles": {
+        "triage": 6,
+        "reader": 2
+      },
+      "managed": 8,
+      "quarantined": 0,
+      "reader_workload_denial_backend_unchanged": true,
+      "viewer_incident_actual_inference_and_user_denial": true,
+      "controlled_test_project_403_no_data": true,
+      "historical_owner_audit_and_jira_views": 3,
+      "same_url_and_existing_rows_preserved": true,
+      "new_jira_issues_on_presentation": 0,
+      "legacy_unused_identities_retired": 8,
+      "pre_existing_workspace_storage_retained": true,
+      "legacy_driver_public_artifact_projection_verified": true,
+      "node_list_and_unrelated_secret_access_denied_for_runtime_accounts": true,
+      "local_background_services_required": false
+    },
+    "pending": [
+      "Reviewed reconciliation of three retained candidate quarantine entries and release of retained build/recovery state after review",
+      "Independent unassisted final-image setup walkthrough",
+      "Artifact rights, signing/provenance, vendor/support and security/licensing clearance"
+    ],
+    "cleanup_inventory": {
+      "unused_candidate_contexts_retired": 16,
+      "exact_resource_uids_reviewed": 48,
+      "receipt_proven_disposable_scratch_pvcs_removed": 16,
+      "requested_scratch_storage_removed_gib": 32,
+      "measured_cloud_cost_savings_claimed": false,
+      "candidate_gateway_objects_removed": 6,
+      "candidate_application_services_parked": true,
+      "candidate_temporary_archive_objects_absent": 8,
+      "final_linux_probe_cleanup_observed": true,
+      "retained_ambiguous_candidate_creations": 3,
+      "retained_quarantine_management_controllers": 3,
+      "retained_persistent_volume_claims": {
+        "installer_qualification_candidate": 9,
+        "workflow_qualification_candidate": 12
+      },
+      "retention_purpose": "Application audit/issue databases, identity tombstones, issuer/key material, original installer checkpoints and rollback evidence. Three quarantined creations and their management/identity dependencies require reviewed reconciliation; no forced deletion. Build state remains until the recorded installation failures and independent walkthrough are reviewed. Intermediate build artifacts remain private qualification evidence until acceptance/release review; no cluster-wide image pruning was performed.",
+      "installer_administrative_bindings_retired": true,
+      "read_only_image_pull_bindings_retained_for_artifacts": true,
+      "unrelated_baseline_controllers_compared": 234,
+      "newly_unready_unrelated_controllers": 0,
+      "healthy_cluster_operators": 21,
+      "independent_baseline_drift": "One monitoring controller spec changed independently; no readiness regression."
+    },
+    "timing_observations": {
+      "presentation_reader_start_to_proposal_seconds": 57,
+      "presentation_viewer_incident_start_to_proposal_seconds": 77,
+      "reader_approval_to_cleanup_seconds": 23,
+      "viewer_incident_approval_to_cleanup_seconds": 20,
+      "human_review_wait_excluded_from_execution_timings": true,
+      "native_compile_seconds": [
+        1367,
+        1364
+      ],
+      "matched_performance_speedup_claimed": false,
+      "scope": "Observed required acceptance runs, not performance limits. No preparation was pending at the final eight-ready observation."
+    },
+    "confidentiality_review": {
+      "shareable_files_scanned": 363,
+      "known_private_values_compared": 19,
+      "matches": 0,
+      "independent_security_or_release_approval": false
+    },
+    "customer_package": {
+      "format": "Standalone sanitized source archive",
+      "entry_point": "README.md",
+      "image_binaries_or_private_credentials_included": false,
+      "external_approved_images_and_platform_inputs_required": true,
+      "fully_disconnected_delivery": false
     }
   }
 }

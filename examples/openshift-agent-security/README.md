@@ -1,55 +1,80 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Agent Security Demo
 
-This OpenShift example has its own prerequisites and installation path.
-From the parent `secure-single-server` checkout, enter the example before
-running its commands:
+**Useful agent workflows. Enforceable security controls.**
+
+Reusable identity, authorization, isolation and approval controls on OpenShift,
+demonstrated through synthetic workflows with Jira as the example backend.
+
+## Start here
+
+Follow these two customer guides in order:
+
+| Guide | What it covers |
+|---|---|
+| **[1. Setup](docs/identity-demo-customer-quickstart.md)** | Six stages: approved platform → inputs → cluster builds → scoped installation → first run |
+| **[2. Operations](docs/identity-demo-console.md)** | Presenting, automatic preparation, audit/Jira history, restart and recovery |
+
+In a `secure-single-server` checkout, enter this example:
 
 ```bash
 cd examples/openshift-agent-security
 ```
 
-A connected evaluation of authenticated users, attested workloads, certificate-bound
-token exchange, protected MCP access, exact approval and scoped Jira credentials.
+For the standalone archive, run `cd openshift-agent-security` instead.
 
-**Verified evaluation boundary:** protected execution, permission denials, real
-inference, automatic preparation, token rotation and selected recovery checks have
-recorded evidence. Browser execution, replenishment and authenticated issue viewing
-were verified with local background workers stopped. The tested target uses
-OpenShift 4.21 and compatible shared platform controllers; bootstrapping every
-controller on an empty cluster is not verified. See the [verified boundaries and
-remaining release gates](docs/identity-demo-reference.md#cluster-runtime-hardening-status).
+## Security at a glance
 
-**Start with [Setup](docs/identity-demo-customer-quickstart.md).** It explains the
-security layer, prepares its infrastructure, then installs and verifies the demo.
-Use [Operations](docs/identity-demo-console.md) for automatic preparation, presenting,
-retained audit/Jira access and recovery. A bounded warm pool keeps unused contexts
-ready; stable gateway configuration still checks every protected request.
+| Control | What the system enforces |
+|---|---|
+| **Identity and isolation** | Keycloak authenticates the person. SPIRE attests the OpenShell supervisor; the agent runs in an isolated sandbox. |
+| **Protected tool access** | Certificate-bound token exchange protects MCP calls. Trusted components keep backend credentials outside the agent. |
+| **Permission and consent** | User, workload, project and run checks apply to protected requests. A create must match the exact approved Jira fields. |
+| **Lifecycle and evidence** | Single-use identities, original run deadlines, correlated audit and independently verified Jira outcomes. |
 
-Managed certificate mode uses an approved cert-manager issuer to renew the three
-application TLS certificates and rotate their keys. Legacy installations opt in
-through guarded idle maintenance; CA rollover remains an explicit PKI procedure.
-See [certificate operations](docs/identity-demo-console.md#managed-application-certificates).
+**Analyst + Triage** may create after exact approval. **Viewer or Reader** cannot;
+approval never supplies missing authority.
 
-The reusable security controls constrain three synthetic demonstrations:
-Incident triage and Remediation change request use real Messages inference;
-CVE triage uses frozen assessment input. Analyst + Triage can create only after
-exact approval; Viewer or Reader cannot. Backend credentials stay outside the agent.
+- **Automatic preparation:** a bounded warm pool keeps fresh contexts ready.
+  Approved execution profiles let compatible workflows share capacity; pool
+  availability grants no authority. Persistent gateway configuration checks every
+  protected request.
+- **Managed TLS:** an approved cert-manager issuer renews three application
+  certificates and rotates their keys. Existing installations opt in through
+  guarded maintenance; CA rollover is explicit. See
+  [certificate operations](docs/identity-demo-console.md#managed-application-certificates).
 
-An existing OpenShift 4.21 cluster with Linux AMD64 workers, platform-admin
-assistance, approved external images and private inputs is required. The installer
-workstation was validated on Apple Silicon macOS with Python 3.13; it can be
-disconnected after setup. Other workstation platforms need validation. This is an
-evaluation package, not production certification or disconnected delivery. See the
-verification record for passing scenarios and outstanding acceptance gates.
+## Included workflows
 
-Architecture review: start with the [request and trust boundaries](docs/identity-demo-reference.md#architecture-and-permission-boundaries),
-then the [source review map and local checks](GETTING-STARTED.md). Customer evaluation
-delivery still needs approved external artifacts, finding dispositions, support/licensing
-clearance and an independent walkthrough; passing tests do not close those gates.
+| Workflow | Assessment | Example task |
+|---|---|---|
+| **CVE triage** | Frozen assessment input | Repeatable user/workload permission comparisons |
+| **Incident triage** | Real Messages model inference | Investigate an incident and propose a task |
+| **Remediation change request** | Real Messages model inference | Draft a change request with tests and rollback |
 
-Optional: [technical reference and release requirements](docs/identity-demo-reference.md),
-[sanitized verification](docs/verification.json), and [source hash inventory](export-manifest.json).
+## Prerequisites
 
-The customer source package excludes credentials, private configuration, generated
-state, binaries and inherited Git history.
+- **Cluster:** OpenShift 4.21, Linux AMD64 workers and compatible platform controllers.
+- **Access and artifacts:** platform-admin assistance, approved external images,
+  registry access and private inputs.
+- **Launcher workstation:** Bash, matching `oc`, `tar` and a SHA-256 utility.
+  The coordinated path builds on OpenShift; local Python, Rust and an engine
+  are not required. Qualification includes reviewed checkpoint recovery.
+
+The workstation can disconnect after setup: browser workflows, replenishment
+and authenticated issue viewing run on OpenShift.
+
+## Verified scope and review
+
+Recorded evidence covers protected execution, permission denials, live inference,
+automatic preparation, token rotation and selected recovery checks. Browser
+operation was verified with local workers stopped. Shared controllers were
+retained; full empty-cluster bootstrap remains unverified.
+
+This is a connected synthetic evaluation, not production certification or
+disconnected delivery. Review [external inputs and release gates](docs/identity-demo-reference.md#open-release-gates)
+before customer distribution.
+
+Optional: [developer guide](GETTING-STARTED.md) ·
+[technical reference](docs/identity-demo-reference.md) ·
+[verification record](docs/verification.json).

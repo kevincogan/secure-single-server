@@ -11,7 +11,7 @@ model. The trusted coordinator and protected gateway own approval and mutation.
 The runtime uses the approved CVE workload image supplied separately; the image
 source, licences and provenance must be reviewed before distribution.
 
-Use the root [quickstart](../../../docs/identity-demo-customer-quickstart.md) and
+Use the example [Setup guide](../../../docs/identity-demo-customer-quickstart.md) and
 [console guide](../../../docs/identity-demo-console.md). Configure the approved
 fixed Messages endpoint/model/image contract before rendering. No embeddings,
 model key or backend credential belongs in the agent environment.

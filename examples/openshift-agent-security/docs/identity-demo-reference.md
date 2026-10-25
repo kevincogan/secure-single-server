@@ -1,14 +1,26 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Technical reference
 
-Start with the [setup quickstart](identity-demo-customer-quickstart.md). This is optional
-operator/developer detail; daily use is in [console operations](identity-demo-console.md).
+Start with [Setup](identity-demo-customer-quickstart.md); use
+[Operations](identity-demo-console.md) for daily tasks. This optional reference
+contains lower-level commands, security boundaries and release evidence.
+
+| Topic | Reference |
+|---|---|
+| Design and permission model | [Architecture](#architecture-and-permission-boundaries), [permission matrix](#permission-matrix), [custody](#custody-and-lifecycle) |
+| Staged installation and backup | [Deployment](#deployment-and-recovery-reference), [recovery](#application-data-backup-and-restart-validation) |
+| Direct CLI acceptance | [Operator CLI](#operator-cli-reference), [security probes](#read-only-replay-certificate-renewal-and-containment-acceptance) |
+| Safe maintenance | [Context retirement](#retire-used-contexts-safely), [worker updates](#updating-the-isolated-cluster-workers) |
+| Delivery and verified scope | [Release gates](#open-release-gates), [verification boundary](#cluster-runtime-hardening-status) |
+| Existing workstation workers only | [Legacy local runtime](#legacy-local-runtime-compatibility) |
 
 ## Architecture and permission boundaries
+
 The browser authenticates the human with Keycloak using OIDC and PKCE. The driver
 registers a bounded run linking that user to one approved workload identity and
-project. The operator coordinator executes in the exact registered OpenShell
-sandbox; SPIRE attests its supervisor and supplies short-lived identity.
+project. The coordinator runs in its own OpenShift Deployment and orchestrates
+the agent inside the exact registered OpenShell sandbox. SPIRE attests the
+sandbox supervisor and supplies its short-lived workload identity.
 
 The native path exchanges the user's delegated credential in two stages. The
 final access token is bound to the supervisor certificate presented on the MCP
@@ -78,6 +90,7 @@ connected evaluation with development patches; review the
 [release gates](#open-release-gates) before customer delivery.
 
 ## Deployment and recovery reference
+
 For the ordered connected setup command, start with the
 [customer quickstart](identity-demo-customer-quickstart.md). The staged commands
 below remain the recovery and inspection interface.
@@ -140,7 +153,7 @@ need refresh. Native gateway/supervisor patches and exact TLS/realm targets must
 the selected rendered profile and retained state.
 
 Retain original receipts privately and do not overwrite failed attempts. Follow
-the quickstart's workstation instructions; virtualenvs must be recreated for the
+the [developer environment](../GETTING-STARTED.md#local-environment); virtualenvs must be recreated for the
 host using both pinned requirements files. Approved offline wheels configure
 operator dependencies only, not disconnected cluster installation. Never source
 an unreviewed shell file.
@@ -149,17 +162,16 @@ an unreviewed shell file.
 
 Fresh installation uses source rendering through the quickstart. Snapshot
 commands below are optional recovery tools for an existing owned installation;
-no snapshot or prior private lab files are needed for fresh setup.
+no prior deployment snapshot is required for fresh setup.
 
 ### Source rendering for a fresh application installation
 
-The existing `identity_demo_setup.py` now also has an offline `render` action.
+The `identity_demo_setup.py render` action works offline.
 It reads versioned templates and current repository Python sources; it does not
 need an export of the running demo. Source rendering is part of the proven
 connected application installer. A render alone does not establish installation
 or runtime acceptance; follow the quickstart through its verification gates.
-The historical snapshot
-workflow below remains available for recovery and comparison.
+Use the snapshot workflow below only for an existing owned installation.
 
 Prepare a private JSON file outside Git with these fields:
 
@@ -202,7 +214,7 @@ expired/damaged generated TLS state require explicit rotation; rendering refuses
 to reuse them silently. The generated evaluation CA/leaf validity is 365/30 days;
 this is the legacy compatibility mode. Opt-in managed mode uses an approved
 cert-manager issuer for the three application leaves; see the Setup guide's
-[certificate prerequisites](identity-demo-customer-quickstart.md#select-application-certificate-management).
+[certificate prerequisites](identity-demo-customer-quickstart.md#1-approve-the-platform).
 Production PKI approval and unattended CA rollover are not implied.
 
 Use the setup entry point's
@@ -229,8 +241,8 @@ scope. Native sender images must be rebuilt for the exact host, token endpoint,
 audiences and trust domain. The artifact lock must record the matching
 `native_build_contract`; installation refuses an unmatched source bundle.
 
-The source templates create new durable Jira storage and independent credentials.
-They do not restart or migrate the reference Jira deployment's `emptyDir` data.
+The source templates create a `fixture-jira-data` PVC and independent credentials.
+A fresh installation does not import another installation's issue history.
 Cluster-wide workspace/token-review grants, SPIRE registrations, shared
 controllers and their installation still require their own explicit preparation.
 
@@ -300,7 +312,7 @@ The bundle contains private Secrets and complete synthetic realm configuration;
 keep it 0600 and never commit/share it as a public manifest. It records source,
 dependency and patch hashes and pinned container images. Namespace UID ranges are
 adapted only within the recorded SCC allocation range when recreating a namespace.
-A copied configuration is not an image provenance/SBOM or bank acceptance claim.
+A copied configuration does not establish image provenance, an SBOM or customer acceptance.
 
 Bundles retain exact source paths and hashes. Capture a new bundle after source
 changes; never rewrite an earlier receipt or remove a hash guard to reuse it.
@@ -346,13 +358,11 @@ are retained by application rollback. Do not delete their namespaces to remove
 the installer grant. Native runtime grants and discovery access remain separate
 explicit steps below.
 
-**Before installing:** verify a separate preserved-data/recovery plan. Reference
-Jira uses `emptyDir`; deleting/restarting its Pod can lose issues. Fresh source
-installations use a PVC, which still requires a verified backup. Preserve original issuer
-CA/key/database custody and driver history, and retire old native contexts before
-replacing their gateway. The current working demo must not be deleted merely to
-make the installation command pass. A reviewed teardown/replacement is a separate
-operator action; no blanket namespace/CRD/SCC deletion command is provided.
+**Before installing:** verify the preservation and recovery plan. The current
+Jira fixture uses a PVC; that still requires a verified database backup. Preserve
+issuer configuration, keys, databases and driver history. Retire native contexts
+before replacing their gateway. Never delete a working installation or shared
+resources merely to bypass a collision check.
 
 On the prepared empty owned application target, with shared prerequisites intact:
 
@@ -379,9 +389,10 @@ access, runtime ServiceAccount privileges or functional behavior; retain the
 separate plan/dry-run and runtime checks.
 
 Verification checks ownership, pinned application and init-container templates, observed workload generation and readiness. Controller-generated gateway/authorizer readiness and actual protected calls still require the following acceptance scenarios. Follow
-[execution setup](identity-demo-reference.md) afterward to reconcile current trust and
-catalog inputs, provision new identities, register mappings and run the five CVE/
-GLM scenarios. Record backend/audit outcomes and manual corrections. Readiness or
+[execution setup](#operator-cli-reference) afterward to reconcile trust and
+catalog inputs, provision identities and register mappings. Run the
+[workflow acceptance matrix](identity-demo-customer-quickstart.md#6-verify-and-present)
+and retain backend/audit outcomes and corrections. Readiness or
 server dry-run is not successful cold-installation/scenario acceptance.
 
 Verification also compares the bundle's exact namespaced Role rules,
@@ -430,14 +441,177 @@ invent credentials. See [OpenShift image pull permissions](https://docs.redhat.c
 
 ## Application data backup and restart validation
 
-Use the [Operations backup and recovery procedure](identity-demo-console.md#back-up-and-verify-application-data)
-for `backup-data`, restored-copy verification and guarded database restart. Keep
-one authoritative command sequence there. The application backup covers driver
-and Jira SQLite data; issuer databases, signing keys, SPIRE, OpenShell and
-workspace volumes require their separately documented recovery inputs.
+Use the private operator environment and original installation receipts. The
+application backup covers driver/Jira SQLite data; issuer databases, signing keys,
+SPIRE, OpenShell and workspace volumes need separate recovery inputs. Rollback
+must preserve newer audit, approvals, consumed identities and quarantine.
 
-Rollback must preserve newer audit, approvals, consumed identities and quarantine.
-Never overwrite live history with an older snapshot or repeat an uncertain write.
+### Back up and verify application data
+
+Use the final connected installation's bundle, not an earlier pre-build render.
+The generated profile and bundle are in the same render directory. These
+commands assume the private paths are loaded and cluster workers are idle.
+Fence only this installation's coordinator/preparer before
+maintenance; keep the UI closed to new submissions.
+
+```bash
+export DEMO_STACK_BUNDLE="$(dirname "$IDENTITY_DEMO_CONFIG")/stack.private.json"
+export DEMO_STACK_SHA256="$(shasum -a 256 "$DEMO_STACK_BUNDLE" | awk '{print $1}')"
+export DEMO_MAINTENANCE="$DEMO_PRIVATE_ROOT/maintenance-01"
+mkdir -m 700 "$DEMO_MAINTENANCE"
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py backup-data \
+  --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
+  --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
+  --output-dir "$DEMO_MAINTENANCE/backup-01"
+export DEMO_BACKUP_MANIFEST="$DEMO_MAINTENANCE/backup-01/backup.private.json"
+export DEMO_BACKUP_SHA256="$("$DEMO_PYTHON" -c \
+  'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
+  "$DEMO_MAINTENANCE/backup-01/setup.summary.json")"
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py verify-backup \
+  --backup-manifest "$DEMO_BACKUP_MANIFEST" --backup-sha256 "$DEMO_BACKUP_SHA256" \
+  --output-dir "$DEMO_MAINTENANCE/restore-check-01"
+```
+
+Expected: driver/Jira snapshots and verified restored **local copies**. A failed
+quiescence, ownership or content check stops maintenance; preserve the receipt
+and inspect before retrying. No live database is overwritten. These backups do
+not cover Keycloak, SPIRE, OpenShell or workspace volumes. Preserve generated
+keys/configuration separately and use component-specific recovery procedures.
+Do not describe these two databases as a complete platform backup.
+
+For a read-only capture with **no active run, preparation or uncertain outcome**,
+`backup-data --allow-idle-heartbeat` permits only the coordinator/preparer
+`updated` timestamps to advance between captures. Other worker fields, schema,
+audit, approvals, pool lifecycle and all Jira data must still match. Restore
+verification checks every captured field. This option neither pauses workers nor
+makes live database rollback safe. If the check fails, keep the failed receipt,
+identify the changed tables and use a new output directory after resolving it.
+
+
+### Restart the two application databases safely
+
+After successful backup verification, use the same bundle/backup arguments with
+`restart-data`. Plan first; inspect the exact owned Deployment changes, then
+apply once to a new output directory:
+
+```bash
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py restart-data \
+  --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
+  --backup-manifest "$DEMO_BACKUP_MANIFEST" --backup-sha256 "$DEMO_BACKUP_SHA256" \
+  --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
+  --output-dir "$DEMO_MAINTENANCE/restart-plan-01"
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py restart-data \
+  --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
+  --backup-manifest "$DEMO_BACKUP_MANIFEST" --backup-sha256 "$DEMO_BACKUP_SHA256" \
+  --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
+  --output-dir "$DEMO_MAINTENANCE/restart-01" --apply
+```
+
+Expected: only driver/Jira restart, with database contents, PVC identities and
+images preserved. After success, start the trusted services, sign in again and
+verify readiness. On failure, retain state and inspect the exact receipt; never
+restore older approval history or repeat an uncertain mutation blindly.
+
+
+### Verify issuer recovery separately
+
+The application backup above excludes the issuer databases and signing keys.
+For the current development-file issuers, use an administrator-approved encrypted
+CSI snapshot procedure; realm exports alone do not establish recovery. This is
+an idle maintenance operation on this installation, never on shared services.
+
+1. Verify exact issuer Deployment/PVC UIDs against installation receipts. Save
+   their configuration and required keys privately, and verify the application
+   backup. Stop if a resource was replaced, an action is uncertain or a run is active.
+2. Fence coordinator/preparer ownership and wait for their Pods and original
+   leases to expire. Stop only the two owned issuers and confirm no Pod still
+   mounts either source PVC before taking cold snapshots.
+3. Use an approved, non-default CSI snapshot class with `Retain` policy. Record
+   snapshot/content UIDs and private storage handles; require both snapshots to
+   report `readyToUse`. Preserve failed receipts and inspect the same operation
+   after a timeout rather than replaying creation.
+4. Restore the original issuer specifications against their original PVCs.
+   Verify readiness and unchanged public signing keys before resuming workers.
+   Never replace live databases with the test copies.
+5. Restore snapshots into **new PVCs in a separate, owned recovery namespace**.
+   Verify deny-all ingress/egress and no Service/Route. Use the same pinned issuer
+   images and feature settings, a loopback listener, no bootstrap credentials,
+   no realm re-import and no Kubernetes token mount. Wait for the actual HTTP
+   listener; Pod `Running` alone is insufficient. Through an authenticated
+   operator tunnel, verify a freshly signed test token against pre-backup public
+   keys and the original issuer. Do not send that token to any live service.
+6. Delete only receipt-matched test Pods and restored volumes. Preserve cold
+   backups, private recovery configuration and current application history.
+   Verify audit, approvals, Jira data and pool readiness afterward.
+
+This procedure passed for both candidate issuers, including actual signing-key
+use, with original volumes preserved. Temporary restored volumes were removed;
+no extra Jira issue was created. It does not prove full SPIRE/OpenShell recovery,
+cross-cluster disaster recovery or a production database backup policy. Arrange
+backup retention, encryption/key access and platform restore ownership with the
+customer administrator. See the official
+[CSI snapshot lifecycle](https://kubernetes.io/docs/concepts/storage/volume-snapshots/)
+and [Keycloak export limitations](https://www.keycloak.org/server/importExport).
+Network policies are additive: a deny-all policy inside a namespace with broader
+allow rules does not by itself isolate a restored issuer.
+
+### Application resource defaults
+
+The owned application namespace uses a standard LimitRange for containers whose
+controller supplies no resource budget, including the MCP broker: requests of
+100m CPU and 128 MiB, with limits of one CPU and 512 MiB. Explicit application and
+build settings take precedence. This keeps generated Pods bounded without
+patching the shared controller. These are single-execution evaluation defaults;
+production sizing still needs representative load measurements.
+
+### Restore kubelet coverage after worker replacement
+
+Inputs: the loaded private installation profile, its original security-creation
+receipts, an approved `DEMO_PLATFORM_KUBECONFIG`, and an idle, certain console.
+The administrator’s installation preflight checks current worker InternalIPs
+without editing policy. Runtime workers have no node-inventory permission; a
+subsequent node change can cause workload attestation to time out during a
+protected read. Monitor SPIRE attestation failures and ask the platform owner to
+restore exact host coverage before retrying with a fresh run.
+
+1. Use `demo_exec --action inspect-state` with a new private output directory.
+   Require no active run, console job, preparation or uncertain action. Match
+   `identity-demo-kubelet-egress` to its **original creation UID** and verify the
+   identity namespace is exclusively owned. Stop if ownership is uncertain or
+   another consumer could be affected; ask the platform owner instead.
+2. Use the guarded idle worker maintenance procedure to fence the two exact
+   owned workers and verify process exit/lease expiry. Keep their definitions
+   and state PVCs; do not uninstall infrastructure or clear leases.
+3. Plan the existing helper's change, then inspect the private receipt:
+
+   ```bash
+   "$DEMO_PYTHON" scripts/identity_demo/identity_demo_spire_network.py \
+     --phase kubelet-reconcile --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" \
+     --output "$DEMO_PRIVATE_ROOT/kubelet-plan-01.private.json"
+   ```
+
+   Expected: `applied: false`, with only current worker host destinations added
+   to the SPIRE-agent rule on TCP 10250. Other selectors, ports and rules must
+   remain unchanged. An identity/API/admission failure stops here. Preserve the
+   receipt and resolve it; do not substitute a broad CIDR or another account.
+4. Recheck the original UID, unchanged rule and reviewed current worker set,
+   then apply with a different output filename:
+
+   ```bash
+   "$DEMO_PYTHON" scripts/identity_demo/identity_demo_spire_network.py \
+     --phase kubelet-reconcile --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" \
+     --output "$DEMO_PRIVATE_ROOT/kubelet-apply-01.private.json" --apply
+   ```
+
+   Expected: `coverage_current: true`; UID/resource-version/spec tests guard the
+   update. On failure, inspect the actual policy and receipt before another
+   mutation. Do not overwrite evidence or restore an older database.
+5. Restore the same two saved worker specifications. Require current
+   readiness, attested contexts and automatic preparation to resume. If coverage
+   still fails, compare the new node set and keep the failure blocked for review.
+
+This updates only the existing owned policy's host allowlist. It does not modify
+nodes, shared controllers, trust roots, workload identities or run deadlines.
 
 ## Cleanup and installation rollback
 
@@ -518,7 +692,7 @@ No externally authored emulator or CVE source has been silently relicensed here.
 
 ### Check the supplied images directly on OpenShift
 
-If the images are not cached on the laptop, use the same `runtime-check` action
+If the images are not cached on the installation workstation, use the same `runtime-check` action
 in a prepared **owned** application namespace instead of downloading large images.
 The namespace must already exist with the profile's owner labels. First omit
 `--apply` for permission/admission planning, then apply in a new output directory:
@@ -533,8 +707,9 @@ The namespace must already exist with the profile's owner labels. First omit
 ```
 
 This creates two bounded Jobs and one policy selecting only those probe Pods.
-They have no API token, real Jira/model credentials or host mounts; ingress and
-egress are denied. The Jira import receives explicitly synthetic initialization
+They have no API token, real Jira/model credentials or host mounts. The dedicated
+policy requests denied ingress/egress; existing namespace allow rules are additive,
+so it does not independently certify isolation. The Jira import receives synthetic initialization
 values and makes no tool call. Failed imports report only allowlisted error types,
 never exception messages or raw logs. The helper requests conditional deletion
 of its exact recorded UIDs after confirmed completion. A timeout or uncertain
@@ -543,6 +718,7 @@ calling the target empty. These checks do not alter the running demo or prove
 the end-to-end permission scenarios.
 
 ## Operator CLI reference
+
 For application installation start with the [quickstart](identity-demo-customer-quickstart.md).
 This reference covers execution contexts, CLI acceptance, optional diagnostics
 and exact retirement on the configured owned installation. It does not bootstrap
@@ -550,22 +726,18 @@ shared platform controllers. Optional diagnostic binaries have separate release
 requirements in [known limitations](identity-demo-reference.md).
 
 For browser operation, use the OpenShift services and automatic pool in the
-[quickstart](identity-demo-customer-quickstart.md#3-start-the-openshift-services-and-automatic-pool).
+[quickstart](identity-demo-customer-quickstart.md#5-review-the-application-handoff-and-activate).
 The manual context/registration commands below apply to explicit CLI maintenance
 or legacy local mode. They do not replace automatic pool preparation. Fence the
 browser workers before direct execution; never run both against one installation.
 
-## Private inputs and ownership
+### CLI inputs and ownership
 
 Use Python 3.12+, the pinned test dependencies, `oc`, and the official OpenShell
 v0.1.3 CLI. Use an explicit private kubeconfig and expected server on every call.
-Supply these outside Git:
-
-Start with [the private-path template](examples/identity-demo-inputs.env.example)
-and [the Messages configuration template](examples/identity-demo-inference.example.json).
-Copy them outside Git, set the actual approved target server and existing
-private paths, and restrict the directory/files to modes 0700/0600. Templates
-contain no credentials and do not bootstrap the existing platform or issue keys.
+Use the [private input rules](#private-inputs). The following additional paths
+are needed only for the selected CLI acceptance or diagnostic operation; do not
+install diagnostic tools for a normal browser workflow.
 
 | Variable | Required input |
 |---|---|
@@ -622,11 +794,11 @@ profile, realm/trust inputs and rebuilt native endpoint/CA contract; use the
 quickstart rather than disabling these guards. Separate-cluster acceptance is
 still required before claiming portability to that target.
 
-Repository infrastructure changes require `the designated platform reviewers` review; workload
-changes require both teams' review. Keep reviewable changes separate from shared
+Infrastructure/native changes require the designated platform reviewers;
+workload changes also require the application owner's review. Keep reviewable changes separate from shared
 resources. These development helper calls never count as review approval.
 
-## 0. Register native workspaces after a fresh application install
+### Register native workspaces after a fresh application install
 
 For a new source installation, export `IDENTITY_DEMO_CONFIG` to the rendered
 `installation-profile.json` and `IDENTITY_DEMO_ARTIFACTS` to its matching private
@@ -658,7 +830,7 @@ workspace inventory and the pending receipt before repeating. Existing reference
 workspaces without the new installation labels must not be silently adopted.
 Then run the management probe and the remaining execution steps below.
 
-## 1. Provision a fresh execution identity
+### Provision a fresh execution identity
 
 Run from the example root. Choose an unused 1–3 character alphanumeric suffix;
 for example `n1` if it has never been used. The resulting sandbox name is at most 19 characters. Use a
@@ -692,7 +864,7 @@ recover-provision` with the same role/suffix and a new output directory inspects
 the existing native identity and completes its registration. It never creates a
 replacement. Recovery requires a native Ready sandbox and unused registration.
 
-## 3. Add trusted workflow mappings
+### Add trusted workflow mappings
 
 The default `--workflow cve --project TEST` keeps the accepted CVE behavior.
 For the SERVICE workflow (now **Remediation change request** in the browser), use
@@ -720,13 +892,14 @@ Repeat `--context-file` to add several freshly validated mappings in one update.
 The helper preserves every old mapping, Secret reference and PVC; it versions
 the code/config ConfigMap and saves the prior Deployment privately. No identity
 can be reassigned. Dry-run mode renders private desired artifacts and performs
-server validation before an apply. Driver rollout means in-memory sessions and
-decision references are lost: reauthenticate; durable actions/audit remain.
+server validation before an apply. After driver rollout, sign in again if the
+browser session expired. Durable run/action/audit records and verified Jira
+references remain available; temporary in-memory state is not recovery evidence.
 
 This step does not prove the service-request matrix. The actual native client,
 approval, backend verification and denial tests must follow.
 
-## 4. Run the reuse and optional Messages workflow
+### Run the CVE and Messages workflows
 
 Use a fresh registered service context for **each** scenario. The runner refuses
 retired identities. The following runs actual approved Messages provider inference, real browser
@@ -942,7 +1115,9 @@ continuing. Foreign/replaced objects or remaining Pods stop cleanup. Older conso
 records without an explicit cleanup result require independent operator review;
 do not fabricate a cleanup flag, remove a tombstone or clear a recovery checkpoint.
 
-Never restart the current Jira fixture to release capacity: it uses `emptyDir`.
+Do not restart Jira as a capacity-cleanup shortcut. Its current PVC preserves
+storage across Pod replacement, but safe maintenance still requires quiescence,
+a verified database backup and the guarded restart procedure.
 
 ## Recovery and rollback
 
@@ -998,12 +1173,6 @@ OpenShell baseline is a reference/rollback artifact; reverting the development
 sender patches does not establish a successful identity demo or authorize a
 client-secret bypass.
 
-## Release requirements and limitations
-This package contains application source, templates, builds and guided security
-foundation manifests for a connected synthetic-data evaluation on OpenShift 4.21. Fresh application
-installation and scenario results are recorded in verification.json. They do not
-certify installation on another target, independent customer acceptance or production safety.
-
 ## Required external inputs
 
 - An installed and reviewed OpenShift cluster, ingress, storage, time,
@@ -1025,6 +1194,10 @@ certify installation on another target, independent customer acceptance or produ
   model key. No credentials or private platform state are included.
 
 ## Open release gates
+
+[Recorded verification](verification.json) describes the tested target. It is
+not independent customer acceptance or production certification. Resolve the
+applicable gates below before the corresponding customer handoff.
 
 | Area | Required before the relevant customer handoff |
 |---|---|
@@ -1115,6 +1288,12 @@ inspect the original UI update records rather than editing the bootstrap ledger.
 Current context/permission configuration and state/credential mounts are retained.
 This adds receipt verification, not permission to activate a busy installation.
 
+Legacy drivers need the reviewed native artifact lock in
+`IDENTITY_DEMO_ARTIFACTS` before enabling profiles. The existing `update-console`
+action adds its read-only public projection, preserving state and credential
+mounts. Existing projections retain their exact path and contract. Do not widen
+the image allowlist to bypass a rejected profile configuration.
+
 ### Retire unused contexts for maintenance
 
 This is a human-installer operation for a planned image upgrade, not normal pool
@@ -1143,6 +1322,10 @@ The three required evidence files are owner-only files outside Git:
 
 An optional `disposable_workspace` evidence entry may name an existing
 receipt-proven synthetic scratch file. Without it, workspace storage is retained.
+Disposable scratch binds to the original pool item, not the new maintenance
+reservation. Apply and reconciliation both verify its exact PVCs are absent before
+completing.
+
 The helper does not remove historical volumes. Each evidence entry has the
 absolute `path` and separately recorded `sha256` shown in the template. Keep the
 review file itself private and record its SHA256. A changed file stops the action.
@@ -1176,7 +1359,8 @@ they are not synthetic business runs. There is no runtime HTTP action for this.
 
 On a failure, preserve receipts and the quarantine. Inspect the same resources;
 never clear a reservation or replay an uncertain delete automatically. Once exact
-Sandbox/Pod/registration absence is established, this explicit reconciliation
+Sandbox/Pod absence and registration absence (or verified controller
+inactivation) are established, this explicit reconciliation
 only finalizes durable state:
 
 ```bash
@@ -1192,6 +1376,21 @@ stage accepts `--resume-retired-pool`: it requires an empty native target, only
 retired durable inventory and verified scoped workers. It preserves history and
 creates fresh identities; it never treats an old database as an initial empty
 installation. Fresh installations continue to use the original activation path.
+
+### Review failed context creation
+
+A failed preparation remains quarantined even if its command returned an error.
+Stop scheduling, fence both workers and verify a current application backup
+before reviewing its original reservation, native identity and resource receipts.
+Pair authenticated native inventory with exact Kubernetes identity/dependency
+checks; an empty search or a masked NotFound response alone proves nothing.
+
+If creation is independently confirmed absent, the installer may retire only its
+capacity entry through the shared guarded transaction. The original quarantined
+preparation, target and failure receipt remain unchanged, with an additional
+correlated absence confirmation. It never repeats creation or native deletion.
+If a native object exists, keep it quarantined for reviewed retirement or recovery;
+do not clear the reservation to make capacity available.
 
 ### Reviewing a proved dispatch rejection
 
@@ -1357,12 +1556,12 @@ temporary build policy after a confirmed terminal Build; failed evidence remains
 
 ## Legacy local runtime compatibility
 
-The default customer path is OpenShift runtime in the Setup guide. This optional
-procedure retains the earlier Mac-hosted workflow for existing local installations.
-It requires an awake operator host and is not used by the current presentation
-deployment. Never run both runtimes against the same execution lane.
+The required Setup guide runs both workers on OpenShift. This section is only
+for existing macOS/launchd worker installations. It is not needed for a fresh
+cluster runtime, requires an awake workstation and has separate credentials.
+Never run both runtimes against the same execution lane.
 
-## 1. Prepare the workflows once
+### Prepare the workflows once
 
 The connected installer prepares both synthetic projects before console activation.
 A missing project is a setup failure, not a valid empty search result. If an older
@@ -1405,13 +1604,13 @@ demo_exec() {
 }
 demo_context() {
   demo_exec --action provision --role "$1" --suffix "$2" \
-    --output-dir "$DEMO_BATCH_DIR/context-$2-$DEMO_BATCH_PHASE" "${DEMO_APPLY[@]}"
+    --output-dir "$DEMO_BATCH_DIR/context-$2-$DEMO_BATCH_PHASE" ${DEMO_APPLY[@]+"${DEMO_APPLY[@]}"}
 }
 demo_register() {
   demo_exec --action register-driver --workflow "$1" --project "$2" \
     --console-enabled --presenter-subject "$DEMO_PRESENTER_SUBJECT" \
     --output-dir "$DEMO_BATCH_DIR/register-$1-$DEMO_BATCH_PHASE" \
-    "${DEMO_CONTEXT_FLAGS[@]}" "${DEMO_APPLY[@]}"
+    "${DEMO_CONTEXT_FLAGS[@]}" ${DEMO_APPLY[@]+"${DEMO_APPLY[@]}"}
 }
 DEMO_BATCH_PHASE=plan
 DEMO_APPLY=()
@@ -1464,7 +1663,7 @@ browser login. Register all initial mappings before presentation. Do not execute
 a legacy browser rehearsal and the coordinator against the same installation
 at the same time.
 
-### Install persistent gateway configuration
+#### Install persistent gateway configuration
 
 Inputs: the configured source copy, generated private environment, current catalog
 credential and an idle installation. Use the existing helper defined above:
@@ -1502,11 +1701,11 @@ initializes a separate verified-TLS profile on 18444, using `DEMO_RUNTIME_CA`.
 Keep both directories private and distinct. Never disable TLS to resolve a
 profile, trust or port mismatch.
 
-## 2. Start the trusted services
+### Start the trusted services
 
 Save the reviewed paths-only environment outside Git, mode 0600; private root
 mode 0700. Set `DEMO_OPERATOR_ENV_FILE` to its absolute path and source it.
-Credentials stay in the referenced private files. From this source root:
+Credentials stay in the referenced private files. From the private configured example directory:
 
 ```bash
 export DEMO_OPERATOR_ENV_FILE=/absolute/private/demo/operator-inputs.env
@@ -1549,7 +1748,7 @@ A private operator-login file is optional. Without one, renew the selected
 kubeconfig interactively with your approved `oc login` procedure before it
 expires; never add passwords to this repository or a command history.
 
-### Enable the automatic warm pool
+#### Enable the automatic warm pool
 
 Run after the two services are healthy and the preparer profile exists. This
 explicit preflight verifies gateway configuration, profile separation, known
@@ -1579,3 +1778,531 @@ identities first. Supply their original private context files using repeated
 `--retired-context-file` arguments. The helper checks exact sandbox, Pod and
 registration absence; the driver checks closed runs and records the receipt.
 Never declare a live or uncertain identity retired just to free capacity.
+
+
+## Onboard another use case
+
+Jira remains the supported cluster integration. The synthetic document connector
+is an automated proof of the shared controls, not a delivered document service
+or evidence of a complete non-Jira installation.
+
+| Shared mechanism | Integration responsibility |
+|---|---|
+| User/workload binding, ownership, deadline and cancellation | Trusted mapping from the actual tool request to its resource/action |
+| Exact consent and atomic execution claim | Strict schema, normalized effectful payload and fixed backend |
+| Credential-release ordering and uncertain-write stop | Scoped backend credential handling and independently verified outcome |
+| Correlated audit and durable recovery | Connector-specific result references and reconciliation evidence |
+
+1. **Define the effect.** Specify permitted reads and writes, resource identifiers,
+   strict tool inputs, a fixed destination and independently observable results.
+2. **Register the connector.** Add a reviewed `ConnectorContract` to
+   `supported_connectors()` in `identity_demo_connector.py`. The registry cannot
+   load modules or destinations from model output or requests. Unknown integration
+   identifiers and tools fail closed. Change the schema/contract version when its
+   authorization semantics change.
+3. **Map authority.** Define user/workload roles and resource scope. Consent never
+   supplies missing authority. Bind approvals to connector, backend, tool, schema,
+   resource and normalized payload. Existing Jira digests retain compatibility;
+   immutable run-contract records prevent their reuse under another connector.
+4. **Define compatible capacity.** Approve the workload/supervisor images,
+   namespace, ServiceAccount, sandbox policy and identity/issuer contract. Map each
+   workflow to that profile and its allowed resource scope. A ready sandbox has
+   no user grant; allocation freezes its run-specific binding and original deadline.
+5. **Prove the boundary.** Exercise actual shared persistence/authorization code:
+   allowed read, exact approval, denied user/workload/resource, changed payload,
+   wrong connector/schema, competing claims, cancellation, expiry and uncertain
+   outcome recovery. Verify the real backend independently before enabling it.
+
+Do not build a universal credential proxy. A new backend still needs its connector,
+policy mappings and acceptance tests. No model-selected credentials, arbitrary URL
+routing or approval reuse across backends is supported.
+
+### Profile pool compatibility
+
+Profile mode is additive and opt-in. It does not reinterpret legacy contexts.
+The prepared contract fingerprints images, namespace, ServiceAccount, isolation
+policy, workload permissions and identity/issuer inputs. A context must match
+that fingerprint and pass fresh native-identity/policy checks before allocation.
+
+Compatible workflows can share Triage capacity; Reader capacity remains separate.
+The defaults are six Triage and two Reader contexts, with at most 12 non-retired
+entries including preparing, allocated, retiring and quarantined states.
+Qualify profile compatibility on an owned candidate before migrating another installation.
+Pool availability cannot grant user, workload or resource permission.
+
+Profile `tools` and `write_actions` must match the registered connector's reviewed
+action labels for that workload role. They do not create permissions. Unsupported
+action lists, resource scopes and role/connector combinations fail configuration
+before activation. New connectors declare these labels before using profile pools.
+
+An authenticated operator may revise targets and trusted workflow/resource mappings
+only while execution, preparation and recovery are idle. Each revision is retained;
+existing runs keep their original binding and deadline. A profile's security
+fingerprint cannot change while any non-retired context still uses it, including
+an ambiguous or quarantined reservation. Retire those contexts through the guarded
+path before approving a replacement profile. Do not edit SQLite records directly.
+
+The compatibility field `project` holds one trusted resource scope per workflow
+mapping. Jira interprets it as a project key; another connector must validate its
+own resource identifier. Multiple-resource authorization is not implemented by
+placing comma-separated values in this field: it needs a reviewed connector
+contract and corresponding scope/approval tests.
+
+Keep historical mappings immutable. Disable scheduling and establish an idle,
+certain execution state before changing modes. Retire obsolete unused contexts
+through the receipt/UID-guarded path; never relabel them as a different profile.
+Rollback must use a compatible image and preserve history, consumed identities
+and quarantine decisions. Never restore an older database over newer records.
+
+### Permission changes
+
+Protected calls check live run closure and cancellation as well as token validity.
+User role claims can remain valid until their bounded authorization expires;
+changing a Keycloak role is not a promise of immediate revocation of issued tokens.
+Use explicit run cancellation for urgent revocation. Cancellation stops future
+authorization and cannot undo a backend operation already dispatched. Establish
+an uncertain write outcome before another execution; do not replay it blindly.
+
+## Platform administrator preparation
+
+The coordinated installer does not install or upgrade shared controllers. These
+optional commands require the developer/operator Python environment described in
+[Development](../GETTING-STARTED.md#local-environment). They produce the approved
+identity foundation and public inputs for Setup stage 1; they are not extra
+application installation stages. Keep all private profiles and receipts outside Git.
+
+### 1A. Prepare or verify the security foundation
+
+Before cluster commands, copy the [paths-only environment template](examples/identity-demo-inputs.env.example)
+outside Git, replace its placeholders and review it before sourcing. Set these
+inputs from the approved target; keep existing values as later stages add paths.
+
+| Input | Required value |
+|---|---|
+| `DEMO_SERVER` | Exact approved Kubernetes API URL |
+| `DEMO_PLATFORM_KUBECONFIG` | Protected platform-administrator kubeconfig |
+| `DEMO_KUBECONFIG`, `DEMO_INSTALLER_USER` | Separate non-admin installer kubeconfig and its authenticated username |
+| `DEMO_PRIVATE_STORAGE` | Existing mode-0700 parent for connected-install outputs; may equal `DEMO_PRIVATE_ROOT` |
+| `DEMO_PACKAGE_OUTPUT` | Existing mode-0700 parent for renders, builds and access receipts |
+
+Set the directories explicitly in your private environment. Credentials stay in
+mode-0600 files; environment variables contain paths or nonsecret identifiers.
+Do not source an unedited template over values already created in stage 0.
+
+
+Use a platform-authorized kubeconfig for this section. Use the application
+installer account for the next section. Never fall back automatically to admin.
+Set `DEMO_PLATFORM_KUBECONFIG` to the platform account’s protected kubeconfig and
+`DEMO_SERVER` to the exact API URL. Copy `docs/examples/identity-demo-installation.example.json` outside Git, fill the
+actual namespace/domain/storage values, and set `DEMO_SECURITY_PROFILE` to that
+private file. It must match the application profile you use later.
+
+The compatibility baseline is `infra/identity-demo/prerequisites.lock.json`:
+OpenShift 4.21; ZTWIM 1.1.1; Agent Sandbox 0.9.0; MCP Gateway 0.7.1;
+Connectivity Link 1.4.3 and platform-managed Istio 1.27.8. These identify the tested
+API baseline, not a promise that another version works or is supported.
+
+Official installation procedures:
+[ZTWIM](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/security_and_compliance/zero-trust-workload-identity-manager),
+[OpenShift Gateway API](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/ingress_and_load_balancing/index),
+[Connectivity Link](https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4/html-single/installing_connectivity_link/index),
+[Agent Sandbox OLM](https://github.com/kubernetes-sigs/agent-sandbox/blob/main/olm/README.md),
+[MCP Gateway](https://github.com/Kuadrant/mcp-gateway).
+Use the pinned operator packages; do not run upstream main-branch installers,
+replace OpenShift-managed CRDs, install a second mesh or blindly approve OLM dependencies.
+
+#### Existing foundation
+
+Inspect installed subscriptions, cluster-scoped identity CRs and consumers first.
+Keep existing controllers if the platform owner approves them and the required
+APIs are compatible. Do not relabel someone else's identity foundation to pass
+an ownership check. An approved attachment must satisfy this implementation's
+owner/trust-domain/cluster-name contract. Run the readiness command below.
+A successful check neither changes controllers nor proves a fresh installation.
+
+<details>
+<summary><strong>Platform administrator: plan and create a missing owned foundation</strong></summary>
+
+#### Plan missing components on the actual cluster
+
+This path supports an empty owned identity foundation on a cluster that may
+already provide shared Sandbox, Gateway/MCP and Kuadrant controllers. Inventory
+comes first. Existing platform components remain prerequisites; they are not
+adopted, relabelled, upgraded or included in the create manifests.
+
+Copy `docs/examples/identity-demo-security-network.example.json` outside Git.
+Supply platform-reviewed **exact API and worker host CIDRs**. API entries include
+the external API DNS addresses, the `default/kubernetes` Service ClusterIPs and
+its actual EndpointSlice addresses; in-cluster API traffic can use different
+addresses from the public API URL. Worker InternalIPs are needed for kubelet
+attestation. Inspect these with `oc get service kubernetes -n default -o json`,
+`oc get endpointslices -n default -l kubernetes.io/service-name=kubernetes -o json`
+and `oc get nodes -o wide`. Account for API/load-balancer or worker changes. Broad ranges, `0.0.0.0/0` and guessed addresses are refused.
+
+```bash
+export PYTHONPATH=scripts/identity_demo:tests/identity_demo
+export DEMO_SECURITY_PROFILE="$DEMO_PRIVATE_ROOT/security-profile.json"
+export DEMO_SECURITY_NETWORK="$DEMO_PRIVATE_ROOT/security-network.json"
+export DEMO_SECURITY_PLAN="$DEMO_PRIVATE_ROOT/security-plan-01"
+# Copy/edit the profile and network examples privately; chmod 600 both files.
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py security-plan \
+  --installation-profile "$DEMO_SECURITY_PROFILE" \
+  --security-network "$DEMO_SECURITY_NETWORK" \
+  --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" --expected-server "$DEMO_SERVER" \
+  --output-dir "$DEMO_SECURITY_PLAN"
+```
+
+Expected: `security_plan_ready: true`, `blocked: 0` in the classification counts,
+and `cluster_changed: false`. Read `security-review.private.json`: it identifies
+create/reuse/blocked objects and the exact UIDs of retained prerequisites. Missing
+SPIRE APIs can be listed as pending operator installation; this is not readiness.
+A Forbidden/unknown inventory, conflicting target, unhealthy package or unreviewed
+version stops setup. Resolve it with the platform owner; never remove guards.
+
+**Use only `create-*.json` from this live plan.** The unprefixed files are the
+complete offline reference and can contain existing shared resources. With a
+conflict, every create list is empty. Re-running planning over a partial owned
+installation is not a recovery mechanism; retain its original receipts.
+
+#### Create only the reviewed, missing resources
+
+The function below skips empty lists and checks the exact server. It performs
+server admission before each creation; it does not update existing objects.
+Keep the terminal output privately. Stop on any failure or partial creation and
+inspect actual UIDs before continuing; do not rerun a started create blindly.
+
+```bash
+set -e
+create_reviewed() {
+  "$DEMO_PYTHON" - "$DEMO_SECURITY_PLAN/security-review.private.json" <<'PYCHECK'
+import json, sys
+if not json.load(open(sys.argv[1]))['ready']:
+    raise SystemExit('Security plan blocked; no creation allowed')
+PYCHECK
+  if "$DEMO_PYTHON" - "$1" <<'PYCOUNT'
+import json, sys
+raise SystemExit(0 if json.load(open(sys.argv[1]))['items'] else 1)
+PYCOUNT
+  then
+    oc --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" --server "$DEMO_SERVER" \
+      create --dry-run=server -f "$1"
+    oc --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" --server "$DEMO_SERVER" \
+      create -f "$1"
+  else
+    echo "No new resources in $1; retained prerequisites stay unchanged."
+  fi
+}
+create_reviewed "$DEMO_SECURITY_PLAN/create-namespaces.json"
+create_reviewed "$DEMO_SECURITY_PLAN/create-operators.json"
+```
+
+Inspect each **new** manual InstallPlan's exact CSVs, versions, permissions and
+dependencies against the baseline before approving that particular plan.
+`startingCSV` is not a permanent version lock. Do not approve extra dependencies,
+a substitute latest version or an upgrade to a retained shared installation.
+Wait for the new approved CSV to report `Succeeded` and required CRDs to be
+`Established`. If no new operator was planned, retain the verified existing ones.
+
+Then create the remaining reviewed objects in order. The foundation uses
+exact-Pod discovery; do not create the operator's broad OIDC discovery operand
+alongside it. Existing GatewayClass/Kuadrant entries have empty create lists.
+
+```bash
+create_reviewed "$DEMO_SECURITY_PLAN/create-network.json"
+create_reviewed "$DEMO_SECURITY_PLAN/create-gateway.json"
+create_reviewed "$DEMO_SECURITY_PLAN/create-identity.json"
+create_reviewed "$DEMO_SECURITY_PLAN/create-discovery.json"
+```
+
+Wait for the SPIRE server and worker agent/CSI components to be ready. The custom
+discovery Pod waits for its identity. Generate its registration using the
+existing attestation helper, which verifies its actual Pod, image and PSAT parent:
+
+```bash
+export IDENTITY_DEMO_CONFIG="$DEMO_SECURITY_PROFILE"
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_discovery_registration.py \
+  --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" \
+  --output "$DEMO_PRIVATE_ROOT/discovery-registration.json"
+oc --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" create -f "$DEMO_PRIVATE_ROOT/discovery-registration.json"
+```
+
+For the new **owned** Kuadrant instance, generate TLS patch plans. The helper
+refuses a foreign owner or broken Kuadrant → Authorino → Service ownership chain.
+Inspect the two JSON patches; they enable the service-CA certificate and contain
+UID/resource-version tests. Apply each once; a conflict requires inspection and
+a new plan, never removing the tests.
+
+```bash
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py security-tls-plan \
+  --installation-profile "$DEMO_SECURITY_PROFILE" \
+  --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" --expected-server "$DEMO_SERVER" \
+  --output-dir "$DEMO_PRIVATE_ROOT/security-tls-plan-01"
+oc --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" patch service authorino-authorino-authorization \
+  -n kuadrant-system --type=json --patch-file "$DEMO_PRIVATE_ROOT/security-tls-plan-01/authorization-service.patch.json"
+oc --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" patch authorino authorino \
+  -n kuadrant-system --type=json --patch-file "$DEMO_PRIVATE_ROOT/security-tls-plan-01/authorino.patch.json"
+```
+
+For an existing shared Kuadrant, its owner configures/reviews TLS; do not use
+this patch path to take ownership. Preserve that owner's controller settings.
+
+</details>
+
+#### Verify the foundation before installing the application
+
+```bash
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py security-check \
+  --installation-profile "$DEMO_SECURITY_PROFILE" \
+  --kubeconfig "$DEMO_PLATFORM_KUBECONFIG" --expected-server "$DEMO_SERVER" \
+  --output-dir "$DEMO_PRIVATE_ROOT/security-check-01"
+```
+
+Expected: `security_configuration_ready: true`. This checks the exact API/TLS,
+required served APIs, owned identity foundation, controller generations,
+SPIRE/CSI readiness, live exact-Pod discovery registration, Authorino TLS and
+current public CA bundles. It exports `service-ca.pem` and `spire-ca.pem` for the
+application source configuration. Supply the approved upstream HTTPS CA bundle
+separately. Authorization and certificate-bound tool access still require the
+functional tests below. Stage-specific `.pending.json`/`.receipt.json` files identify the failed check
+without disclosing credentials; preserve them. A forbidden API or failed check stops setup; ask the
+platform owner for the documented access rather than bypassing the check.
+
+The aggregate ZTWIM manager can remain NotReady because its unused operator OIDC
+operand is absent. Required operands and our exact-Pod discovery are verified
+individually; do not create broad discovery just to turn that aggregate green.
+
+**Evidence boundary:** distinguish a fresh owned identity/application install
+from an empty-platform controller bootstrap. A retained shared controller was
+not installed by this procedure. The current tested boundaries and outstanding
+gates are recorded in [verification](verification.json). Retain failed and
+successful stage receipts; readiness alone does not prove authorization.
+
+
+## Installation checkpoint recovery
+
+The launcher is create-only. `status` and `observe` read the original recorded
+Build/Job UID. They never infer ownership from a name or label and do not submit
+another attempt. Keep every original response, pending marker, private stage log
+and source/image hash. A terminal rejection may be reconciled explicitly only
+after checking the exact API object and proving that no mutation remains uncertain.
+
+An existing bootstrap namespace requires `install.sh build --namespace-receipt
+/absolute/private/original-namespace.json --namespace-receipt-sha256 <sha256>`.
+That receipt must be the original creation response, not a newly captured object.
+For an approved new attempt, choose a new private output directory and
+`--attempt-id <short-id>` only after reconciling the preceding submission. These
+flags do not authorize overwriting an existing BuildConfig or adopting a namespace.
+
+A failed tokenless planning Job can be replaced only after its terminal state,
+original UID and absence of API credentials are established. Preserve its logs
+and receipt, use UID/resourceVersion deletion preconditions, and record the new
+creation response. Do not delete a running parent Job, claim, Lease or PVC to make
+an uncertain installation appear fresh. The build/application parent owns its
+lease and fences child process groups if ownership is lost.
+
+Installation rollback disables scheduling first, waits for a certain idle state,
+then selects a compatible retained image/configuration. It preserves new history,
+approvals, consumed identities and quarantine. Never restore an older database
+over current records or install expired certificates. A candidate must pass the
+functional gates before the presentation URL is switched.
+
+## Managed certificate maintenance commands
+
+These optional commands use the private operator/developer environment. Daily
+browser use needs none of these workstation services.
+
+### Renewal, loading and CA rollover
+
+Legacy installations use the original evaluation certificates until explicitly
+migrated. Managed mode delegates three leaves to the approved cert-manager issuer:
+
+| Certificate | Purpose | Replacement loading |
+|---|---|---|
+| `fixture-openshell-server-tls` | TLS for native management and sandbox connections | OpenShell's existing file watcher |
+| `fixture-openshell-client-tls` | OpenShell peer-client TLS | Projected file; each new peer channel reads current credentials |
+| `fixture-mcp-bound-mutual` | Protected MCP listener's server identity | Envoy SDS |
+
+The requested validity is 30 days with renewal seven days before expiry and a
+new ECDSA key each time. Issuers can impose different limits; the helper checks
+actual issuance. Renewal under the approved CA needs no native rebuild or routine
+operator approval. It does not extend user sessions, run deadlines or approvals.
+SPIRE's SVID lifecycle remains separate.
+
+`fixture-openshell-client-ca` holds public application trust separately from the
+leaf Secret, permitting a reviewed CA-overlap window. MCP workload authentication
+uses the separate `fixture-mcp-bound-mutual-cacert` SPIRE bundle. Never replace that
+bundle with the MCP server's issuer CA.
+
+Inputs: the approved private certificate config from Setup, current profile,
+installer kubeconfig and a new external output directory. Observe status and the
+**actual served certificates**, without starting a demo:
+
+```bash
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py certificate-status \
+  --installation-profile "$IDENTITY_DEMO_CONFIG" \
+  --managed-certificate-config "$DEMO_CERTIFICATE_CONFIG" \
+  --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
+  --verify-certificate-loading \
+  --output-dir "$DEMO_PRIVATE_ROOT/certificate-status-01"
+```
+
+Expected: `ready: true`, verified Certificate revisions and expiry/renewal times.
+The approved issuer UID is checked against your private configuration.
+The loading receipt matches actual OpenShell/MCP server fingerprints to issued
+leaves. A new native mTLS connection checks the renewed client credential; the
+consumer Secret reference is pinned. A single-replica installation does not
+exercise a peer-to-peer RPC. The minimal native image needs no diagnostic tools. A Secret update or Ready Pod alone is not
+proof of loading. `mutual_tls_verified` describes that diagnostic handshake only;
+the MCP listener observation checks server TLS, while a real protected workload
+request proves its separate SPIRE-bound client authentication. Root expiry within
+45 days is reported for rollover planning.
+If verification fails, retain the receipt, inspect issuer/Certificate events and
+consumer logs, and keep execution stopped. Never bypass hostname/chain checks.
+
+Workers mount only the three **public** leaf PEMs. They gain no serving-key,
+signing-key or deployment-mutation permissions. A healthy leaf in its renewal
+window does not stop a ready workflow. Insufficient validity for the maximum
+session/run bound plus five minutes, an invalid chain or unexpected identity
+stops admission with an application-certificate diagnostic in the coordinator log.
+
+#### Migrate an existing installation
+
+1. Complete the approved-issuer gate in Setup. First enable the existing
+   [public SPIRE trust isolation](identity-demo-reference.md#updating-the-isolated-cluster-workers)
+   in its own guarded idle update if not already enabled; retain that completed
+   worker receipt. Certificate migration requires its recorded separate public
+   listener trust. Ordinary migration keeps the application CA byte-for-byte;
+   a CA change is a separate operation.
+2. The migration installer needs `get` and `patch` on `certificates/status`,
+   restricted to the three names in the table above and the owned core namespace.
+   Ask the platform owner for that named permission; no runtime ServiceAccount
+   needs it. Preflight checks this before downtime and never falls back to admin.
+3. Verify private database/configuration/key backups and exact rollback receipts.
+   Confirm no execution, uncertain write or preparation remains.
+4. Plan the existing [idle worker update](identity-demo-reference.md#updating-the-isolated-cluster-workers)
+   with `--managed-certificate-config "$DEMO_CERTIFICATE_CONFIG"`, the original
+   application `--ledger`/`--console-ledger-sha256`, and current worker/publication
+   receipts. Use the new runtime image containing managed monitoring.
+5. Review the plan, then apply that same maintenance stage in a new private output
+   directory. It fences both workers, creates only the reviewed resources, verifies
+   issuance and isolates OpenShell's public client trust. That initial trust-volume
+   change causes one guarded OpenShell rollout. Ordinary leaf renewals do not.
+6. Require live loading checks, fresh worker Leases, protected access and the
+   permission/workflow checks before presenting. Existing unused identities and
+   historical data remain retained; root-stable migration needs no native rebuild.
+
+A valid legacy leaf can initially report Ready without a new issuance. Migration
+therefore requests one explicit renewal through cert-manager's public `Issuing`
+condition, the same operation used by [cmctl renew](https://cert-manager.io/docs/reference/cmctl/#renew).
+It keeps the Secret and its UID, waits for verified issuance and key loading, and
+journals the request once. Normal scheduled renewals need no operator request.
+
+An interrupted creation, ambiguous patch or failed rollout stays stopped for
+operator reconciliation. Do not replay the maintenance command over collisions.
+Use the exact before-state, created UIDs and pending receipts to complete only
+the remaining reviewed steps. Rollback fences scheduling first and restores
+recorded worker/consumer specifications while retaining valid current leaves.
+Never restore expired certificates or an older database over newer history.
+
+#### CA rollover is separate
+
+The CA issuer does **not** automatically rotate its signing CA. Follow the
+approved PKI's lifecycle. In an idle owned candidate, distribute overlapping old
+and new public roots to OpenShell client/peer trust, management profiles and all
+native outbound trust stores **before** switching issuance. Keep SPIRE trust
+separate. Use `native-repackage` when only public roots change and verified native
+binaries remain compatible; no recompile is required for unchanged build contracts.
+
+To repackage unchanged verified binaries, supply the original completed native
+build receipt/hash, the same installation profile, and the reviewed **combined**
+public outbound trust bundle (all required platform roots plus both application
+roots). Build privately before following Setup's publication/admission stages:
+
+```bash
+"$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py native-repackage \
+  --native-build-receipt "$DEMO_NATIVE_BUILD" --native-build-sha256 "$DEMO_NATIVE_BUILD_SHA256" \
+  --installation-profile "$IDENTITY_DEMO_CONFIG" \
+  --native-ca-bundle "$DEMO_OVERLAP_PUBLIC_TRUST" --engine docker \
+  --output-dir "$DEMO_PRIVATE_ROOT/native-overlap-plan"
+# Review, then use a new output directory and --apply to build the two images.
+```
+
+Expected: `compilation_performed: false`, followed after apply by verified
+packaged binaries and a new receipt. A contract/hash mismatch stops this path;
+do not reuse binaries compiled for a different installation. No cluster change
+is made by repackaging. Publish and admit the reviewed images before switching
+issuance; a file on the operator workstation does not update running consumers.
+
+Then issue/verify new leaves, prove new management and protected connections, and
+retire/replace only affected unused contexts under the existing guarded path.
+Update pinned issuer/public-trust observations and worker inputs through reviewed
+maintenance. Remove the old root only after all consumers use the new chain and
+the overlap has ended. Verify both the accepted new path and rejection of retired
+trust. Preserve the old CA's private recovery inputs until the PKI retention policy
+allows removal. Unattended CA rollover and full production PKI acceptance are not
+claimed by ordinary certificate-renewal acceptance.
+
+OpenShift-issued Service certificates are a separate lifecycle. Keycloak can
+reload its configured HTTPS files; the Python console, adapter and Jira launchers
+load TLS at startup. Their replacement requires guarded idle restart and a fresh
+served-certificate check. Updating those Secrets alone is insufficient.
+
+
+## Pinned builder mirror
+
+A registry mirror is an optional artifact-delivery input, not a different compiler.
+The platform owner copies the exact Linux AMD64 Rust manifest recorded as
+`builder_platform_digest` in `infra/openshell/native-build/inputs.lock.json` and
+retains source/destination digest evidence. The upstream multi-platform index
+remains pinned as `builder_base`. Never replace the image with a mutable tag or
+an independently rebuilt lookalike.
+
+Add `native_builder_image` to the versioned installer configuration only after
+verification. Its canonical `registry/repository@sha256:...` must use that exact
+AMD64 manifest digest. An internal mirror must be in this installation's bootstrap
+namespace as `fixture-native-builder-base`; the planner grants only named image
+layer reads to the required owned ServiceAccounts. External approved mirrors need
+their platform-reviewed pull access. The installer does not export a human login,
+copy the workstation Docker configuration into Pods, change a shared pull Secret
+or install a cluster-wide mirror rule.
+
+Customer installations can use their existing approved registry process. A
+one-time public-image copy from an authorized workstation is also an artifact
+preparation option; it is not an ongoing runtime dependency. Private registry
+credentials stay outside the source package and must not appear in logs or receipts.
+
+### Updating a worker image through OpenShift Builds
+
+The existing `console-runtime-cluster-build` helper accepts the same optional
+`--publication-id r2` convention as the publication helpers. Use a new private,
+configured source copy and its completed provider-configuration receipt. The
+suffix selects a distinct owned BuildConfig/ImageStream, preserving the active
+image and prior build evidence. The default installer still uses its fixed build
+name; its scoped admission does not gain permission to choose arbitrary build
+repositories. This optional maintenance action needs an authorized operator.
+
+For a maintenance build after application isolation is active, supply the
+existing `--publication-network /absolute/private/build-network.json` input.
+Its version-1 `api_cidrs` and `https_cidrs` contain reviewed, bounded destinations;
+include actual API endpoints after Service translation. The helper reuses the
+publication policy validator and selects only the exact first Build Pod. DNS and
+the internal registry remain separately scoped. It deletes this temporary policy
+by UID after a verified terminal build; uncertain submissions retain it for
+reconciliation. Runtime network permissions do not change. Do not disable the
+application's default-deny policies to build an update.
+
+Packaged tool/import verification must pass before using the resulting
+`publication.receipt.json` with the existing guarded worker-update procedure.
+A published image alone does not prove workflow acceptance. Native binaries need
+no rebuild when only compatible Python or documentation changes are made.
+
+### Public trust during a long installation
+
+SPIRE may add or remove overlapping CA roots while native builds run. Before
+recording trust and activating workers, setup reconciles only this installation's
+public issuer/listener trust copies from the approved operator-managed bundle.
+The existing helper verifies idle state, reviews all changes and applies exact
+UID/version/data preconditions. It preserves managed serving certificates and
+TLS verification, then waits for the owned issuer rollout. It requires no SPIRE
+server execution or registration write permission. Unexpected ownership, an
+uncertain update or failed verification stops setup for reconciliation.

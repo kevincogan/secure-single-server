@@ -4,8 +4,8 @@
 Apply the patches in the order pinned by
 [the native build lock](../native-build/inputs.lock.json), using the
 [guarded native build procedure](../native-build/README.md).
-Upstream source/dependency pins are retained. Patch hashes describe the neutral
-export bytes; they are not historical deployment receipts.
+Upstream source/dependency pins are retained. Patch hashes identify the source
+in this package; runtime acceptance and maintenance ownership are separate gates.
 
 1. `v0.1.3-sandbox-subject-comparison.patch`: compare signed JWT-SVID subject with
    the authenticated sandbox before intermediate credential release.
