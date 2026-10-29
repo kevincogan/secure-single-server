@@ -156,21 +156,34 @@ class UpstreamWatchTests(unittest.TestCase):
         self.assertEqual(writes[0].kwargs["payload"], {"state": "closed"})
 
     def test_successful_issue_writes_return_api_bodies(self):
+        """Create and refresh tracking issues for a release newer than the pin."""
+        current_pin = upstream_watch.read_pin(ROOT / "openshell/configs/images.env")
+        major, minor, patch = upstream_watch.parse_version(current_pin)
+        newer_pin = f"v{major}.{minor}.{patch + 1}"
+        if patch:
+            stale_pin = f"v{major}.{minor}.{patch - 1}"
+        elif minor:
+            stale_pin = f"v{major}.{minor - 1}.999"
+        elif major:
+            stale_pin = f"v{major - 1}.999.999"
+        else:
+            stale_pin = newer_pin
         release = {
-            "tag_name": "v0.1.5",
-            "name": "OpenShell v0.1.5",
+            "tag_name": newer_pin,
+            "name": f"OpenShell {newer_pin}",
             "published_at": "2026-10-19T20:48:39Z",
-            "html_url": "https://example.invalid/v0.1.5",
+            "html_url": f"https://example.invalid/{newer_pin}",
             "body": "Release notes",
         }
-        generated = upstream_watch.issue_body("v0.1.4", [release], 12_000)
+        generated = upstream_watch.issue_body(current_pin, [release], 12_000)
         write_url = f"{upstream_watch.API_BASE}/repos/example/example/issues"
         response = {"number": 12, "html_url": "https://example.invalid/issues/12"}
         cases = [
             ("create", None, "POST", write_url, response),
             ("update", {"number": 12, "title": "Old title",
-                        "body": generated.replace("Current downstream pin: `v0.1.4`",
-                                                  "Current downstream pin: `v0.1.3`")},
+                        "body": generated.replace(
+                            f"Current downstream pin: `{current_pin}`",
+                            f"Current downstream pin: `{stale_pin}`")},
              "PATCH", f"{write_url}/12", response),
         ]
         for operation, existing_issue, method, url, api_body in cases:
@@ -200,7 +213,7 @@ class UpstreamWatchTests(unittest.TestCase):
                 self.assertEqual(len(writes), 1)
                 self.assertEqual(writes[0].args[0], url)
                 self.assertEqual(writes[0].kwargs["payload"]["title"],
-                                 upstream_watch.issue_title("v0.1.4"))
+                                 upstream_watch.issue_title(current_pin))
                 self.assertIn(upstream_watch.ISSUE_MARKER,
                               writes[0].kwargs["payload"]["body"])
 

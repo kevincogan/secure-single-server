@@ -1,14 +1,14 @@
-# Test in a local RHEL 9 VM
+# Test in a local RHEL 9.8+ VM
 
 Use this path to exercise the complete installer, rootless Podman, SELinux,
 systemd user services, logout, and reboot behavior before testing in AWS.
 
 ## Create the VM
 
-On a Mac M4, use a native **RHEL 9 aarch64** guest. Suggested allocation:
+On a Mac M4, use a native **RHEL 9.8+ aarch64** guest. Suggested allocation:
 4 vCPUs, 8 GiB RAM and 50 GiB disk for hosted-model tests; no GPU is needed.
 
-1. Download the RHEL **9** aarch64 installation ISO from
+1. Download the RHEL **9.8 or later** aarch64 installation ISO from
    [Red Hat Developer](https://developers.redhat.com/products/rhel/download).
    Verify its supplied checksum. Use x86_64 on an Intel/AMD machine instead.
 2. In UTM or an equivalent native macOS virtualizer, choose **Virtualize →
@@ -18,7 +18,7 @@ On a Mac M4, use a native **RHEL 9 aarch64** guest. Suggested allocation:
    authorize your dedicated public SSH key. Keep the private key on the Mac.
 
 The [RHEL VMs extension for Podman Desktop](https://developers.redhat.com/articles/2025/06/11/how-manage-rhel-virtual-machines-podman-desktop)
-is another option if it offers a RHEL 9 image for your architecture. A RHEL 10
+is another option if it offers a RHEL 9.8+ image for your architecture. A RHEL 10
 guest does not qualify this RHEL 9 installer. This local VM is a test target,
 not a claim that every Mac hypervisor is a Red Hat-supported production host.
 

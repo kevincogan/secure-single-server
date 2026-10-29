@@ -62,9 +62,9 @@ other colors or fonts.
 | Status | The `ok`, `warn`, `risk`, and `info` tokens only |
 | Theme | `data-site` attribute; the header button flips it |
 
-The page starts in the theme chosen on the site (read from the Material
-palette key in `localStorage`). Without one, it uses the choice saved by the
-page's own button, then the operating system.
+The page starts in the theme saved by its own button, so a reader's choice
+survives a reload. Without one, it uses the theme chosen on the site (read from
+the Material palette key in `localStorage`), then the operating system.
 
 If `overrides/assets/stylesheets/redhat.css` changes, update the template head
 and render the existing demos again.

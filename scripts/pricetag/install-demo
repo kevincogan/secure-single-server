@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Install the management demo on a fresh RHEL benchmark host using local images.
+
+Images must already exist in root's Podman store. No real provider credentials
+are accepted. Existing deployments/data are refused; cleanup is a separate action.
+"""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'common'))
+
+from install import import_image, preflight, service_prefix, valid_hostname
+from demo_config import mock_configuration
+
+ROOT = Path(__file__).resolve().parents[2]
+INPUTS = Path('/root/pricetag-demo-inputs')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--hostname', required=True)
+    for component in ('praxis', 'maas', 'metering'):
+        parser.add_argument('--' + component + '-image', required=True,
+                            help='immutable sha256 image ID in root Podman storage')
+    parser.add_argument('--plan', action='store_true')
+    args = parser.parse_args()
+    if not valid_hostname(args.hostname):
+        parser.error('hostname must be an IPv4 address or DNS name')
+    images = [args.praxis_image, args.maas_image, args.metering_image]
+    if any(not re.fullmatch(r'sha256:[0-9a-f]{64}', image) for image in images):
+        parser.error('images must be immutable local sha256 IDs')
+    print('Management demo: synthetic providers, admin/alice/bob, $5 monthly budgets')
+    print('Steps: prepare RHEL; import images; prepare/start services; providers remain host-managed')
+    if args.plan:
+        return
+    preflight('mock')
+    if INPUTS.exists() or INPUTS.is_symlink():
+        parser.error('demo inputs already exist; review the interrupted installation')
+    os.umask(0o077)
+    def run(command):
+        subprocess.run([str(x) for x in command], check=True, cwd='/tmp')
+    run(['dnf', 'install', '-y', 'podman', 'git', 'python3', 'python3-pyyaml', 'openssl',
+         'curl', 'sudo', 'policycoreutils-python-utils', 'shadow-utils', 'selinux-policy-devel', 'make'])
+    run([ROOT / 'scripts/common/install', '--prepare'])
+    prefix = service_prefix()
+    # Retained volumes must never be mistaken for a fresh database.
+    for volume in ('pricetag-data', 'pricetag-db'):
+        result = subprocess.run(prefix + ['podman', 'volume', 'exists', volume], cwd='/tmp')
+        if result.returncode != 1:
+            raise ValueError('existing database volume or Podman error; refusing reinstall')
+    import pwd
+    units = Path('/etc/containers/systemd/users') / str(pwd.getpwnam('praxis-svc').pw_uid)
+    if list(units.glob('pricetag*')):
+        raise ValueError('existing PriceTag Quadlets; refusing reinstall')
+    ids = [import_image(image, prefix, component) for component, image in
+           zip(('Praxis', 'MaaS', 'PriceTag'), images)]
+    secret = 'pricetag-mock-ui-v1'
+    if subprocess.run(prefix + ['podman', 'secret', 'exists', secret], cwd='/tmp').returncode != 1:
+        raise ValueError('synthetic secret already exists or Podman error; review retained state')
+    subprocess.run(prefix + ['podman', 'secret', 'create', secret, '-'],
+                   input=b'synthetic-anthropic', cwd='/tmp', check=True, stdout=subprocess.DEVNULL)
+    INPUTS.mkdir(mode=0o700)
+    for name, value in [('configuration.json', mock_configuration()),
+                        ('secret-references.json', {'mock': secret}), ('prices.json', {})]:
+        (INPUTS / name).write_text(json.dumps(value, indent=2) + '\n')
+    run([sys.executable, ROOT / 'scripts/pricetag/prepare.py', '--hostname', args.hostname,
+         '--praxis-image', ids[0], '--maas-image', ids[1], '--metering-image', ids[2],
+         '--mock-provider', '--managed-mock', '--mock-secret', secret,
+         '--price-sources', INPUTS / 'prices.json'])
+    run([ROOT / 'scripts/pricetag/start'])
+    print('Demo services installed. Set illustrative prices and create the 20-user fixture next.')
+    print('Administrator key: /root/pricetag-admin/admin.key')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, subprocess.CalledProcessError):
+        raise SystemExit('Demo installation stopped. Existing files and volumes were preserved; inspect the failed stage.') from None

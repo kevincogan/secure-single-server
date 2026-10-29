@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Bootstrap only the interpreter; all deployment stages live in install.py.
+set -euo pipefail
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if ! command -v python3 >/dev/null; then
+  for argument in "$@"; do
+    case "$argument" in
+      --plan|--help|-h) echo 'python3 is required for help/plan; install it with sudo dnf install python3.' >&2; exit 1 ;;
+    esac
+  done
+  [[ "$EUID" == 0 ]] || { echo 'Run with sudo on RHEL.' >&2; exit 1; }
+  # shellcheck disable=SC1091
+  source /etc/os-release
+  [[ "${ID:-}" == rhel ]] || { echo 'This installer supports RHEL only.' >&2; exit 1; }
+  dnf install -y python3
+fi
+exec python3 "${script_dir}/install.py" "$@"

@@ -6,7 +6,7 @@ uses the `dev` profile and `openclaw agent exec`, not a browser or gateway servi
 
 Use a checkout containing this integration, or a bootc image built from it.
 Previously published `v0.1` images do not gain the new scripts automatically.
-See the [0.1.4 pin review](../../testing/upgrade-0.1.4.md) for the active pins
+See the [0.1.5 pin review](../../testing/upgrade-0.1.5.md) for the active pins
 and release compatibility. The [0.1.3 fixture qualification](../../testing/upgrade-0.1.3.md)
 and [earlier real-model evidence](../../testing/openclaw-praxis.md) are
 historical records; rerun an opt-in real-model task before promotion.
@@ -111,8 +111,8 @@ OpenShell allow/deny enforcement. AWS also exercises the pinned workload and
 bootc container build. These [0.1.3 upgrade checks](../../testing/upgrade-0.1.3.md)
 used a controlled model fixture, and the same pins passed
 [real OpenAI model tasks on manual and booted bootc deployments](../../testing/upgrade-0.1.3-e2e.md).
-The earlier Qwen GPU results and both records are historical for 0.1.4; the
-active pins require separate opt-in qualification.
+The earlier Qwen GPU results and both records predate the active 0.1.5 pins;
+real-model and GPU acceptance still require separate opt-in qualification.
 A synthetic credential test does not qualify a paid OpenAI account or every
 OpenAI-compatible service. Browser login, gateway service deployment, retained
 sessions, and `--backend` remain outside this tested path.

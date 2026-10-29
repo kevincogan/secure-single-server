@@ -26,7 +26,7 @@ artifacts.
 
 ## Manual gateway setup on RHEL
 
-Run these commands in Bash on the dedicated RHEL 9 x86_64 host, logged in as
+Run these commands in Bash on the dedicated RHEL 9.8+ x86_64 host, logged in as
 the administrator. Keep the same shell open so `repo`, `uid`, and `os_run`
 remain defined. The checkout under `/opt` is readable by the service account
 without placing it in an administrator's home directory.

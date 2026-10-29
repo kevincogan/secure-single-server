@@ -24,7 +24,7 @@ def main():
                      [sys.executable, "-m", "unittest", "discover", "-s", "tests/common", "-p", "test_*.py"]]
         commands += [[sys.executable, path] for path in ("tests/remote-gateway/credentials.py",
             "tests/remote-gateway/security.py", "tests/aws/plan.py", "tests/aws/session.py", "tests/aws/https-access.py",
-            "tests/rhel/smoke.py", "tests/rhel/unit.py", "tests/rhel/users.py", "tests/rhel/providers.py", "tests/rhel/vllm.py", "tests/rhel/clients.py", "tests/rhel/features-test.py", "tests/pricetag/unit.py", "tests/pricetag/providers.py")]
+            "tests/rhel/smoke.py", "tests/rhel/unit.py", "tests/rhel/users.py", "tests/rhel/providers.py", "tests/rhel/vllm.py", "tests/rhel/clients.py", "tests/rhel/features-test.py", "tests/pricetag/unit.py", "tests/pricetag/providers.py", "tests/pricetag/install.py", "tests/pricetag/metering-admin.py", "tests/pricetag/manage.py", "tests/pricetag/api.py", "tests/pricetag/perf.py", "tests/pricetag/capacity-export.py")]
         commands += [[sys.executable, "tests/llm-d-sc/unit.py"]]
     if args.suite == "praxis":
         commands += [["bash", "tests/shared-gateway-image.sh"], ["bash", "tests/shared-gateway-valkey-image.sh"]]

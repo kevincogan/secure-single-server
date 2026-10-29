@@ -1,6 +1,6 @@
 # Experimental OpenShell add-on installation
 
-Use a disposable, trusted single-operator RHEL 9 x86_64 host with a reviewed
+Use a disposable, trusted single-operator RHEL 9.8+ x86_64 host with a reviewed
 checkout available on the VM. Install
 [Praxis all-in-one](../all-in-one/README.md) first. Commands below run on that VM
 from the repository root. Bootc hosts instead use [bootc reconciliation](../../../bootc/README.md).

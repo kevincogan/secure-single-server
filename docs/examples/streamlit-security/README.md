@@ -24,7 +24,7 @@ OpenShell sandbox
 
 ### Where to run it
 
-Run the commands on a dedicated RHEL 9 x86_64 Linux host, such as a local or
+Run the commands on a dedicated RHEL 9.8+ x86_64 Linux host, such as a local or
 cloud VM or bare-metal machine; an ordinary nested container is not a supported
 OpenShell host. Before running the demo, complete the
 [manual gateway setup in OpenShell Overview](../../../openshell/docs/README.md#manual-gateway-setup-on-rhel):
@@ -111,6 +111,10 @@ os_run openshell profile import -f "$repo/openshell/demos/streamlit-security/pro
 Register the provider by reusing the hidden-prompt procedure linked above, with
 `--name streamlit-demo-compatible`,
 `--type streamlit-openai-compatible`, and `--credential OPENAI_API_KEY`.
+
+Both request formats use `temperature=0.1`. The OpenAI provider sends
+`max_completion_tokens`; the OpenAI-compatible provider sends `max_tokens` for
+servers that implement the legacy Chat Completions parameter.
 
 ## Run the unsafe version
 

@@ -6,7 +6,7 @@ bind_address        = "127.0.0.1:8090"
 health_bind_address = "127.0.0.1:8091"
 log_level           = "info"
 compute_driver      = "podman"
-# Supervisors verify gateway TLS with this CA; v0.1.4 uses sandbox JWT identity.
+# Supervisors verify gateway TLS with this CA; OpenShell uses sandbox JWT identity.
 guest_tls_ca = "/var/lib/openshell/tls/ca.crt"
 
 [openshell.gateway.auth]

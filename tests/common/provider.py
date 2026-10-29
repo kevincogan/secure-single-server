@@ -48,10 +48,17 @@ def continuation(path, body):
     return False
 
 
-def completion(path, body, missing_usage=False):
+def completion(path, body, missing_usage=False, declared_tools_only=False):
     """Two input + three output tokens; add(2, 3), followed by result '5'."""
     continued = continuation(path, body)
     tool = bool(body.get("tools")) and not continued
+    if declared_tools_only:
+        # Interactive harnesses advertise their own tools. Never invent add()
+        # unless it was declared; legacy protocol fixtures retain their mode.
+        tool = tool and any(isinstance(item, dict) and (
+            item.get('name') == 'add' or
+            isinstance(item.get('function'), dict) and item['function'].get('name') == 'add'
+        ) for item in body.get('tools', []))
     text = "5" if continued else "mock answer"
     model = body.get("model", "fixture")
     if path == "/v1/chat/completions":
@@ -152,13 +159,16 @@ def events(path, result):
 
 class Provider:
     def __init__(self, ports=(18080, 18081, 19000), host="127.0.0.1", control_host="127.0.0.1",
-                 openai_authorization="Bearer synthetic-openai", model="fixture", local=False, strict_openai=False):
+                 openai_authorization="Bearer synthetic-openai", model="fixture", local=False, strict_openai=False,
+                 declared_tools_only=False, request_backlog=5, record_limit=None):
         # None requires the local profile to remove Authorization completely.
         self.openai_authorization = openai_authorization
         self.model = model
         self.local = local
         self.strict_openai = strict_openai
+        self.declared_tools_only = declared_tools_only
         self.records = []
+        self.record_limit = record_limit
         self.mode = "ok"
         self.delay = 1.0
         self.lock = threading.Lock()
@@ -209,6 +219,8 @@ class Provider:
                             "stream": bool(body.get("stream")), "continuation": continuation(self.path, body)})
                         if isinstance(body.get('include_reasoning'), bool):
                             fixture.records[-1]['include_reasoning'] = body['include_reasoning']
+                        if fixture.record_limit is not None:
+                            del fixture.records[:-fixture.record_limit]
                     return credential_ok and clean
 
                 def do_POST(self):
@@ -251,7 +263,10 @@ class Provider:
                         return self.reply(int(mode[4:]), {"error": {"type": "fixture_error", "message": mode}})
                     if mode == "timeout":
                         time.sleep(delay)
-                    result = completion(self.path, body, mode == "missing_usage")
+                    if fixture.declared_tools_only:
+                        result = completion(self.path, body, mode == "missing_usage", declared_tools_only=True)
+                    else:
+                        result = completion(self.path, body, mode == "missing_usage")
                     if not body.get("stream"):
                         return self.reply(200, result)
                     self.send_response(200)
@@ -267,7 +282,10 @@ class Provider:
                         self.wfile.flush()
                     self.close_connection = True
 
-            server = ThreadingHTTPServer((control_host if index == 2 else host, port), Handler)
+            class FixtureServer(ThreadingHTTPServer):
+                request_queue_size = request_backlog
+
+            server = FixtureServer((control_host if index == 2 else host, port), Handler)
             server.provider_index = index
             self.servers.append(server)
         self.ports = [server.server_port for server in self.servers]

@@ -92,6 +92,7 @@ def select(entries, harness, profile, config, backend):
 
 
 def workload(item):
+    """Build a deterministic workload definition from its template and pins."""
     image = os.environ.get(item['image_variable'], '')
     require(re.fullmatch(r'[^\s@]+@sha256:[a-f0-9]{64}', image), 'template image must be digest-pinned')
     cpu = os.environ.get('OPENSHELL_SANDBOX_CPU', item['cpu'])
@@ -101,7 +102,7 @@ def workload(item):
     labels = {'managed-by': 'secure-single-server', **{key: item[key] for key in ('harness', 'profile', 'backend')}}
     result = {'image': image, 'resources': {'cpu': cpu, 'memory': memory},
               'environment': item.get('environment', {}), 'labels': labels}
-    # v0.1.4 validates templates with the sandbox's 19-character name limit.
+    # v0.1.5 validates templates with the sandbox's 19-character name limit.
     # Human-readable identity lives in labels and sync's catalog/name output.
     digest = hashlib.sha256(json.dumps(result, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     name = 'sss-' + digest[:15]

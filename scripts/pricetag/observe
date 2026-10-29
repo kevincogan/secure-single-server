@@ -58,6 +58,9 @@ def sample(prefix):
               'disk_total_bytes': total, 'disk_available_bytes': available,
               'disk_available_percent': available * 100 / total,
               'load_average': os.getloadavg(),
+              'socket_counters': Path('/proc/net/sockstat').read_text().strip(),
+              'ephemeral_port_range': Path('/proc/sys/net/ipv4/ip_local_port_range').read_text().strip(),
+              'cpu_ticks': list(map(int, Path('/proc/stat').read_text().splitlines()[0].split()[1:])),
               'pressure': {name: Path('/proc/pressure', name).read_text().strip()
                            for name in ('cpu', 'memory', 'io') if Path('/proc/pressure', name).exists()}}
     record['containers'] = command(prefix + ['podman', 'stats', '--no-stream', '--format', 'json', *SERVICES], True)

@@ -15,6 +15,21 @@ SYSTEM_MESSAGE = {
     ),
 }
 
+PROVIDER_REQUEST_FORMATS = {
+    "streamlit-demo-openai": "openai",
+    "streamlit-demo-compatible": "openai-compatible",
+}
+
+
+def request_format_for_provider(provider: str) -> str:
+    """Return the Chat Completions parameter format for a demo provider."""
+    try:
+        return PROVIDER_REQUEST_FORMATS[provider]
+    except KeyError as error:
+        raise ValueError(
+            "STREAMLIT_DEMO_PROVIDER is not a supported demo provider"
+        ) from error
+
 
 class RejectRedirects(urllib.request.HTTPRedirectHandler):
     """Keep bearer credentials from following endpoint redirects."""
@@ -29,6 +44,7 @@ def call_model(
     base_url: str,
     api_key: str,
     model: str,
+    request_format: str,
     messages: list[dict[str, str]] | None = None,
 ) -> str:
     """Call the configured endpoint with ticket context and ordered chat turns."""
@@ -38,6 +54,8 @@ def call_model(
         raise ValueError("OPENAI_API_KEY is required")
     if not model:
         raise ValueError("OPENAI_MODEL is required")
+    if request_format not in {"openai", "openai-compatible"}:
+        raise ValueError("request_format must be openai or openai-compatible")
     parsed_url = urlsplit(base_url)
     if (
         parsed_url.scheme not in {"http", "https"}
@@ -83,8 +101,11 @@ def call_model(
             *conversation,
         ],
         "temperature": 0.1,
-        "max_tokens": 300,
     }
+    if request_format == "openai":
+        payload["max_completion_tokens"] = 1000
+    else:
+        payload["max_tokens"] = 300
 
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/chat/completions",

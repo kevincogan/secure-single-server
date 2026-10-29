@@ -10,7 +10,7 @@ repository; the guides below are separated by the question they answer.
    [Architecture overview](quickstarts/architecture-walkthrough/README.md) to
    understand the component roles, model access paths, and system boundaries.
 2. **Deploy a sandboxed harness.** Use
-   [OpenShell](https://github.com/NVIDIA/OpenShell/tree/v0.1.4/docs) through the
+   [OpenShell](https://github.com/NVIDIA/OpenShell/tree/v0.1.5/docs) through the
    [manual container guide](quickstarts/openshell-single-server/manual.md) or
    [bootc deployment guide](quickstarts/openshell-single-server/bootc.md) to deploy [OpenCode](https://github.com/anomalyco/opencode) or
    [OpenClaw](https://github.com/openclaw/openclaw) on one trusted RHEL host.
@@ -37,6 +37,7 @@ and performance guides are linked from that overview.
 
 | If you need to… | Use |
 | --- | --- |
+| Get a short overview to present or share | [Overview slide deck](slides/secure-single-server-overview.html) |
 | Review component roles and model paths | [Architecture overview](quickstarts/architecture-walkthrough/README.md) |
 | Install OpenShell and harness containers separately | [Manual single-server deployment](quickstarts/openshell-single-server/manual.md) |
 | Choose a deployment method | [Deployment methods](deployment-methods.md) |
@@ -44,6 +45,7 @@ and performance guides are linked from that overview.
 | Try content-aware CPU/GPU routing with the optional Web UI | [llm-d-sc quickstart](quickstarts/llm-d-sc/README.md) |
 | Serve users from accounts on one RHEL host | [All-in-one gateway](quickstarts/all-in-one/README.md) |
 | Connect harnesses on remote client machines | [Remote HTTPS/JWT gateway](quickstarts/remote-gateway/README.md) |
+| Deploy a remote gateway with user keys and USD budgets | [MaaS and PriceTag deployment](quickstarts/remote-gateway-pricetag/README.md), [providers](quickstarts/remote-gateway-pricetag/providers.md), [user administration](quickstarts/remote-gateway-pricetag/users.md) |
 | Try a post-deployment workflow | [Example scenarios](examples/README.md) |
 | Inspect or adjust shared model-token allowances | [Praxis token quotas scenario](examples/praxis-quotas/README.md) |
 | Review the MaaS + PriceTag metering pilot | [Pilot overview](testing/pricetag.md), [AWS deployment runbook](testing/aws-pricetag.md), [performance procedure](testing/pricetag-perf.md) |
@@ -62,7 +64,7 @@ and performance guides are linked from that overview.
 | Harness sandboxes | Coding agents packaged as digest-pinned images with four profiles: [OpenCode](../openshell/harnesses/opencode/README.md), [OpenClaw](../openshell/harnesses/openclaw/README.md) | [Single-server guide](quickstarts/openshell-single-server/README.md) |
 | Praxis | Provider credential custody, model routing, and shared token quotas | [OpenShell + Praxis guide](quickstarts/openshell-praxis/README.md), [token quota reference](quickstarts/common/token-quotas.md), [quota operations scenario](examples/praxis-quotas/README.md) |
 | llm-d-sc | Experimental semantic prompt classification for CPU/GPU routing | [llm-d-sc quickstart](quickstarts/llm-d-sc/README.md) |
-| MaaS + PriceTag | Finite API keys, USD budgets, and usage metering for the experimental single-server pilot | [Pilot overview](testing/pricetag.md), [deployment runbook](testing/aws-pricetag.md), [performance procedure](testing/pricetag-perf.md) |
+| MaaS and PriceTag | Finite API keys, per-user USD allowances, usage metering and administrator dashboards | [Deployment and operations](quickstarts/remote-gateway-pricetag/README.md), [performance procedure](testing/pricetag-perf.md) |
 | vLLM | Private local model inference on a separate CPU or GPU server | [Private vLLM workflow](quickstarts/common/vllm.md) |
 | Valkey | Durable quota ledger for the managed gateway | [All-in-one Valkey profile](quickstarts/all-in-one/valkey.md) |
 | bootc images | Repeatable RHEL 9 OS deployment carrying the selected harness | [bootc images](../bootc/README.md) |
@@ -90,8 +92,8 @@ For maintainers: [build and publish standalone MaaS and PriceTag images](develop
 
 - [OpenCode](https://github.com/anomalyco/opencode)
 - [OpenClaw](https://github.com/openclaw/openclaw)
-- [OpenShell documentation](https://github.com/NVIDIA/OpenShell/tree/v0.1.4/docs)
-  and [sandbox overview](https://github.com/NVIDIA/OpenShell/blob/v0.1.4/docs/how-it-works/sandboxes/overview.mdx)
+- [OpenShell documentation](https://github.com/NVIDIA/OpenShell/tree/v0.1.5/docs)
+  and [sandbox overview](https://github.com/NVIDIA/OpenShell/blob/v0.1.5/docs/how-it-works/sandboxes/overview.mdx)
 - [Praxis framework](https://github.com/praxis/praxis)
 - [Praxis experimental gateway](https://github.com/praxis-proxy/experimental)
 - [llm-d-sc semantic classifier](https://github.com/llm-d-incubation/llm-d-semantic-classifier)

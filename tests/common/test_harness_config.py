@@ -13,6 +13,35 @@ from test_unified import MODELS
 
 
 class NativeConfigTest(unittest.TestCase):
+    def test_claude_messages_omit_unsupported_thinking_binding(self):
+        entry = {'id': 'external/friendly-alias', 'praxis': {
+            'provider': 'external', 'upstream_model': 'claude-opus-5-5',
+            'context': 128000, 'output': 8192}}
+        model = harness_config.opencode_model(entry, 'anthropic')
+        self.assertEqual(model['options']['thinking'], {'type': 'adaptive', 'blockBinding': False})
+        self.assertEqual(harness_config.opencode_model(entry, 'messages')['options']['thinking'],
+                         {'type': 'adaptive', 'blockBinding': False})
+        self.assertEqual(model['limit'], {'context': 128000, 'output': 8192})
+        self.assertNotIn('options', harness_config.opencode_model(entry, 'openai'))
+        for upstream in ('claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-4-8'):
+            entry['praxis']['upstream_model'] = upstream
+            self.assertEqual(harness_config.opencode_model(entry, 'anthropic')['options']['thinking'],
+                             {'type': 'adaptive', 'blockBinding': False})
+        for upstream in ('rits/zai-org/glm-5-3', 'claude-haiku-4-5', 'claude-sonnet-4-5'):
+            entry['praxis']['upstream_model'] = upstream
+            self.assertNotIn('options', harness_config.opencode_model(entry, 'anthropic'))
+
+    def test_generated_messages_config_preserves_claude_thinking(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            openai = unified_config.catalog([MODELS[0]], 'openai')['data']
+            messages = unified_config.catalog([MODELS[3]], 'anthropic')['data']
+            outputs = harness_config.files(home, openai, messages, 8080, 8081)
+            config = json.loads(outputs[home / '.config/opencode/opencode.json'])
+            claude = config['provider']['praxis-messages']['models']['team/claude-sonnet-5']
+            self.assertEqual(claude['options']['thinking'],
+                             {'type': 'adaptive', 'blockBinding': False})
+
     def test_opencode_uses_responses_for_gpt_and_local_qwen(self):
         models = [*MODELS, {**MODELS[2], 'id': 'team/gpt-6-luna', 'model': 'gpt-6-luna'},
                   {**MODELS[2], 'id': 'team/other', 'model': 'other-chat-model'}]

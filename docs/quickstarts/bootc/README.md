@@ -1,6 +1,6 @@
 # Bootc quickstart
 
-Run this walkthrough in Bash on a disposable, already bootc-managed RHEL 9
+Run this walkthrough in Bash on a disposable, already bootc-managed RHEL 9.8+
 x86_64 host. Have an OpenAI API key and an exact model ID available to your
 account ready. This published-image example uses OpenCode with Praxis.
 For OpenClaw, use the [bounded model/tool guide](../openshell-praxis/openclaw.md)

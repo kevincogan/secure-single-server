@@ -7,10 +7,11 @@ import subprocess
 
 import streamlit as st
 
-from model_client import call_model
+from model_client import call_model, request_format_for_provider
 
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "safe").lower()
+STREAMLIT_DEMO_PROVIDER = os.environ.get("STREAMLIT_DEMO_PROVIDER", "")
 MODEL_BASE_URL = os.environ.get("MODEL_BASE_URL", "https://api.openai.com/v1")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "")
@@ -90,6 +91,7 @@ if st.button("Summarize with model", type="primary"):
                 base_url=MODEL_BASE_URL,
                 api_key=OPENAI_API_KEY,
                 model=OPENAI_MODEL,
+                request_format=request_format_for_provider(STREAMLIT_DEMO_PROVIDER),
             )
     except Exception:
         st.error("Model call failed. Check the endpoint, credentials, and app logs.")
@@ -199,6 +201,7 @@ if chat_prompt:
                     base_url=MODEL_BASE_URL,
                     api_key=OPENAI_API_KEY,
                     model=OPENAI_MODEL,
+                    request_format=request_format_for_provider(STREAMLIT_DEMO_PROVIDER),
                     messages=[
                         *st.session_state.chat_messages,
                         {"role": "user", "content": chat_prompt},

@@ -25,7 +25,7 @@ for variant in "${variants[@]}"; do
     if [[ "$1" == base ]]; then
       test "$(cat "$root/bootc/vllm-profile")" = any
       test -x /usr/bin/openshell
-      test "$(/usr/bin/openshell --version)" = "openshell 0.1.4"
+      test "$(/usr/bin/openshell --version)" = "openshell 0.1.5"
       test -L /etc/systemd/system/multi-user.target.wants/secure-single-server.service
       test -L /etc/systemd/system/multi-user.target.wants/secure-single-server-vllm.service
       test -x /usr/share/secure-single-server/bootc/scripts/vllm
@@ -77,7 +77,7 @@ for variant in "${variants[@]}"; do
     else
       test "$(cat "$root/bootc/vllm-profile")" = any
       test -x /usr/bin/openshell
-      test "$(/usr/bin/openshell --version)" = "openshell 0.1.4"
+      test "$(/usr/bin/openshell --version)" = "openshell 0.1.5"
       test -L /etc/systemd/system/multi-user.target.wants/secure-single-server.service
       test -L /etc/systemd/system/multi-user.target.wants/secure-single-server-vllm.service
       test -x /usr/share/secure-single-server/bootc/scripts/vllm

@@ -1,37 +1,41 @@
 #!/usr/bin/env python3
-"""Build pinned, unmodified upstream metering source without Git metadata or secrets."""
+"""Build pinned metering demo source without Git metadata or secrets."""
 import argparse
+import re
 from pathlib import Path
 import subprocess
 import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-REVISION = '557ceb1cbe1316d93e0f682baa8301455956fe18'
+REVISION = '666770c4e31e035c1de236490bbff9dfffe7e047'
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source', required=True, type=Path, help='local redhat-et/pricetag-metering Git checkout')
+    parser.add_argument('--source', required=True, type=Path, help='PriceTag Git checkout containing the selected revision')
     parser.add_argument('--platform', choices=['linux/amd64', 'linux/arm64'], help='defaults to container-engine host architecture')
-    parser.add_argument('--tag', default='localhost/pricetag-metering:upstream-557ceb1')
+    parser.add_argument('--tag', default='localhost/pricetag-metering:demo-666770c')
+    parser.add_argument('--revision', default=REVISION, help='full source commit to test; defaults to the qualified revision')
     args = parser.parse_args()
+    if not re.fullmatch(r'[0-9a-f]{40}', args.revision):
+        parser.error('--revision must be a full lowercase Git commit SHA')
     with tempfile.TemporaryDirectory(prefix='pricetag-build-') as directory:
         path = Path(directory)
         archive = path / 'source.tar'
         with archive.open('wb') as output:
-            subprocess.run(['git', '-C', str(args.source), 'archive', REVISION], stdout=output, check=True)
+            subprocess.run(['git', '-C', str(args.source), 'archive', args.revision], stdout=output, check=True)
         context = path / 'source'
         context.mkdir()
         with tarfile.open(archive) as source:
             source.extractall(context, filter='data')
-        command = ['podman', 'build', '--label', 'org.opencontainers.image.revision=' + REVISION,
-                   '--label', 'org.opencontainers.image.source=https://github.com/redhat-et/pricetag-metering',
+        command = ['podman', 'build', '--label', 'org.opencontainers.image.revision=' + args.revision,
+                   '--label', 'org.opencontainers.image.source=https://github.com/Ladas/pricetag-metering',
                    '-f', str(ROOT / 'configs/pricetag/Containerfile.metering'), '-t', args.tag]
         if args.platform:
             command.extend(['--platform', args.platform])
         subprocess.run([*command, str(context)], check=True)
-    print('Built unmodified upstream revision ' + REVISION + '; inspect the image ID before deployment.')
+    print('Built PriceTag fork revision ' + args.revision + '; inspect the image ID before deployment.')
 
 
 if __name__ == '__main__':

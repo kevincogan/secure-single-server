@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Run mock load, exact ledger verification and resource sampling in one command."""
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import subprocess
+import sys
+import uuid
+
+ROOT = Path(__file__).resolve().parents[2]
+DEPLOY = Path('/etc/praxis-pricetag')
+
+
+def load_observer():
+    loader = importlib.machinery.SourceFileLoader('pricetag_observe', str(ROOT / 'scripts/pricetag/observe'))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    observer = importlib.util.module_from_spec(spec)
+    loader.exec_module(observer)
+    return observer
+
+
+def require_mock(directory):
+    models = json.loads((directory / 'models.json').read_text())
+    legacy = len(models) == 1 and models[0].get('id') == 'fixture' and models[0].get('model') == 'fixture'
+    managed = bool(models) and all(m.get('provider') == 'mock' and str(m.get('id', '')).startswith('mock/')
+        and re.fullmatch(r'fixture(?:-[a-z0-9-]+)?', str(m.get('model', ''))) for m in models)
+    if not (legacy or managed):
+        raise ValueError('benchmark requires the dedicated fixture-only deployment')
+    unit = (directory / 'quadlets/pricetag-gateway.container').read_text()
+    credential_lines = [line for line in unit.splitlines() if line.startswith('Secret=') and 'type=env' in line]
+    mock_credentials = managed and all(re.fullmatch(
+        r'Secret=(?:pricetag-mock-ui-v[0-9]+|praxis-mock-api-key-v[0-9]+),type=env,target=CUSTOM_MOCK_API_KEY', line)
+        for line in credential_lines)
+    if 'Network=pricetag-mock.network' not in unit or (credential_lines and not mock_credentials):
+        raise ValueError('benchmark refuses a deployment with real-provider credentials')
+    config = json.loads((directory / 'gateway/gateway.json').read_text())
+    endpoints = [endpoint for chain in config['filter_chains'] for item in chain['filters']
+                 if item.get('filter') == 'load_balancer' for cluster in item.get('clusters', [])
+                 for endpoint in cluster.get('endpoints', [])]
+    if not {'pricetag-provider:18080', 'pricetag-provider:18081'} <= set(endpoints):
+        raise ValueError('mock provider endpoints are missing')
+    if any(not str(endpoint).startswith(('pricetag-provider:', '127.0.0.1:', 'pricetag-metering:'))
+           for endpoint in endpoints):
+        raise ValueError('benchmark refuses external provider endpoints')
+
+
+def check_sample(record):
+    def errors(value):
+        if isinstance(value, dict):
+            return 'error' in value or any(errors(v) for v in value.values())
+        return isinstance(value, list) and any(errors(v) for v in value)
+    if errors(record):
+        raise ValueError('resource sampler reported an error; inspect observations')
+    if record['disk_available_percent'] < 30:
+        raise ValueError('less than 30% disk available; load stopped')
+    services = {}
+    for block in record['services'].split('\n\n'):
+        fields = dict(line.split('=', 1) for line in block.splitlines() if '=' in line)
+        if fields.get('ActiveState') != 'active' or fields.get('Result') != 'success':
+            raise ValueError('a benchmark service is not healthy')
+        services[fields['Id']] = int(fields['NRestarts'])
+    if len(services) != 5:
+        raise ValueError('expected five benchmark services')
+    return services
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--requests', type=int, choices=range(1, 1001), default=100,
+                        help='requests per user per phase; default 100 gives 3600 requests')
+    parser.add_argument('--concurrency', type=int, nargs='+', choices=range(1, 21), default=[1, 5, 10, 20])
+    args = parser.parse_args()
+    if os.geteuid() != 0:
+        parser.error('run with sudo on the mock-only RHEL server')
+    require_mock(DEPLOY)
+    selected_model = json.loads((DEPLOY / 'models.json').read_text())[0]['id']
+    owner = pwd.getpwnam('praxis-svc')
+    prefix = ['sudo', '-u', 'praxis-svc', 'env', f'XDG_RUNTIME_DIR=/run/user/{owner.pw_uid}',
+              f'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{owner.pw_uid}/bus']
+    os.umask(0o077)
+    name = 'perf-' + uuid.uuid4().hex[:12]
+    output = Path('/root/pricetag-admin') / name
+    output.mkdir(mode=0o700)
+    print('Results: ' + str(output), flush=True)
+    observer = load_observer()
+    records = []
+    initial_restarts = None
+    with (output / 'observe.jsonl').open('x') as stream:
+        def sample():
+            nonlocal initial_restarts
+            record = observer.sample(prefix)
+            stream.write(json.dumps(record) + '\n')
+            stream.flush()
+            records.append(record)
+            restarts = check_sample(record)
+            if initial_restarts is None:
+                initial_restarts = restarts
+            elif restarts != initial_restarts:
+                raise ValueError('service restart detected during the benchmark')
+        sample()
+        common = [sys.executable, str(ROOT / 'scripts/pricetag/perf')]
+        subprocess.run(common + ['users', '--tokens', str(output / 'keys'), '--prefix', name,
+                       '--count', str(max(args.concurrency))], check=True, cwd='/tmp')
+        command = common + ['run', '--model', selected_model, '--url', 'https://localhost:8443', '--ca', str(DEPLOY / 'ca.pem'),
+                            '--tokens', str(output / 'keys'), '--concurrency', *map(str, args.concurrency),
+                            '--requests', str(args.requests), '--think', '0', '--output', str(output / 'requests.json')]
+        load = subprocess.Popen(command, cwd='/tmp')
+        try:
+            while load.poll() is None:
+                sample()
+                try:
+                    load.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    pass
+            if load.returncode:
+                raise ValueError('load test failed; inspect requests.json')
+        finally:
+            if load.poll() is None:
+                load.terminate()
+                try:
+                    load.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    load.kill()
+                    load.wait()
+        subprocess.run(common + ['verify', '--report', str(output / 'requests.json'),
+                       '--database', 'pricetag-db', '--service-user', 'praxis-svc'], check=True, cwd='/tmp')
+        sample()
+    report = json.loads((output / 'requests.json').read_text())
+    summary = {'result': 'passed', 'synthetic_provider': True, 'exact_accounting': True,
+               'phases': [{k: v for k, v in phase.items() if k != 'samples'} for phase in report['phases']],
+               'resource_samples': len(records),
+               'min_available_memory_kib': min(r['memory']['MemAvailable_kib'] for r in records),
+               'database_growth_bytes': records[-1]['postgres']['database_bytes'] - records[0]['postgres']['database_bytes'],
+               'wal_start_bytes': records[0]['postgres']['wal_directory_bytes'],
+               'wal_end_bytes': records[-1]['postgres']['wal_directory_bytes'],
+               'disk_available_change_bytes': records[-1]['disk_available_bytes'] - records[0]['disk_available_bytes'],
+               'new_service_restarts': 0}
+    (output / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
+    print('PASS: load, exact accounting and resource checks. Summary: ' + str(output / 'summary.json'))
+    print('Test keys are private under keys/. Revoke when no longer needed; usage history is retained.')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError, KeyboardInterrupt) as error:
+        raise SystemExit(f'Benchmark failed: {type(error).__name__}; inspect retained reports and host state') from None

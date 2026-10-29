@@ -1,6 +1,6 @@
 # Podman quickstart
 
-Use Bash on a RHEL 9 x86_64 host with **Podman already started and running**.
+Use Bash on a RHEL 9.8+ x86_64 host with **Podman already started and running**.
 For the model-call example, run from a reviewed repository checkout and have
 an OpenAI key and an accessible model ID ready. Target a first model response
 in under five minutes with cached images; initial image downloads add time.

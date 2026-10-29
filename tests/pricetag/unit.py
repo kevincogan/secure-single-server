@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import subprocess
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -37,6 +38,76 @@ maas_loader.exec_module(maas_key)
 
 
 class PreparationTest(unittest.TestCase):
+    def test_demo_installer_plan_and_input_validation(self):
+        command = [sys.executable, str(ROOT / 'scripts/pricetag/install-demo'), '--plan',
+                   '--hostname', 'gateway.example']
+        for component in ('praxis', 'maas', 'metering'):
+            command += ['--' + component + '-image', 'sha256:' + 'a' * 64]
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('synthetic providers', result.stdout)
+        command[4] = 'https://invalid.example/path'
+        result = subprocess.run(command, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+
+
+    def test_managed_mock_supports_authenticated_ui_routes(self):
+        original, models = prepare.mock_inputs(managed=True)
+        self.assertEqual([m['id'] for m in models], ['mock/fixture', 'mock/demo-cheap'])
+        self.assertTrue(all(m['provider'] == 'mock' for m in models))
+        result = prepare.render(original, models)
+        for chain in result['filter_chains']:
+            if chain['name'] not in ('openai', 'anthropic'):
+                continue
+            injection = next(f for f in chain['filters'] if f['filter'] == 'credential_injection')
+            self.assertEqual(injection['clusters'][0]['env_var'], 'CUSTOM_MOCK_API_KEY')
+            self.assertNotIn('synthetic-anthropic', json.dumps(result))
+
+
+    def test_access_policy_checks_rewritten_model_and_routes_require_alias(self):
+        original, models = prepare.mock_inputs()
+        models[0]['id'] = 'mock/fixture'
+        result = prepare.render(original, models)
+        for chain in result['filter_chains']:
+            if chain['name'] not in ('openai', 'anthropic'):
+                continue
+            access = next(f for f in chain['filters'] if f['filter'] == 'model_access')
+            self.assertEqual(access['models'], ['fixture'])
+            rejection = next(f for f in chain['filters'] if f.get('body') == 'Unknown model')
+            self.assertEqual(rejection['conditions'],
+                             [{'unless': {'headers': {'X-Gateway-Model': 'mock/fixture'}}}])
+
+    def test_admission_checks_the_requested_model(self):
+        original, models = prepare.mock_inputs()
+        result = prepare.render(original, models)
+        for chain in result['filter_chains']:
+            if chain['name'] in ('openai', 'anthropic'):
+                metering = next(f for f in chain['filters'] if f['filter'] == 'external_metering')
+                self.assertTrue(metering['model_policy_check'])
+                self.assertFalse(metering['fail_open'])
+
+    def test_admin_model_suggestions_use_dashboard_boundary(self):
+        original, models = prepare.mock_inputs()
+        result = prepare.render(original, models)
+        edge = next(c for c in result['filter_chains'] if c['name'] == 'edge')
+        guard = next(f for f in edge['filters'] if f.get('body') == 'Route not available')
+        self.assertIn({'unless': {'path': '/api/v1/admin/models'}}, guard['conditions'])
+        router = next(f for f in edge['filters'] if f['filter'] == 'router')
+        self.assertIn({'path': '/api/v1/admin/models', 'cluster': 'dashboard'}, router['routes'])
+
+    def test_pricing_management_routes_use_dashboard_authentication(self):
+        original, models = prepare.mock_inputs()
+        result = prepare.render(original, models)
+        edge = next(c for c in result['filter_chains'] if c['name'] == 'edge')
+        router = next(f for f in edge['filters'] if f['filter'] == 'router')
+        guard = next(f for f in edge['filters'] if f.get('body') == 'Route not available')
+        for path in ('/api/v1/admin/pricing-discounts', '/api/v1/admin/pricing/refresh',
+                     '/api/v1/admin/pricing/reprice', '/admin/impersonate'):
+            self.assertIn({'path': path, 'cluster': 'dashboard'}, router['routes'])
+            self.assertIn({'unless': {'path': path}}, guard['conditions'])
+        self.assertIn({'path_prefix': '/api/v1/admin/pricing/reprice/', 'cluster': 'dashboard'}, router['routes'])
+        self.assertNotIn({'path_prefix': '/api/v1/admin/', 'cluster': 'dashboard'}, router['routes'])
+
     def test_postgres_bootstrap_is_idempotent_and_quotes_generated_passwords(self):
         sql = prepare.postgres_bootstrap("metering'pw", 'maas-pw')
         self.assertEqual(sql.count('\\gexec'), 4)
@@ -124,6 +195,30 @@ class PreparationTest(unittest.TestCase):
         self.assertEqual(routes['/v1/messages'], 'authenticated-anthropic')
         self.assertEqual(routes['/v1/responses'], 'authenticated-openai')
         self.assertTrue(models)
+
+    def test_single_api_keeps_other_api_authenticated_and_disabled(self):
+        for enabled in ('openai', 'anthropic'):
+            with self.subTest(enabled=enabled):
+                original, models = prepare.mock_inputs()
+                for model in models:
+                    model['apis'] = [enabled]
+                rendered = prepare.render(original, models)
+                chains = {c['name']: c['filters'] for c in rendered['filter_chains']}
+                for api in ('openai', 'anthropic'):
+                    filters = chains[api]
+                    self.assertEqual(filters[0]['filter'], 'api_key_auth')
+                    access = [f for f in filters if f['filter'] == 'model_access']
+                    if api == enabled:
+                        self.assertEqual(access[0]['models'], [m['id'] for m in models])
+                    else:
+                        self.assertEqual(access, [])
+                        self.assertEqual(filters[-1]['filter'], 'static_response')
+                        self.assertEqual(filters[-1]['status'], 404)
+                        self.assertTrue(any(f['filter'] == 'static_response' and
+                                            f.get('status') == 404 and not f.get('conditions')
+                                            for f in filters))
+                        self.assertFalse(any(f['filter'] in ('router', 'load_balancer', 'external_metering')
+                                             for f in filters))
 
     def test_internal_model_headers_survive_router_selection_then_are_removed_before_upstream(self):
         original, models = prepare.mock_inputs()
@@ -258,7 +353,10 @@ class HarnessTest(unittest.TestCase):
         messages_model = {'id': 'pricetag/claude-sonnet-5', 'praxis': {
             'provider': 'pricetag', 'upstream_model': 'claude-sonnet-5',
             'context': 128000, 'output': 8192, 'apis': ['anthropic']}}
-        rows = [self.model, openai_model, messages_model]
+        external_gpt = copy.deepcopy(openai_model)
+        external_gpt['id'] = 'pricetag/gpt-6-luna'
+        external_gpt['praxis']['provider'] = 'pricetag'
+        rows = [self.model, openai_model, messages_model, external_gpt]
         selected = self.preview('opencode', catalog_rows=rows)
         config = json.loads(selected['environment']['OPENCODE_CONFIG_CONTENT'])
         self.assertEqual(config['model'], 'praxis-openai/' + self.model['id'])
@@ -272,6 +370,13 @@ class HarnessTest(unittest.TestCase):
                          {'context': 1050000, 'output': 128000})
         self.assertEqual(anthropic['models'][messages_model['id']]['limit'],
                          {'context': 128000, 'output': 8192})
+        gpt = openai['models'][openai_model['id']]
+        self.assertEqual(gpt['provider']['npm'], '@ai-sdk/openai')
+        self.assertEqual(openai['models'][external_gpt['id']]['provider'], gpt['provider'])
+        self.assertNotIn('provider', anthropic['models'][messages_model['id']])
+        self.assertTrue(gpt['reasoning'])
+        self.assertFalse(gpt['options']['store'])
+        self.assertEqual(gpt['options']['include'], ['reasoning.encrypted_content'])
         self.assertIn(self.model['id'], openai['models'])
         self.assertIn(self.model['id'], anthropic['models'])
         selected = self.preview('codex')

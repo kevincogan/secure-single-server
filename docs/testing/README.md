@@ -3,6 +3,13 @@
 > **Where this fits:** The evidence stop. Return here after every deployment or
 > configuration change.
 
+## MaaS and PriceTag benchmarks
+
+[Set up a mock host and run benchmarks](pricetag-perf.md) with configurable
+concurrency and request counts, accounting verification and resource sampling.
+For real-provider installation and administration, use the official
+[MaaS and PriceTag guide](../quickstarts/remote-gateway-pricetag/README.md).
+
 ## AWS RHEL workflow
 
 For a fresh VM and manual use, follow the [official installation sequence](aws.md#6-install-services-and-test)
@@ -41,7 +48,7 @@ References, as needed:
 ## OpenShell harness model and tool checks
 
 The active OpenShell pins and release compatibility are reviewed in
-[OpenShell 0.1.4](upgrade-0.1.4.md). The
+[OpenShell 0.1.5](upgrade-0.1.5.md). The
 [OpenShell 0.1.3 upgrade qualification](upgrade-0.1.3.md) remains historical
 AWS OpenCode and OpenClaw evidence with controlled model fixtures and its
 coverage limits.
@@ -90,7 +97,9 @@ Other environments:
 
 The pinned Praxis and Valkey images include amd64 and arm64. Container tests
 compare the image architecture with the engine host; emulation does not qualify
-native deployment. The mutable vLLM workflow requires RHEL 9 x86_64.
+native deployment. The mutable vLLM workflow requires RHEL 9 x86_64. OpenShell
+runtime checks and deployment qualification require RHEL 9.8+; the tested
+baseline is Podman 5.8.2.
 
 [CI](https://github.com/redhat-et/secure-single-server/blob/main/.github/workflows/validate.yml) runs static checks and container
 contracts on native amd64 and arm64 Linux runners with synthetic credentials.
@@ -99,7 +108,8 @@ RHEL architecture, profile and harness/model combination separately.
 
 ## OpenShell and bootc
 
-These workflows target RHEL 9 x86_64. Run their offline checks on Linux with
+These workflows target RHEL 9 x86_64. OpenShell runtime qualification requires
+RHEL 9.8+ with Podman 5.8.2. Run offline checks on Linux with
 Bash 4+ (the macOS system Bash 3.2 cannot run all bootc/static checks):
 
 ```console

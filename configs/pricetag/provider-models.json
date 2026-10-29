@@ -14,28 +14,48 @@
       "gpt-6.1-sol",
       1050000,
       128000
-    ]
-  ],
-  "anthropic": [
-    [
-      "Inferact/Qwen3.8-Flash-Next-NVFP4",
-      128000,
-      8192
     ],
     [
-      "claude-sonnet-5",
-      128000,
-      8192
-    ],
-    [
-      "claude-opus-4-8",
-      128000,
-      8192
+      "gpt-6-astra",
+      1050000,
+      128000
     ],
     [
       "rits/zai-org/glm-5-3",
       262144,
       65536
+    ],
+    [
+      "rits/deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      1000000,
+      384000
+    ]
+  ],
+  "anthropic": [
+    [
+      "claude-sonnet-5-5",
+      1000000,
+      128000
+    ],
+    [
+      "claude-opus-5-5",
+      1000000,
+      128000
+    ],
+    [
+      "claude-haiku-5-5",
+      1000000,
+      128000
+    ],
+    [
+      "rits/zai-org/glm-5-3",
+      262144,
+      65536
+    ],
+    [
+      "rits/deepseek-ai/DeepSeek-V4.1-Flash-1017",
+      1000000,
+      384000
     ]
   ]
 }

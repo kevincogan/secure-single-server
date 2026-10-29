@@ -96,6 +96,6 @@ turning "restrictions we documented" into "delegated task patterns we
 validated":
 
 1. Review as a service — `pr-review` profile, task driver, report
-   collector ([review service design](review-service.md)).
+   collector ([review service design](../examples/review-service/README.md)).
 2. Issue digest automation on the `automation` profile.
 3. Codemod patch loop on the `dev` profile.

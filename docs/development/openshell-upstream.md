@@ -20,6 +20,7 @@ this table.
 | --- | --- | --- | --- |
 | `v0.1.3` | Reviewed | Historical baseline pin; coordinated runtime images and CLI checksums were qualified by the OpenShell test lanes. | No listed usage surfaces affected. |
 | `v0.1.4` | Reviewed | [PR 68](https://github.com/redhat-et/secure-single-server/pull/68) moved the coordinated gateway, supervisor, sandbox, CLI, and prover pins together and checked release assets and manifest digests. See the [compatibility review](../testing/upgrade-0.1.4.md). | Affected usage surfaces: Gateway configuration schema; Supervisor network path; Workload images and CLI checksums. |
+| `v0.1.5` | Reviewed | [Release notes](https://github.com/NVIDIA/OpenShell/releases/tag/v0.1.5): coordinated pins, push config delivery, OCSF JSONL naming and gateway authentication events. See the [compatibility review](../testing/upgrade-0.1.5.md). | Affected usage surfaces: Gateway configuration schema; OCSF audit output; Workload images and CLI checksums. |
 
 ## Usage-surface register
 
@@ -33,11 +34,12 @@ Do not bump `OPENSHELL_CLI_VERSION` without that reviewed declaration.
 | Usage surface | Known upstream changes to carry forward | Downstream evidence |
 | --- | --- | --- |
 | `sandbox create` flags, resources, and templates | [#3727](https://github.com/NVIDIA/OpenShell/pull/3727) changed gateway WebSocket behavior; template/resource flags remain part of every release review. | `openshell/tests/regressions.py`, `openshell/tests/templates.py` |
-| Gateway configuration schema and version | Watch schema-version changes, WebSocket opt-in behavior, and authentication settings. v0.1.4 requires `[openshell]` `version = 2`; the template already uses it and keeps `operator_enabled = false`. | `openshell/configs/gateway/gateway.toml.in`, `openshell/tests/gateway.py`, `docs/testing/upgrade-0.1.4.md` |
+| Gateway configuration schema and version | Watch schema-version changes, WebSocket opt-in behavior, and authentication settings. v0.1.4 requires `[openshell]` `version = 2`; v0.1.5 adds optional `config_delivery_mode = "push"`. Keep polling until live sandbox policy updates pass AWS runtime qualification. The template keeps `operator_enabled = false`. | `openshell/configs/gateway/gateway.toml.in`, `openshell/tests/gateway.py`, `docs/testing/upgrade-0.1.5.md` |
 | Policy schema and sandbox-local loopback | [#3740](https://github.com/NVIDIA/OpenShell/pull/3740) clarified sandbox-local loopback access. | `openshell/tests/policy-boundary.py`, policy schema tests |
 | Supervisor network path and CONNECT/REST handling | [#3745](https://github.com/NVIDIA/OpenShell/pull/3745) changed mediated CONNECT header handling. v0.1.4 adds consistent HTTP framing and sandbox upload backpressure; the CLI and supervisor are upgraded together. | `tests/openshell-praxis/*`, `tests/common/contracts.py`, `docs/testing/upgrade-0.1.4.md` |
 | Orphan and process lifecycle behavior | [#3757](https://github.com/NVIDIA/OpenShell/pull/3757) changed sandbox orphan reaping. | `openshell/tests/cleanup.py`, runtime qualification |
-| Workload images and CLI checksums | Every pin must keep coordinated image digests and amd64/arm64 CLI checksums together. The v0.1.4 release manifest, image digests, CLI checksums, and pinned prover were checked together. | `openshell/configs/images.env`, `openshell/configs/releases/v0.1.4.json`, `openshell/tests/openshell-static.sh` |
+| OCSF audit output | v0.1.5 changes OCSF file names to `.jsonl` and can emit gateway authentication events through the optional gateway file sink. Do not conflate gateway auth events with sandbox network denials. | `docs/testing/upgrade-0.1.5.md`; optional sink is not enabled by default |
+| Workload images and CLI checksums | Every pin keeps coordinated image digests and amd64/arm64 CLI/prover checksums together. The v0.1.5 release manifest records the checked release assets and GHCR digests. | `openshell/configs/images.env`, `openshell/configs/releases/v0.1.5.json`, `openshell/tests/openshell-static.sh` |
 
 ## Pin-bump procedure
 

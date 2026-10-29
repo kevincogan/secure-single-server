@@ -25,27 +25,26 @@ for var in ODH_OPENCODE_IMAGE ODH_CODEX_IMAGE; do
 done
 [[ "${ODH_OPENCLAW_IMAGE}" =~ ^ghcr\.io/openclaw/openclaw@sha256:[a-f0-9]{64}$ ]] \
   || fail 'OpenClaw must use a valid digest-pinned upstream image'
-[[ "${OPENSHELL_CLI_VERSION}" == v0.1.4 ]] || fail 'CLI release must match the control plane'
+[[ "${OPENSHELL_CLI_VERSION}" == v0.1.5 ]] || fail 'CLI release must match the control plane'
 for digest in "${OPENSHELL_CLI_SHA256_AMD64}" "${OPENSHELL_CLI_SHA256_ARM64}"; do
   [[ "${digest}" =~ ^[a-f0-9]{64}$ ]] || fail 'CLI checksum missing or malformed'
 done
-[[ "${OPENSHELL_PROVER_VERSION}" == v0.1.4 ]] || fail 'prover release must match the control plane'
+[[ "${OPENSHELL_PROVER_VERSION}" == v0.1.5 ]] || fail 'prover release must match the control plane'
 [[ "${OPENSHELL_PROVER_SHA256_AMD64}" =~ ^[a-f0-9]{64}$ ]] \
   || fail 'prover checksum missing or malformed'
-arm64_prover_variable=OPENSHELL_PROVER_SHA256_ARM64
-[[ -z "${!arm64_prover_variable:-}" ]] \
-  || fail 'the reviewed v0.1.4 prover is AMD64-only; remove the ARM64 checksum'
-python3 - "${OS_DIR}/configs/releases/v0.1.4.json" \
+[[ "${OPENSHELL_PROVER_SHA256_ARM64:-}" =~ ^[a-f0-9]{64}$ ]] \
+  || fail 'prover ARM64 checksum missing or malformed'
+python3 - "${OS_DIR}/configs/releases/v0.1.5.json" \
   "${ODH_GATEWAY_IMAGE}" "${ODH_SUPERVISOR_IMAGE}" "${ODH_SANDBOX_IMAGE}" \
   "${OPENSHELL_CLI_SHA256_AMD64}" "${OPENSHELL_CLI_SHA256_ARM64}" \
-  "${OPENSHELL_PROVER_SHA256_AMD64}" <<'PY' || fail 'pins do not match the reviewed v0.1.4 release manifest'
+  "${OPENSHELL_PROVER_SHA256_AMD64}" "${OPENSHELL_PROVER_SHA256_ARM64}" <<'PY' || fail 'pins do not match the reviewed v0.1.5 release manifest'
 import json
 import sys
 
 with open(sys.argv[1]) as manifest_file:
     manifest = json.load(manifest_file)
-if manifest.get("prover_architectures") != ["amd64"]:
-    raise SystemExit("the reviewed prover manifest must be AMD64-only")
+if manifest.get("prover_architectures") != ["amd64", "arm64"]:
+    raise SystemExit("the reviewed prover manifest must cover AMD64 and ARM64")
 # Compare the reviewed manifest against the values sourced from images.env.
 # They are passed as arguments because sourced-but-unexported variables are
 # invisible to os.environ in this subprocess.
@@ -56,11 +55,25 @@ expected = {
     "OPENSHELL_CLI_SHA256_AMD64": (manifest["cli_sha256"]["amd64"], sys.argv[5]),
     "OPENSHELL_CLI_SHA256_ARM64": (manifest["cli_sha256"]["arm64"], sys.argv[6]),
     "OPENSHELL_PROVER_SHA256_AMD64": (manifest["prover_sha256"]["amd64"], sys.argv[7]),
+    "OPENSHELL_PROVER_SHA256_ARM64": (manifest["prover_sha256"]["arm64"], sys.argv[8]),
 }
 mismatched = [name for name, (want, got) in expected.items() if got != want]
 if mismatched:
     raise SystemExit("mismatched pins: " + ", ".join(mismatched))
 PY
+
+# 1c. The prover workflow consumes the reviewed version and checksum from
+# images.env, rather than maintaining an unchecked duplicate pin.
+prover_workflow="${ROOT}/.github/workflows/openshell-validate.yml"
+grep -Fq 'source openshell/configs/images.env' "${prover_workflow}" \
+  || fail 'prover workflow must source the shared image pins'
+grep -Fq "\${OPENSHELL_PROVER_VERSION}" "${prover_workflow}" \
+  || fail 'prover workflow must use the shared version'
+grep -Fq "\${OPENSHELL_PROVER_SHA256_AMD64}" "${prover_workflow}" \
+  || fail 'prover workflow must use the shared AMD64 checksum'
+if grep -Eq '^[[:space:]]*OPENSHELL_PROVER_(VERSION|SHA256)=' "${prover_workflow}"; then
+  fail 'prover workflow must not duplicate a prover pin'
+fi
 
 # 2. All shell scripts under openshell/ pass shellcheck.
 command -v shellcheck >/dev/null 2>&1 || fail "shellcheck is required"

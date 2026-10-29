@@ -6,7 +6,7 @@ PR; it has no credentials and no write access to GitHub. Reports are
 collected to the operator's machine over the same SSH channel that installed
 the harness configuration — no `podman cp` or host login required.
 
-Design rationale: [sandbox use-case analysis](sandbox-use-case-analysis.md).
+Design rationale: [sandbox use-case analysis](../../development/sandbox-use-case-analysis.md).
 
 ## Security model
 
@@ -101,7 +101,7 @@ Praxis gateway, not provider APIs directly, so always pass the
 model ID when creating.
 
 The instructions the agent follows
-([review-agents.md](../../openshell/harnesses/opencode/review-agents.md))
+([review-agents.md](../../../openshell/harnesses/opencode/review-agents.md))
 are pushed into the sandbox on every review turn, so updating them in the
 repository is enough — no sandbox recreation.
 
@@ -148,7 +148,7 @@ One file per PR, `~/reports/pr-N.md`, always written — including a failure
 report when a step (clone, rate limit, unfetchable ref) goes wrong. Verdict
 is one of `approve`, `comment`, `request-changes`; every finding carries
 file, line, severity, and a suggested fix. The full contract lives in
-[review-agents.md](../../openshell/harnesses/opencode/review-agents.md).
+[review-agents.md](../../../openshell/harnesses/opencode/review-agents.md).
 
 ## Limitations
 

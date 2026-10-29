@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Plot sanitized capacity reports. Requires matplotlib; never reads key files."""
+import argparse
+import json
+from pathlib import Path
+import re
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
+
+def memory_mb(value):
+    match=re.match(r'([\d.]+)\s*([A-Za-z]+)',value)
+    if not match: return 0
+    return float(match[1])*{'B':1e-6,'kB':1e-3,'KB':1e-3,'MB':1,'GB':1000,'KiB':.001024,'MiB':1.048576,'GiB':1073.741824}[match[2]]
+
+
+def cpu_seconds(value):
+    units={'h':3600,'m':60,'s':1,'ms':1e-3,'us':1e-6,'µs':1e-6,'μs':1e-6,'ns':1e-9}
+    return sum(float(number)*units[unit] for number,unit in re.findall(r'([\d.]+)(ns|µs|μs|us|ms|s|m|h)',value))
+
+
+def cpu(samples):
+    result=[]
+    for a,b in zip(samples,samples[1:]):
+        x,y=a['cpu_ticks'][:8],b['cpu_ticks'][:8]
+        total=sum(y)-sum(x)
+        idle=(y[3]+y[4])-(x[3]+x[4])
+        result.append((b['monotonic_seconds'],100*(total-idle)/total if total else 0))
+    return result
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('report',type=Path)
+    parser.add_argument('--output',required=True,type=Path)
+    args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
+    cases=[]
+    if args.report.is_file():
+        input_cases=json.loads(args.report.read_text())['cases']
+    else:
+        input_cases=[]
+        for path in sorted(args.report.glob('r*-u*-l*/requests.json')):
+            report=json.loads(path.read_text())
+            input_cases.append({'name':path.parent.name,'phase':report['phases'][0],
+                'connection_policy':report.get('connection_policy','new TLS connection per request'),
+                'rows':[json.loads(line) for line in (path.parent/'observe.jsonl').read_text().splitlines()]})
+    policies={item.get('connection_policy','new TLS connection per request') for item in input_cases}
+    connection_label='; '.join(sorted(policies))
+    for item in input_cases:
+        phase=item['phase']; rows=item['rows']
+        rate=int(item['name'].split('-')[0][1:])
+        loads=[r for r in rows if phase['started_monotonic']<=r['monotonic_seconds']<=phase['ended_monotonic']] or rows
+        components={}
+        for r in loads:
+            for c in r.get('containers',[]):
+                if not isinstance(c,dict):continue
+                name=c['name'];v=components.setdefault(name,{'peak_mb':0,'peak_cpu_percent':0})
+                v['peak_mb']=max(v['peak_mb'],memory_mb(c['mem_usage']))
+        for before,after in zip(rows,rows[1:]):
+            elapsed=after['monotonic_seconds']-before['monotonic_seconds']
+            previous={c['name']:cpu_seconds(c['cpu_time']) for c in before['containers']}
+            for c in after['containers']:
+                delta=cpu_seconds(c['cpu_time'])-previous.get(c['name'],0)
+                if elapsed>0 and delta>=0 and c['name'] in components:
+                    components[c['name']]['peak_cpu_percent']=max(components[c['name']]['peak_cpu_percent'],100*delta/elapsed)
+        cases.append({'rate':rate,'label':f"{phase['users']}×{phase['lanes_per_user']}",'phase':phase,'rows':rows,'components':components,
+            'host_peak_cpu':max((v for _,v in cpu(rows)),default=0),
+            'host_peak_used_gib':max((r['memory']['MemTotal_kib']-r['memory']['MemAvailable_kib'])/1048576 for r in loads),
+            'db_growth_mib':(rows[-1]['postgres']['database_bytes']-rows[0]['postgres']['database_bytes'])/1048576})
+    if not cases:raise ValueError('no completed phase reports')
+    plt.rcParams.update({'font.size':9,'axes.spines.top':False,'axes.spines.right':False})
+    fig,axes=plt.subplots(2,3,figsize=(15,8),layout='constrained')
+    for rate in sorted({c['rate'] for c in cases}):
+        selected=sorted((c for c in cases if c['rate']==rate),key=lambda c:c['phase']['in_flight_limit'])
+        xs=[c['phase']['in_flight_limit'] for c in selected]
+        series=[([c['phase']['successful_requests_per_second'] for c in selected],'Accepted requests / second'),
+                ([c['phase']['p95_seconds'] for c in selected],'p95 completion (seconds)'),
+                ([100*(c['phase']['attempts']-c['phase']['successes'])/c['phase']['attempts'] for c in selected],'Non-successful attempts (%)'),
+                ([c['host_peak_cpu'] for c in selected],'Peak sampled host CPU busy (%)'),
+                ([c['host_peak_used_gib'] for c in selected],'Peak host memory unavailable (GiB)'),
+                ([c['db_growth_mib'] for c in selected],'Database growth per phase (MiB)')]
+        for ax,(values,title) in zip(axes.flat,series):
+            ax.plot(xs,values,'o-',label=f'{rate} req/s; burst {4*rate}')
+            ax.set(title=title,xlabel='Maximum simultaneous requests');ax.grid(alpha=.2)
+            if ax is axes[0,0] and rate==max(c['rate'] for c in cases):
+                for x,y,c in zip(xs,values,selected):
+                    offset=(-12,12) if x==16 else ((8,-13) if x==20 else (3,5))
+                    ax.annotate(c['label'],(x,y),xytext=offset,textcoords='offset points',fontsize=8)
+    for ax in axes.flat: ax.set_ylim(bottom=0)
+    axes[1,0].set_ylim(0,100)
+    axes[0,0].legend(fontsize=8)
+    fig.suptitle('Mock gateway capacity — labels are users × simultaneous requests per user\nGenerator and mock LLM share the RHEL host; '+connection_label,fontsize=12)
+    for ext in ('png','svg'):fig.savefig(args.output/('capacity-summary.'+ext),dpi=160)
+    plt.close(fig)
+    names=sorted({n for c in cases for n in c['components']})
+    fig,axes=plt.subplots(2,1,figsize=(15,8),layout='constrained')
+    ordered=sorted(cases,key=lambda c:c['phase']['started_monotonic'])
+    labels=[f"{c['rate']} r/s\n{c['label']}" for c in ordered]
+    for name in names:
+        axes[0].plot(labels,[c['components'].get(name,{}).get('peak_mb',0) for c in ordered],'o-',label=name)
+        axes[1].plot(labels,[c['components'].get(name,{}).get('peak_cpu_percent',0) for c in ordered],'o-',label=name)
+    axes[0].set(ylabel='Peak reported container memory (MB)',title='Per-container reported memory')
+    axes[1].set(ylabel='Sampled CPU % (100% = one CPU)',title='Per-container CPU counter deltas')
+    for ax in axes:ax.grid(alpha=.2);ax.legend(fontsize=8)
+    fig.suptitle('Component resource use; includes synthetic backend, excludes load generator from container series')
+    for ext in ('png','svg'):fig.savefig(args.output/('capacity-components.'+ext),dpi=160)
+    plt.close(fig)
+    fig,axes=plt.subplots(3,1,figsize=(15,9),layout='constrained')
+    start=min(c['rows'][0]['monotonic_seconds'] for c in cases)
+    for c in ordered:
+        rows=c['rows'];times=[(r['monotonic_seconds']-start)/60 for r in rows]
+        busy=cpu(rows)
+        axes[0].plot([(t-start)/60 for t,_ in busy],[v for _,v in busy])
+        axes[1].plot(times,[r['memory']['MemAvailable_kib']/1048576 for r in rows])
+        axes[2].plot(times,[r['postgres']['wal_directory_bytes']/1048576 for r in rows])
+        for ax in axes:
+            ax.axvspan((c['phase']['started_monotonic']-start)/60,(c['phase']['ended_monotonic']-start)/60,alpha=.07)
+            ax.grid(alpha=.2)
+    for ax,label in zip(axes,['Host CPU busy (%)','Available memory (GiB)','PostgreSQL WAL directory (MiB)']):ax.set(ylabel=label,xlabel='Minutes since first observation')
+    fig.suptitle('RHEL resource timeline; shaded intervals are load phases')
+    for ext in ('png','svg'):fig.savefig(args.output/('capacity-timeline.'+ext),dpi=160)
+    for c in cases:c.pop('rows');c['phase'].pop('samples',None)
+    (args.output/'measurements.json').write_text(json.dumps(cases,indent=2)+'\n')
+
+
+if __name__=='__main__':main()

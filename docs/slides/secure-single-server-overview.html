@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Single-Server AI Harness</title>
+  <link href="https://cdn.jsdelivr.net/npm/@rhds/tokens@3.0.2/css/global.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;700;900&family=Red+Hat+Text:wght@400;500;700&family=Red+Hat+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* === RESET & BASE === */
+    :root { color-scheme: dark; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* === COLOR VARIABLES (Core Dark) === */
+    :root {
+      --bg-primary: #000000;
+      --bg-secondary: #1f1f1f;
+      --bg-surface: #292929;
+      --text-primary: #ffffff;
+      --text-secondary: #c7c7c7;
+      --text-muted: #a3a3a3;
+      --accent: #ee0000;
+      --accent-dark: #a60000;
+      --accent-light: #f56e6e;
+      --tag-border: #383838;
+      --icon-filter: brightness(0) invert(1);
+      --icon-filter-accent: invert(12%) sepia(100%) saturate(10000%) hue-rotate(0deg) brightness(95%);
+
+      /* === TYPOGRAPHY === */
+      --font-display: var(--rh-font-family-heading, 'Red Hat Display', sans-serif);
+      --font-body: var(--rh-font-family-body-text, 'Red Hat Text', sans-serif);
+      --font-mono: var(--rh-font-family-code, 'Red Hat Mono', monospace);
+    }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: var(--rh-font-size-body-text-lg, 1.125rem);
+      line-height: 1.5;
+    }
+    .accent { color: var(--accent); }
+
+    /* === LOGO STYLES === */
+    .rh-logo { height: 28px; width: auto; }
+    .rh-logo.small { height: 20px; }
+    .rh-logo.large { height: 40px; }
+
+    /* === ICON STYLES === */
+    .rh-icon { height: 48px; width: 48px; filter: var(--icon-filter); vertical-align: middle; }
+    .rh-icon.small { height: 24px; width: 24px; }
+    .rh-icon.medium { height: 48px; width: 48px; }
+    .rh-icon.large { height: 64px; width: 64px; }
+    .rh-icon.xl { height: 96px; width: 96px; }
+    .rh-icon.accent { filter: var(--icon-filter-accent); }
+
+    /* === SLIDE CONTAINER === */
+    .deck { position: fixed; inset: 0; }
+    .slide {
+      position: absolute; inset: 0;
+      display: none; flex-direction: column; justify-content: center; justify-content: safe center;
+      gap: var(--rh-space-lg, 24px);
+      padding: var(--rh-space-4xl, 80px) var(--rh-space-3xl, 64px);
+      background: var(--bg-primary);
+      overflow-x: hidden; overflow-y: auto;
+    }
+    .slide > * { position: relative; z-index: 1; }
+    .slide::before {
+      content: ''; position: absolute; top: -20%; right: -10%; width: 60%; height: 60%;
+      background: radial-gradient(ellipse, rgba(238,0,0,0.08) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .slide.glow-left::before { right: auto; left: -15%; top: auto; bottom: -20%; }
+    .slide.glow-strong::before { background: radial-gradient(ellipse, rgba(238,0,0,0.16) 0%, transparent 70%); width: 80%; height: 80%; }
+    .slide::after {
+      content: ''; position: absolute; left: 0; top: 0; width: 6px; height: 64px;
+      background: var(--accent); z-index: 1;
+    }
+
+    /* === SLIDE TYPES === */
+    .slide-label {
+      font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem);
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);
+      display: flex; align-items: center; gap: var(--rh-space-sm, 8px);
+    }
+    .slide-label::before { content: ''; width: 32px; height: 2px; background: var(--accent); }
+    .headline-xl, .headline-lg, .headline-md { font-family: var(--font-display); font-weight: 900; letter-spacing: -0.02em; }
+    .headline-xl { font-size: clamp(2.4rem, 5.2vw, 4.2rem); line-height: 1.05; }
+    .headline-lg { font-size: clamp(1.8rem, 3.6vw, 3rem); line-height: 1.1; max-width: 1100px; }
+    .headline-md { font-size: clamp(1.3rem, 2.2vw, 1.9rem); line-height: 1.15; }
+    .subtitle, .body-text { font-size: var(--rh-font-size-body-text-xl, 1.25rem); color: var(--text-secondary); max-width: 900px; line-height: 1.5; }
+    .body-text { font-size: var(--rh-font-size-body-text-lg, 1.125rem); }
+    .breadcrumb {
+      font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem);
+      color: var(--text-muted); display: flex; align-items: center;
+    }
+    .slide > .breadcrumb { position: absolute; top: var(--rh-space-xl, 32px); left: var(--rh-space-3xl, 64px); }
+    .breadcrumb span { margin-left: var(--rh-space-sm, 8px); }
+    .attribution { font-size: var(--rh-font-size-body-text-sm, 0.875rem); color: var(--text-muted); }
+    .slide > .attribution { position: absolute; bottom: var(--rh-space-xl, 32px); left: var(--rh-space-3xl, 64px); }
+    .source { font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem); color: var(--text-muted); margin-top: var(--rh-space-md, 16px); }
+    .tags { display: flex; flex-wrap: wrap; gap: var(--rh-space-sm, 8px); }
+    .tag {
+      display: inline-block; padding: var(--rh-space-xs, 4px) var(--rh-space-md, 16px);
+      border: var(--rh-border-width-sm, 1px) solid var(--tag-border);
+      border-radius: var(--rh-border-radius-pill, 64px);
+      font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem);
+      letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary);
+    }
+    .tag.accent { border-color: var(--accent); color: var(--accent); }
+    code, .mono { font-family: var(--font-mono); font-size: 0.9em; color: var(--text-primary); }
+
+    .bullet-list { list-style: none; display: flex; flex-direction: column; gap: var(--rh-space-md, 16px); max-width: 960px; }
+    .bullet-list li { position: relative; padding-left: 28px; color: var(--text-secondary); font-size: var(--rh-font-size-body-text-lg, 1.125rem); }
+    .bullet-list li::before { content: ''; position: absolute; left: 0; top: 0.75em; width: 14px; height: 2px; background: var(--accent); }
+    .bullet-list li strong { color: var(--text-primary); font-weight: 700; }
+
+    .big-number-wrap { display: flex; align-items: center; gap: var(--rh-space-3xl, 64px); }
+    .big-number { font-family: var(--font-display); font-weight: 900; font-size: clamp(7rem, 20vw, 15rem); line-height: 0.9; letter-spacing: -0.03em; color: var(--accent); }
+    .big-number-context { font-size: var(--rh-font-size-heading-md, 1.5rem); color: var(--text-secondary); max-width: 560px; }
+
+    .compare-grid, .proof-grid { display: grid; gap: var(--rh-space-lg, 24px); }
+    .compare-grid { grid-template-columns: 1fr 1fr; }
+    .proof-grid { grid-template-columns: repeat(2, 1fr); }
+    .proof-grid.three { grid-template-columns: repeat(3, 1fr); }
+    .compare-col, .proof-card {
+      background: rgba(41,41,41,0.6); border: var(--rh-border-width-sm, 1px) solid var(--tag-border);
+      border-radius: var(--rh-border-radius-default, 3px); padding: var(--rh-space-lg, 24px);
+      box-shadow: var(--rh-box-shadow-md, 0 4px 6px 1px rgba(21,21,21,0.25));
+    }
+    .compare-col.winner { border-color: var(--accent); }
+    .compare-col h3, .proof-card h4 { font-family: var(--font-display); font-weight: 700; font-size: var(--rh-font-size-heading-sm, 1.25rem); color: var(--text-primary); margin: var(--rh-space-sm, 8px) 0; }
+    .compare-col .lead, .proof-card .proof-title { font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+    .compare-col.winner .lead, .proof-card .proof-title { color: var(--accent); }
+    .compare-col p, .proof-card p { color: var(--text-secondary); font-size: var(--rh-font-size-body-text-md, 1rem); }
+    .compare-col .bullet-list li, .compare-col .bullet-list { font-size: var(--rh-font-size-body-text-md, 1rem); }
+    .compare-col .bullet-list { gap: var(--rh-space-sm, 8px); }
+    .proof-card { border-left: 3px solid var(--accent); }
+
+    .flow { display: flex; align-items: stretch; gap: var(--rh-space-sm, 8px); }
+    .flow-node {
+      flex: 1; background: rgba(31,31,31,0.8); border: var(--rh-border-width-sm, 1px) solid #383838;
+      border-radius: var(--rh-border-radius-default, 3px); padding: var(--rh-space-md, 16px);
+      box-shadow: var(--rh-box-shadow-md, 0 4px 6px 1px rgba(21,21,21,0.25));
+    }
+    .flow-node.key { border-color: var(--accent); background: rgba(238,0,0,0.06); }
+    .flow-node h4 { font-family: var(--font-display); font-weight: 700; font-size: var(--rh-font-size-heading-sm, 1.25rem); margin: var(--rh-space-xs, 4px) 0; }
+    .flow-node p { color: var(--text-secondary); font-size: var(--rh-font-size-body-text-sm, 0.875rem); }
+    .flow-node .arch-tag { font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+    .flow-arrow { align-self: center; color: var(--accent); font-size: 1.75rem; font-family: var(--font-mono); }
+
+    .steps { list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: var(--rh-space-md, 16px); max-width: 960px; }
+    .steps li { counter-increment: s; display: flex; gap: var(--rh-space-md, 16px); align-items: baseline; color: var(--text-secondary); }
+    .steps li::before { content: counter(s); font-family: var(--font-display); font-weight: 900; font-size: 1.75rem; color: var(--accent); min-width: 32px; }
+    .steps li strong { color: var(--text-primary); }
+    .link-row { font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-sm, 0.875rem); color: var(--text-secondary); }
+
+    /* Title slide */
+    .title-slide .headline-xl { max-width: 1000px; }
+    .title-slide .headline-xl .accent { font-style: italic; }
+    .logo-footer { display: flex; justify-content: center; margin-top: var(--rh-space-xl, 32px); }
+    .thank-you-slide { align-items: center; justify-content: center; justify-content: safe center; text-align: center; }
+    .thank-you-slide .author-block { color: var(--text-secondary); font-size: var(--rh-font-size-body-text-lg, 1.125rem); }
+    .thank-you-slide .author-block .name { color: var(--text-primary); font-weight: 700; font-size: var(--rh-font-size-heading-sm, 1.25rem); }
+    .thank-you-slide .contact { font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-sm, 0.875rem); color: var(--text-muted); }
+
+    /* === NAVIGATION === */
+    .controls {
+      position: fixed; bottom: var(--rh-space-md, 16px); right: var(--rh-space-xl, 32px); left: var(--rh-space-xl, 32px);
+      display: flex; justify-content: space-between; align-items: center; z-index: 20; pointer-events: none;
+    }
+    .nav-hint, .progress { font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem); color: var(--text-muted); }
+    .progress .current { color: var(--accent); font-weight: 700; }
+    .slide > .attribution { bottom: var(--rh-space-2xl, 48px); }
+
+    /* === CONTEXTUAL NOTES PANEL === */
+    .notes-panel {
+      position: fixed; right: 0; top: 0; bottom: 0; width: min(420px, 90vw);
+      background: rgba(31,31,31,0.97); border-left: 2px solid var(--accent);
+      padding: var(--rh-space-xl, 32px) var(--rh-space-lg, 24px); overflow-y: auto; z-index: 30;
+      transform: translateX(100%); transition: transform 0.25s ease;
+      font-size: var(--rh-font-size-body-text-sm, 0.875rem); color: var(--text-secondary);
+    }
+    .notes-panel.visible { transform: translateX(0); }
+    .notes-panel p { margin-bottom: var(--rh-space-md, 16px); }
+    .notes-panel a { color: var(--accent-light); }
+    .notes-panel .note-tag { font-family: var(--font-mono); font-size: var(--rh-font-size-body-text-xs, 0.75rem); color: var(--accent); }
+
+    /* === ANIMATIONS === */
+    .slide.active .animate-in { animation: fadeSlideUp 0.6s ease-out forwards; opacity: 0; }
+    .slide.active .animate-in:nth-child(2) { animation-delay: 0.1s; }
+    .slide.active .animate-in:nth-child(3) { animation-delay: 0.2s; }
+    .slide.active .animate-in:nth-child(4) { animation-delay: 0.3s; }
+    .slide.active .animate-in:nth-child(5) { animation-delay: 0.4s; }
+    @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 800px) {
+      .slide { padding: var(--rh-space-3xl, 64px) var(--rh-space-lg, 24px); overflow-y: auto; justify-content: flex-start; }
+      .compare-grid, .proof-grid, .proof-grid.three { grid-template-columns: 1fr; }
+      .flow { flex-direction: column; }
+      .flow-arrow { transform: rotate(90deg); }
+      .big-number-wrap { flex-direction: column; align-items: flex-start; gap: var(--rh-space-md, 16px); }
+      .slide > .breadcrumb { left: var(--rh-space-lg, 24px); }
+      .slide > .attribution { position: static; margin-top: var(--rh-space-lg, 24px); }
+    }
+
+    /* === PRINT / PDF EXPORT === */
+    body.printing .deck { visibility: hidden; }
+
+    @media print {
+      body.printing .deck,
+      body.printing .slide { visibility: visible !important; }
+      @page { size: 13.33in 7.5in; margin: 0; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      html, body { height: auto !important; width: auto !important; overflow: visible !important; background: #000 !important; }
+      .deck { height: auto !important; width: auto !important; position: static !important; overflow: visible !important; }
+      .slide {
+        display: flex !important; position: relative !important; inset: auto !important;
+        width: 13.33in !important; height: 7.5in !important;
+        padding: 0.55in 0.85in !important; gap: 0.14in !important; box-sizing: border-box !important;
+        break-after: page; page-break-after: always; break-inside: avoid; page-break-inside: avoid;
+        overflow: hidden !important;
+      }
+      .slide:last-child { break-after: auto; page-break-after: auto; }
+      .slide::before, .slide::after { display: none !important; }
+
+      .headline-xl { font-size: 60pt !important; line-height: 1.05 !important; letter-spacing: -0.02em; }
+      .headline-lg { font-size: 42pt !important; line-height: 1.05 !important; letter-spacing: -0.02em; }
+      .headline-md { font-size: 28pt !important; line-height: 1.1 !important; }
+      .subtitle, .body-text { font-size: 14pt !important; line-height: 1.45 !important; }
+      .big-number { font-size: 150pt !important; line-height: 0.9 !important; letter-spacing: -0.03em; }
+      .big-number-context { font-size: 18pt !important; }
+      .slide-label, .breadcrumb { font-size: 10pt !important; letter-spacing: 0.1em; }
+      .attribution, .source, .nav-hint,
+      .flow-node .arch-tag, .compare-col .lead, .proof-card .proof-title, .tag { font-size: 9pt !important; }
+
+      .bullet-list, .steps { gap: 10pt !important; max-width: none !important; }
+      .bullet-list li { padding-left: 18pt !important; font-size: 12pt !important; line-height: 1.45 !important; }
+      .bullet-list li::before {
+        content: '' !important; position: absolute !important; left: 0 !important; top: 0.7em !important;
+        width: 10pt !important; height: 2pt !important; background: #ee0000 !important; border-radius: 0 !important;
+      }
+      .steps li { font-size: 12pt !important; }
+      .compare-col .bullet-list li, .compare-col p, .proof-card p { font-size: 11pt !important; }
+      .compare-col h3, .proof-card h4 { font-size: 14pt !important; }
+      .flow-node h4 { font-size: 13pt !important; }
+      .flow-node p { font-size: 10pt !important; }
+      .compare-grid, .proof-grid { gap: 0.18in !important; }
+      .compare-col, .proof-card { padding: 0.2in !important; }
+      .flow-arrow { font-size: 18pt !important; }
+
+      .breadcrumb { top: 0.4in !important; left: 0.85in !important; }
+      .attribution { bottom: 0.4in !important; left: 0.85in !important; }
+
+      .slide .animate-in, .slide.active .animate-in { animation: none !important; opacity: 1 !important; transform: none !important; }
+      .controls, .nav-hint, .notes-panel { display: none !important; }
+      .ambient-glow, .bg-glow, [class*="glow"] { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+
+    <!-- SLIDE 1: TITLE -->
+    <div class="slide title-slide glow-strong" data-notes="<p class='note-tag'>TIPS FOR VIEWERS</p><p>Arrow keys or click to navigate. Press N to toggle these notes. The file works in any modern browser, so you can share it directly. Fullscreen (F11) works best when presenting. Save as PDF with Cmd/Ctrl+P, landscape.</p><p>This deck summarizes the <a href='https://github.com/redhat-et/secure-single-server' target='_blank'>secure-single-server</a> repository. Published docs: <a href='https://redhat-et.github.io/secure-single-server/' target='_blank'>redhat-et.github.io/secure-single-server</a>.</p><p>The stack is experimental and not production-ready. Every claim in the deck traces to the repository README or the linked scenario pages.</p><p class='note-tag'>IMAGE OPPORTUNITY</p><p>Prompt for Nano Banana Pro 2: &quot;Abstract dark-mode illustration of a single server rack enclosed by a thin glowing red perimeter line, with small geometric agent shapes inside and a single narrow gate on one side. Black background, Red Hat red and dark gray palette, subtle teal highlights, no text, 16:9, cinematic lighting.&quot;</p>">
+      <div class="breadcrumb">
+        <svg class="rh-logo small" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 613 145" role="img" aria-label="Red Hat">
+          <title>Red Hat</title>
+          <path d="M127.47,83.49c12.51,0,30.61-2.58,30.61-17.46a14,14,0,0,0-.31-3.42l-7.45-32.36c-1.72-7.12-3.23-10.35-15.73-16.6C124.89,8.69,103.76.5,97.51.5,91.69.5,90,8,83.06,8c-6.68,0-11.64-5.6-17.89-5.6-6,0-9.91,4.09-12.93,12.5,0,0-8.41,23.72-9.49,27.16A6.43,6.43,0,0,0,42.53,44c0,9.22,36.3,39.45,84.94,39.45M160,72.07c1.73,8.19,1.73,9.05,1.73,10.13,0,14-15.74,21.77-36.43,21.77C78.54,104,37.58,76.6,37.58,58.49a18.45,18.45,0,0,1,1.51-7.33C22.27,52,.5,55,.5,74.22c0,31.48,74.59,70.28,133.65,70.28,45.28,0,56.7-20.48,56.7-36.65,0-12.72-11-27.16-30.83-35.78" fill="#e00"/>
+          <path d="M160,72.07c1.73,8.19,1.73,9.05,1.73,10.13,0,14-15.74,21.77-36.43,21.77C78.54,104,37.58,76.6,37.58,58.49a18.45,18.45,0,0,1,1.51-7.33l3.66-9.06A6.43,6.43,0,0,0,42.53,44c0,9.22,36.3,39.45,84.94,39.45,12.51,0,30.61-2.58,30.61-17.46a14,14,0,0,0-.31-3.42Z"/>
+          <path d="M579.74,92.8c0,11.89,7.15,17.67,20.19,17.67a52.11,52.11,0,0,0,11.89-1.68V95a24.84,24.84,0,0,1-7.68,1.16c-5.37,0-7.36-1.68-7.36-6.73V68.3h15.56V54.1H596.78v-18l-17,3.68V54.1H568.49V68.3h11.25Zm-53,.32c0-3.68,3.69-5.47,9.26-5.47a43.12,43.12,0,0,1,10.1,1.26v7.15a21.51,21.51,0,0,1-10.63,2.63c-5.46,0-8.73-2.1-8.73-5.57m5.2,17.56c6,0,10.84-1.26,15.36-4.31v3.37h16.82V74.08c0-13.56-9.14-21-24.39-21-8.52,0-16.94,2-26,6.1l6.1,12.52c6.52-2.74,12-4.42,16.83-4.42,7,0,10.62,2.73,10.62,8.31v2.73a49.53,49.53,0,0,0-12.62-1.58c-14.31,0-22.93,6-22.93,16.73,0,9.78,7.78,17.24,20.19,17.24m-92.44-.94h18.09V80.92h30.29v28.82H506V36.12H487.93V64.41H457.64V36.12H439.55ZM370.62,81.87c0-8,6.31-14.1,14.62-14.1A17.22,17.22,0,0,1,397,72.09V91.54A16.36,16.36,0,0,1,385.24,96c-8.2,0-14.62-6.1-14.62-14.09m26.61,27.87h16.83V32.44l-17,3.68V57.05a28.3,28.3,0,0,0-14.2-3.68c-16.19,0-28.92,12.51-28.92,28.5a28.25,28.25,0,0,0,28.4,28.6,25.12,25.12,0,0,0,14.93-4.83ZM320,67c5.36,0,9.88,3.47,11.67,8.83H308.47C310.15,70.3,314.36,67,320,67M291.33,82c0,16.2,13.25,28.82,30.28,28.82,9.36,0,16.2-2.53,23.25-8.42l-11.26-10c-2.63,2.74-6.52,4.21-11.14,4.21a14.39,14.39,0,0,1-13.68-8.83h39.65V83.55c0-17.67-11.88-30.39-28.08-30.39a28.57,28.57,0,0,0-29,28.81M262,51.58c6,0,9.36,3.78,9.36,8.31S268,68.2,262,68.2H244.11V51.58Zm-36,58.16h18.09V82.92h13.77l13.89,26.82H292l-16.2-29.45a22.27,22.27,0,0,0,13.88-20.72c0-13.25-10.41-23.45-26-23.45H226Z" fill="#fff"/>
+        </svg>
+        <span>› Office of the CTO</span>
+      </div>
+      <div class="slide-label animate-in">Office of the CTO · Oct 26, 2026</div>
+      <h1 class="headline-xl animate-in">Coding agents get a perimeter on <span class="accent">one RHEL host</span></h1>
+      <p class="subtitle animate-in">OpenCode and OpenClaw run inside an OpenShell sandbox, reach models through a Praxis gateway, and ship as a bootc image.</p>
+      <div class="tags animate-in">
+        <span class="tag accent">Experimental</span>
+        <span class="tag">RHEL 9</span>
+        <span class="tag">OpenShell</span>
+        <span class="tag">Praxis</span>
+        <span class="tag">bootc</span>
+      </div>
+      <div class="attribution">Pavel Anni · Office of the CTO · Red Hat</div>
+    </div>
+
+    <!-- SLIDE 2: THE PROBLEM -->
+    <div class="slide" data-notes="<p>The repository's architecture overview opens with this framing: harnesses are useful because they read a workspace, run tools, and call a model. The same abilities raise the four questions on this slide.</p><p>The design answer is to assign each question to a separate component, which the next slides show.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/quickstarts/architecture-walkthrough/README.md' target='_blank'>Architecture overview</a>.</p><p class='note-tag'>MEME OPPORTUNITY</p><p>A well-placed reaction image of an agent confidently running a command on a laptop would land here and set up the tension on the next slide.</p>">
+      <div class="slide-label animate-in">The problem</div>
+      <h2 class="headline-lg animate-in">A coding agent reads your files, runs commands, and calls a model</h2>
+      <p class="body-text animate-in">Those abilities make a harness useful. They also raise four questions the harness does not answer by itself.</p>
+      <ul class="bullet-list animate-in">
+        <li><strong>Files and commands.</strong> Which paths can the agent read and write, and which binaries can it run?</li>
+        <li><strong>Model traffic.</strong> Where do prompts and responses go?</li>
+        <li><strong>Credentials.</strong> Who holds the provider keys?</li>
+        <li><strong>The host.</strong> How does the machine stay consistent from one deployment to the next?</li>
+      </ul>
+    </div>
+
+    <!-- SLIDE 3: THE TENSION -->
+    <div class="slide glow-left" data-notes="<p>This is the Streamlit before-and-after scenario. The same app runs first in an ordinary container with the real model key in its process, then in an OpenShell sandbox with an attached provider, a read-only application directory, and a hard-required Landlock policy.</p><p>The provider profile authorizes the credential only for <code>POST /v1/chat/completions</code>.</p><p>Run it on a dedicated RHEL 9 x86_64 host. An ordinary nested container is not a supported OpenShell host.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/examples/streamlit-security/README.md' target='_blank'>Streamlit before and after OpenShell</a>.</p><p class='note-tag'>VIDEO OPPORTUNITY</p><p>A short screen recording of the two runs side by side would make this slide concrete.</p>">
+      <div class="slide-label animate-in">The gap</div>
+      <h2 class="headline-lg animate-in">In an ordinary container the app holds the real key</h2>
+      <div class="compare-grid animate-in">
+        <div class="compare-col">
+          <img class="rh-icon medium" src="https://cdn.jsdelivr.net/npm/@rhds/icons@2.1.0/standard/padlock-unlocked.svg" alt="">
+          <div class="lead">Ordinary container</div>
+          <h3>Everything sits inside the app</h3>
+          <ul class="bullet-list">
+            <li>The real model key lives in the app process</li>
+            <li>The app can write to its own directory</li>
+            <li>The app can read a marker outside its directory</li>
+          </ul>
+        </div>
+        <div class="compare-col winner">
+          <img class="rh-icon medium accent" src="https://cdn.jsdelivr.net/npm/@rhds/icons@2.1.0/standard/padlock-locked.svg" alt="">
+          <div class="lead">OpenShell sandbox</div>
+          <h3>The perimeter sits around the app</h3>
+          <ul class="bullet-list">
+            <li>The app gets an opaque placeholder, and OpenShell swaps in the real key for one authorized endpoint</li>
+            <li>The app directory is read-only</li>
+            <li>The marker outside the allowed paths is unreadable</li>
+          </ul>
+        </div>
+      </div>
+      <div class="source animate-in">Source: docs/examples/streamlit-security</div>
+    </div>
+
+    <!-- SLIDE 4: THE INSIGHT / REQUEST PATH -->
+    <div class="slide" data-notes="<p>The integrated request path is OpenCode or OpenClaw, then the OpenShell sandbox, then Praxis, then an approved model.</p><p>The model path is separate from the execution boundary. OpenShell governs the harness and its tools. The chosen model route decides where prompts and responses are processed.</p><p>Model choices: local inference through Praxis to a private vLLM host, or an external provider through Praxis or a configured OpenShell provider profile.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/quickstarts/architecture-walkthrough/README.md' target='_blank'>Architecture overview</a>, <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/quickstarts/openshell-praxis/README.md' target='_blank'>Praxis integration</a>.</p><p class='note-tag'>IMAGE OPPORTUNITY</p><p>Prompt for Nano Banana Pro 2: &quot;Minimal dark diagram-style illustration of a horizontal path passing through two gates, the first drawn as a red outlined frame, the second as a gray one. Black background, Red Hat red accent, thin lines, no text, 16:9.&quot;</p>">
+      <div class="slide-label animate-in">The approach</div>
+      <h2 class="headline-lg animate-in">Every request follows one path: harness, sandbox, gateway, model</h2>
+      <div class="flow animate-in">
+        <div class="flow-node">
+          <img class="rh-icon small" src="https://cdn.jsdelivr.net/npm/@rhds/icons@2.1.0/standard/robot.svg" alt="">
+          <div class="arch-tag">Harness</div>
+          <h4>OpenCode / OpenClaw</h4>
+          <p>Prompts, model selection, tool calls</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node key">
+          <img class="rh-icon small accent" src="https://cdn.jsdelivr.net/npm/@rhds/icons@2.1.0/standard/container-secured.svg" alt="">
+          <div class="arch-tag">Execution boundary</div>
+          <h4>OpenShell sandbox</h4>
+          <p>Filesystem, network, and process policy</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <img class="rh-icon small" src="https://cdn.jsdelivr.net/npm/@rhds/icons@2.1.0/standard/gateway.svg" alt="">
+          <div class="arch-tag">Model gateway</div>
+          <h4>Praxis</h4>
+          <p>Routing, key custody, shared limits</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node">
+          <img class="rh-icon small" src="https://cdn.jsdelivr.net/npm/@rhds/icons@2.1.0/standard/ai-model.svg" alt="">
+          <div class="arch-tag">Upstream</div>
+          <h4>Approved model</h4>
+          <p>Private vLLM host or external provider</p>
+        </div>
+      </div>
+      <p class="body-text animate-in">Sandbox policy can limit the harness to the gateway while Praxis selects the approved upstream.</p>
+    </div>
+
+    <!-- SLIDE 5: OWNERS -->
+    <div class="slide glow-left" data-notes="<p>Each row of this slide maps to a table in the architecture overview: workspace and tool access, model routing, provider credentials, and host consistency.</p><p>Limits apply. OpenShell is operated by a trusted administrator and is not a multi-tenant authorization system. Praxis routing and limits depend on the selected profile and upstream.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/quickstarts/architecture-walkthrough/README.md' target='_blank'>Architecture overview</a>.</p>">
+      <div class="slide-label animate-in">How it works</div>
+      <h2 class="headline-lg animate-in">Each concern has exactly one owner</h2>
+      <div class="proof-grid animate-in">
+        <div class="proof-card">
+          <div class="proof-title">OpenShell</div>
+          <h4>Workspace and tools</h4>
+          <p>Declared writable paths, read-only paths, approved binaries, and network destinations.</p>
+        </div>
+        <div class="proof-card">
+          <div class="proof-title">Praxis</div>
+          <h4>Model routing</h4>
+          <p>One gateway endpoint for the harness, with a local or external upstream behind it.</p>
+        </div>
+        <div class="proof-card">
+          <div class="proof-title">Praxis or provider profile</div>
+          <h4>Provider credentials</h4>
+          <p>Keys stay out of ordinary harness configuration.</p>
+        </div>
+        <div class="proof-card">
+          <div class="proof-title">bootc</div>
+          <h4>Host consistency</h4>
+          <p>The reviewed host environment and pinned workload references ship as one OS image.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: BIG NUMBER -->
+    <div class="slide glow-strong" data-notes="<p>On the integrated paths, Praxis owns provider credentials and selects the approved upstream. The harness and the sandbox do not hold provider keys.</p><p>This applies to the integrated Praxis paths only. A configured OpenShell provider profile is a separate documented option, and there the sandbox sees a placeholder while OpenShell substitutes the real key.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server#how-it-works' target='_blank'>README, How It Works</a>.</p>">
+      <div class="slide-label animate-in">The result</div>
+      <div class="big-number-wrap animate-in">
+        <img class="rh-icon xl accent" src="https://cdn.jsdelivr.net/npm/@rhds/icons@2.1.0/standard/key.svg" alt="">
+        <div class="big-number">0</div>
+        <div class="big-number-context">provider keys held by the harness or the sandbox on the integrated Praxis paths</div>
+      </div>
+      <div class="source animate-in">Source: README, How It Works</div>
+    </div>
+
+    <!-- SLIDE 7: PROOF -->
+    <div class="slide" data-notes="<p>Each scenario runs after deployment from the repository checkout: <code>/usr/share/secure-single-server</code> on a bootc image, <code>/opt/secure-single-server</code> on a manual deployment.</p><p>Published image tags contain only the reviewed revision from their build time, so use a rebuilt image or an updated checkout for newer examples.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/examples/README.md' target='_blank'>Example scenarios</a>.</p><p class='note-tag'>VIDEO OPPORTUNITY</p><p>A recording of the document exfiltration scenario, where each attempt is blocked in turn, would work as an in-slide demo.</p>">
+      <div class="slide-label animate-in">The proof</div>
+      <h2 class="headline-lg animate-in">Three attack scenarios stop at the same perimeter</h2>
+      <div class="proof-grid three animate-in">
+        <div class="proof-card">
+          <div class="proof-title">API key theft</div>
+          <h4>Planted key</h4>
+          <p>The key is discoverable. Attempts to spend it outside the approved gateway are blocked and audited.</p>
+        </div>
+        <div class="proof-card">
+          <div class="proof-title">Document exfiltration</div>
+          <h4>Malicious skill</h4>
+          <p>The skill tries several ways to send a document to an attacker destination. The boundary blocks each one.</p>
+        </div>
+        <div class="proof-card">
+          <div class="proof-title">Model escalation</div>
+          <h4>Unapproved model</h4>
+          <p>The gateway catalog refuses the model before any credential is used.</p>
+        </div>
+      </div>
+      <div class="source animate-in">Source: docs/examples</div>
+    </div>
+
+    <!-- SLIDE 8: DEPLOY -->
+    <div class="slide glow-left" data-notes="<p>Published bootc images carry the OpenShell CLI, service configuration, and pinned workload references. First boot pulls the selected control-plane and harness images into rootless Podman storage.</p><p>Host image management does not preserve application or workspace data by itself, so plan storage separately.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/bootc/README.md' target='_blank'>Published bootc images</a>, <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/deployment-methods.md' target='_blank'>Deployment methods</a>.</p>">
+      <div class="slide-label animate-in">Deployment</div>
+      <h2 class="headline-lg animate-in">One bootc image repeats the host</h2>
+      <ul class="bullet-list animate-in">
+        <li><strong>Image variants</strong> exist for OpenCode and OpenClaw.</li>
+        <li><strong>First boot</strong> pulls the selected control-plane and harness images into rootless Podman storage.</li>
+        <li><strong>Manual Podman install</strong> supports the same post-deployment scenarios.</li>
+        <li><strong>Workspace data</strong> needs its own storage plan, because the host image does not preserve it.</li>
+      </ul>
+    </div>
+
+    <!-- SLIDE 9: WORKFLOW -->
+    <div class="slide" data-notes="<p>The OpenCode PR-candidate queue is issue-or-prompt-to-patch only. It does not review pull requests, and the sandbox receives no GitHub token or GitHub write access.</p><p>Each task produces one bundle containing the task, the proposed patch, metadata, and a report. You review it on your workstation and open the draft PR yourself.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/examples/opencode-pr-queue/README.md' target='_blank'>OpenCode PR-candidate queue</a>.</p><p class='note-tag'>IMAGE OPPORTUNITY</p><p>Prompt for Nano Banana Pro 2: &quot;Dark abstract illustration of a queue of small document tiles flowing into a sealed box and emerging as a single bundled package on the other side. Black background, Red Hat red accent line, dark gray tiles, no text, 16:9.&quot;</p>">
+      <div class="slide-label animate-in">What you can do</div>
+      <h2 class="headline-lg animate-in">Agents keep working after your laptop disconnects</h2>
+      <ul class="bullet-list animate-in">
+        <li>Queue public GitHub issues or prompt files for a public repository.</li>
+        <li>Keep a longer batch alive in <code>tmux</code> after you drop the SSH session.</li>
+        <li>Collect one bundle per task: the task, a proposed patch, metadata, and a report.</li>
+        <li>Apply the bundle on your workstation and open a draft PR with your own Git and GitHub credentials.</li>
+      </ul>
+      <p class="body-text animate-in">The sandbox receives no GitHub token and has no GitHub write access.</p>
+      <div class="source animate-in">Source: docs/examples/opencode-pr-queue</div>
+    </div>
+
+    <!-- SLIDE 10: LIMITS -->
+    <div class="slide glow-left" data-notes="<p>The README states plainly that this is an experimental demonstration, not a production-ready platform. Use a disposable host for first evaluation.</p><p>A component's presence in the repository does not mean every upstream feature, provider combination, or hardware configuration has been qualified. See the compatibility matrix for the combinations that were exercised.</p><p>Read more: <a href='https://github.com/redhat-et/secure-single-server/blob/main/docs/testing/README.md' target='_blank'>Testing and compatibility</a>.</p>">
+      <div class="slide-label animate-in">Limits</div>
+      <h2 class="headline-lg animate-in">Treat it as an experiment on a disposable host</h2>
+      <ul class="bullet-list animate-in">
+        <li><strong>Not production-ready.</strong> Review the qualification evidence before you extend a deployment.</li>
+        <li><strong>One trusted administrator.</strong> OpenShell here is not a multi-tenant authorization system.</li>
+        <li><strong>Qualified combinations only.</strong> The compatibility matrix lists what was exercised.</li>
+        <li><strong>Profile-dependent limits.</strong> Praxis routing and quotas follow the selected profile and upstream.</li>
+      </ul>
+    </div>
+
+    <!-- SLIDE 11: CTA -->
+    <div class="slide" data-notes="<p>Run the Streamlit demo on a dedicated RHEL 9 x86_64 host. Complete the manual gateway setup first: install OpenShell, verify Landlock ABI 3 or newer, start the gateway, and define the <code>repo</code> and <code>os_run</code> helpers.</p><p>Links: <a href='https://redhat-et.github.io/secure-single-server/' target='_blank'>published docs</a>, <a href='https://github.com/redhat-et/secure-single-server' target='_blank'>repository</a>, <a href='https://github.com/NVIDIA/OpenShell' target='_blank'>OpenShell</a>, <a href='https://github.com/praxis/praxis' target='_blank'>Praxis</a>, <a href='https://github.com/anomalyco/opencode' target='_blank'>OpenCode</a>, <a href='https://github.com/openclaw/openclaw' target='_blank'>OpenClaw</a>.</p><p class='note-tag'>QR CODE</p><p>Add a QR code to the published docs on this slide when presenting live.</p>">
+      <div class="slide-label animate-in">Next steps</div>
+      <h2 class="headline-lg animate-in">Start with the Streamlit demo, then pick a scenario</h2>
+      <ol class="steps animate-in">
+        <li><span><strong>Read the architecture overview</strong> to see which component owns which concern.</span></li>
+        <li><span><strong>Run the Streamlit before-and-after</strong> on a dedicated RHEL 9 x86_64 host.</span></li>
+        <li><span><strong>Try a security scenario</strong> from the examples index.</span></li>
+      </ol>
+      <p class="link-row animate-in">redhat-et.github.io/secure-single-server · github.com/redhat-et/secure-single-server</p>
+    </div>
+
+    <!-- SLIDE 12: THANK YOU -->
+    <div class="slide thank-you-slide glow-strong" data-notes="<p>Questions and feedback are welcome through the repository's issue tracker: <a href='https://github.com/redhat-et/secure-single-server/issues' target='_blank'>github.com/redhat-et/secure-single-server/issues</a>.</p>">
+      <h2 class="headline-xl animate-in">Thank <span class="accent">You</span></h2>
+      <div class="author-block animate-in">
+        <div class="name">Pavel Anni</div>
+        <div>Office of the CTO · Red Hat</div>
+      </div>
+      <div class="contact animate-in">panni@redhat.com</div>
+      <div class="logo-footer animate-in">
+        <svg class="rh-logo large" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 613 145" role="img" aria-label="Red Hat">
+          <title>Red Hat</title>
+          <path d="M127.47,83.49c12.51,0,30.61-2.58,30.61-17.46a14,14,0,0,0-.31-3.42l-7.45-32.36c-1.72-7.12-3.23-10.35-15.73-16.6C124.89,8.69,103.76.5,97.51.5,91.69.5,90,8,83.06,8c-6.68,0-11.64-5.6-17.89-5.6-6,0-9.91,4.09-12.93,12.5,0,0-8.41,23.72-9.49,27.16A6.43,6.43,0,0,0,42.53,44c0,9.22,36.3,39.45,84.94,39.45M160,72.07c1.73,8.19,1.73,9.05,1.73,10.13,0,14-15.74,21.77-36.43,21.77C78.54,104,37.58,76.6,37.58,58.49a18.45,18.45,0,0,1,1.51-7.33C22.27,52,.5,55,.5,74.22c0,31.48,74.59,70.28,133.65,70.28,45.28,0,56.7-20.48,56.7-36.65,0-12.72-11-27.16-30.83-35.78" fill="#e00"/>
+          <path d="M160,72.07c1.73,8.19,1.73,9.05,1.73,10.13,0,14-15.74,21.77-36.43,21.77C78.54,104,37.58,76.6,37.58,58.49a18.45,18.45,0,0,1,1.51-7.33l3.66-9.06A6.43,6.43,0,0,0,42.53,44c0,9.22,36.3,39.45,84.94,39.45,12.51,0,30.61-2.58,30.61-17.46a14,14,0,0,0-.31-3.42Z"/>
+          <path d="M579.74,92.8c0,11.89,7.15,17.67,20.19,17.67a52.11,52.11,0,0,0,11.89-1.68V95a24.84,24.84,0,0,1-7.68,1.16c-5.37,0-7.36-1.68-7.36-6.73V68.3h15.56V54.1H596.78v-18l-17,3.68V54.1H568.49V68.3h11.25Zm-53,.32c0-3.68,3.69-5.47,9.26-5.47a43.12,43.12,0,0,1,10.1,1.26v7.15a21.51,21.51,0,0,1-10.63,2.63c-5.46,0-8.73-2.1-8.73-5.57m5.2,17.56c6,0,10.84-1.26,15.36-4.31v3.37h16.82V74.08c0-13.56-9.14-21-24.39-21-8.52,0-16.94,2-26,6.1l6.1,12.52c6.52-2.74,12-4.42,16.83-4.42,7,0,10.62,2.73,10.62,8.31v2.73a49.53,49.53,0,0,0-12.62-1.58c-14.31,0-22.93,6-22.93,16.73,0,9.78,7.78,17.24,20.19,17.24m-92.44-.94h18.09V80.92h30.29v28.82H506V36.12H487.93V64.41H457.64V36.12H439.55ZM370.62,81.87c0-8,6.31-14.1,14.62-14.1A17.22,17.22,0,0,1,397,72.09V91.54A16.36,16.36,0,0,1,385.24,96c-8.2,0-14.62-6.1-14.62-14.09m26.61,27.87h16.83V32.44l-17,3.68V57.05a28.3,28.3,0,0,0-14.2-3.68c-16.19,0-28.92,12.51-28.92,28.5a28.25,28.25,0,0,0,28.4,28.6,25.12,25.12,0,0,0,14.93-4.83ZM320,67c5.36,0,9.88,3.47,11.67,8.83H308.47C310.15,70.3,314.36,67,320,67M291.33,82c0,16.2,13.25,28.82,30.28,28.82,9.36,0,16.2-2.53,23.25-8.42l-11.26-10c-2.63,2.74-6.52,4.21-11.14,4.21a14.39,14.39,0,0,1-13.68-8.83h39.65V83.55c0-17.67-11.88-30.39-28.08-30.39a28.57,28.57,0,0,0-29,28.81M262,51.58c6,0,9.36,3.78,9.36,8.31S268,68.2,262,68.2H244.11V51.58Zm-36,58.16h18.09V82.92h13.77l13.89,26.82H292l-16.2-29.45a22.27,22.27,0,0,0,13.88-20.72c0-13.25-10.41-23.45-26-23.45H226Z" fill="#fff"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="notes-panel" aria-live="polite"></div>
+  <div class="controls">
+    <div class="nav-hint">← → or click to navigate · N for additional context</div>
+    <div class="progress"><span class="current">1</span> / <span class="total">12</span></div>
+  </div>
+
+  <script>
+  (function() {
+    const slides = document.querySelectorAll('.slide');
+    const currentEl = document.querySelector('.current');
+    const totalEl = document.querySelector('.total');
+    const notesPanel = document.querySelector('.notes-panel');
+    let idx = 0;
+    let notesVisible = false;
+
+    totalEl.textContent = slides.length;
+
+    function pauseAllMedia() {
+      document.querySelectorAll('.slide:not(.active) video').forEach(v => v.pause());
+      document.querySelectorAll('.slide:not(.active) iframe').forEach(f => {
+        f.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+        f.contentWindow.postMessage('{"method":"pause"}', '*');
+      });
+    }
+
+    function playActiveMedia() {
+      document.querySelectorAll('.slide.active video').forEach(v => v.play());
+      document.querySelectorAll('.slide.active iframe').forEach(f => {
+        f.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+        f.contentWindow.postMessage('{"method":"play"}', '*');
+      });
+    }
+
+    function show(i) {
+      slides.forEach((s, j) => {
+        s.classList.toggle('active', j === i);
+        s.style.display = j === i ? 'flex' : 'none';
+      });
+      currentEl.textContent = i + 1;
+      pauseAllMedia();
+      playActiveMedia();
+      if (notesVisible && notesPanel) {
+        const note = slides[i].dataset.notes || '';
+        notesPanel.innerHTML = note;
+      }
+    }
+
+    function next() { if (idx < slides.length - 1) { idx++; show(idx); } }
+    function prev() { if (idx > 0) { idx--; show(idx); } }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+      if (e.key === 'ArrowLeft') { prev(); }
+      if (e.key === 'n' || e.key === 'N') {
+        notesVisible = !notesVisible;
+        if (notesPanel) notesPanel.classList.toggle('visible', notesVisible);
+        show(idx);
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.controls') || e.target.closest('.notes-panel') || e.target.closest('.video-container') || e.target.closest('.media-container') || e.target.closest('a')) return;
+      const x = e.clientX / window.innerWidth;
+      x > 0.5 ? next() : prev();
+    });
+
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+    document.addEventListener('touchend', (e) => {
+      const diff = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(diff) > 50) { diff < 0 ? next() : prev(); }
+    });
+
+    // Print / PDF export: clear inline display, auto-fit overflowing slides, restore on close.
+    window.addEventListener('beforeprint', () => {
+      slides.forEach(s => { s.style.display = ''; });
+      document.body.classList.add('printing');
+
+      slides.forEach(s => {
+        let fit = s.querySelector(':scope > .slide-fit');
+        if (!fit) {
+          fit = document.createElement('div');
+          fit.className = 'slide-fit';
+          while (s.firstChild) fit.appendChild(s.firstChild);
+          s.appendChild(fit);
+        }
+        const cs = window.getComputedStyle(s);
+        fit.style.cssText =
+          'display:flex;width:100%;height:100%;' +
+          'flex-direction:' + (cs.flexDirection || 'column') + ';' +
+          'justify-content:' + (cs.justifyContent || 'center') + ';' +
+          'align-items:' + (cs.alignItems || 'stretch') + ';' +
+          'text-align:' + (cs.textAlign || 'left') + ';' +
+          'gap:' + (cs.gap || '0') + ';' +
+          'transform-origin:top left;transform:none;';
+        for (let i = 0; i < fit.children.length; i++) {
+          fit.children[i].style.flexShrink = '0';
+        }
+
+        s._priorStyle = s.style.cssText;
+        s.style.cssText +=
+          ';display:flex !important;width:13.33in !important;height:7.5in !important;' +
+          'padding:0.55in 0.85in !important;box-sizing:border-box !important;' +
+          'overflow:hidden !important;';
+
+        const cw = fit.clientWidth, ch = fit.clientHeight;
+        const sw = fit.scrollWidth, sh = fit.scrollHeight;
+        if (sw > cw + 1 || sh > ch + 1) {
+          const k = Math.min(cw / sw, ch / sh);
+          fit.style.width  = (cw / k) + 'px';
+          fit.style.height = (ch / k) + 'px';
+          fit.style.transform = 'scale(' + k + ')';
+          fit.dataset.fitScale = k.toFixed(3);
+        }
+      });
+    });
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing');
+      document.querySelectorAll('.slide > .slide-fit').forEach(fit => {
+        const s = fit.parentElement;
+        while (fit.firstChild) {
+          const child = fit.firstChild;
+          if (child.style && child.style.flexShrink) child.style.flexShrink = '';
+          s.appendChild(child);
+        }
+        fit.remove();
+        if (s._priorStyle !== undefined) {
+          s.style.cssText = s._priorStyle;
+          delete s._priorStyle;
+        }
+      });
+      show(idx);
+    });
+
+    show(0);
+  })();
+  </script>
+</body>
+</html>

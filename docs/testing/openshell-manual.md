@@ -3,7 +3,8 @@
 This is an engineering acceptance page, not a customer deployment guide. For
 the OpenCode or OpenClaw manual and bootc paths, start with the
 [single-server guide](../quickstarts/openshell-single-server/README.md). Run
-these all-in-one checks after [direct harness acceptance](harnesses.md) and
+these all-in-one checks on RHEL 9.8+ with Podman 5.8.2, after
+[direct harness acceptance](harnesses.md) and
 keep real Qwen installed.
 The [matrix](compatibility.md#openshell) separates CPU/GPU, service-operator
 checks and ordinary-user access. Bootc results do not qualify mutable RHEL.

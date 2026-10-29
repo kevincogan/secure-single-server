@@ -46,12 +46,12 @@ jobs:
           shellcheck --version
       - name: Install pinned OpenShell policy prover
         run: |
-          OPENSHELL_PROVER_VERSION=v0.1.4
-          OPENSHELL_PROVER_SHA256=dcf52ed3b8c81a1ab15842653667090a28bc24eefa9ba76660a82fe0e78ecc43
+          set -euo pipefail
+          source openshell/configs/images.env
           curl --fail --show-error --silent --location --retry 3 --retry-all-errors --connect-timeout 10 --max-time 120 \
             "https://github.com/NVIDIA/OpenShell/releases/download/${OPENSHELL_PROVER_VERSION}/openshell-prover-x86_64-unknown-linux-musl.tar.gz" \
             -o /tmp/openshell-prover.tar.gz
-          printf '%s  /tmp/openshell-prover.tar.gz\n' "${OPENSHELL_PROVER_SHA256}" | sha256sum -c -
+          printf '%s  /tmp/openshell-prover.tar.gz\n' "${OPENSHELL_PROVER_SHA256_AMD64}" | sha256sum -c -
           tar -xzf /tmp/openshell-prover.tar.gz -C /tmp
           install -m 0755 /tmp/openshell-prover /usr/local/bin/openshell-prover
           openshell-prover --version

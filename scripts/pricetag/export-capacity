@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""Export only fixed-schema numeric capacity telemetry, never credentials/config."""
+import argparse
+import json
+import math
+from pathlib import Path
+import re
+
+SERVICES={'pricetag-gateway','pricetag-metering','pricetag-maas','pricetag-db','pricetag-provider'}
+FIELDS=('users','lanes_per_user','in_flight_limit','started_monotonic','ended_monotonic','elapsed_seconds','attempts','successes','successful_requests_per_second','p50_seconds','p95_seconds','p99_seconds','p95_first_byte_seconds')
+MEMORY=('MemTotal_kib','MemAvailable_kib','MemFree_kib','Cached_kib','Buffers_kib','SwapTotal_kib','SwapFree_kib')
+
+
+def number(value, nullable=False):
+    if value is None and nullable:return None
+    if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0:raise ValueError('invalid numeric field')
+    return value
+
+
+def container(row):
+    if row['name'] not in SERVICES:raise ValueError('unexpected component')
+    duration=row['cpu_time']
+    if not re.fullmatch(r'(?:[\d.]+(?:ns|µs|μs|us|ms|s|m|h))+',duration):raise ValueError('invalid CPU counter')
+    memory=row['mem_usage']
+    if not re.fullmatch(r'[\d.]+\s*(?:B|kB|KB|MB|GB|KiB|MiB|GiB) / [\d.]+\s*(?:B|kB|KB|MB|GB|KiB|MiB|GiB)',memory):raise ValueError('invalid memory counter')
+    return {'name':row['name'],'cpu_time':duration,'mem_usage':memory}
+
+
+def observation(row):
+    return {'monotonic_seconds':number(row['monotonic_seconds']),
+        'cpu_ticks':[number(v) for v in row['cpu_ticks']],
+        'memory':{k:number(row['memory'][k]) for k in MEMORY},
+        'disk_available_bytes':number(row['disk_available_bytes']),
+        'disk_available_percent':number(row['disk_available_percent']),
+        'load_average':[number(v) for v in row['load_average']],
+        'containers':[container(c) for c in row['containers']],
+        'postgres':{k:number(row['postgres'][k]) for k in ('database_bytes','wal_directory_bytes','usage_events')}}
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('directory',type=Path)
+    parser.add_argument('--check',action='store_true',help='validate and print counts only')
+    args=parser.parse_args();cases=[]
+    for path in sorted(args.directory.glob('r*-u*-l*/requests.json')):
+        if not re.fullmatch(r'r[0-9]+-u[0-9]+-l[0-9]+',path.parent.name):raise ValueError('invalid case name')
+        document=json.loads(path.read_text())
+        source=document['phases'][0]
+        policy=document.get('connection_policy','new TLS connection per request')
+        if policy not in ('new TLS connection per request','reuse HTTP/1.1 connections'):raise ValueError('invalid connection policy')
+        phase={k:number(source[k],nullable=k.startswith('p')) for k in FIELDS}
+        statuses={}
+        for key,value in source['statuses'].items():
+            if not re.fullmatch(r'(?:0|[1-5][0-9][0-9])',key):raise ValueError('invalid status code')
+            statuses[key]=number(value)
+        phase['statuses']=statuses
+        for key in ('new_connection_attempts','reused_connection_requests'):
+            if key in source:phase[key]=number(source[key])
+        rows=[observation(json.loads(line)) for line in (path.parent/'observe.jsonl').read_text().splitlines()]
+        cases.append({'name':path.parent.name,'connection_policy':policy,'streaming':bool(document['stream']),'phase':phase,'rows':rows})
+    if not cases:raise ValueError('no phase reports')
+    result={'schema':1,'cases':cases}
+    if args.check:print(json.dumps({'validated_cases':len(cases),'numeric_samples':sum(len(c['rows']) for c in cases),'includes_keys_or_configuration':False}))
+    else:print(json.dumps(result))
+
+
+if __name__=='__main__':main()

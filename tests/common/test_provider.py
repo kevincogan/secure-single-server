@@ -9,6 +9,31 @@ from contracts import check
 
 
 class ProviderTest(unittest.TestCase):
+    def test_bounded_history_for_capacity_fixture(self):
+        self.fixture.record_limit = 2
+        for _ in range(4):
+            with self.request('/v1/chat/completions', {'model': 'fixture'}) as response:
+                self.assertEqual(response.status, 200)
+        self.assertEqual(len(self.fixture.records), 2)
+
+    def test_declared_tools_only_does_not_invent_harness_tools(self):
+        self.fixture.declared_tools_only = True
+        for route, tool, provider in (
+                ('/v1/chat/completions', {'type': 'function', 'function': {'name': 'bash'}}, 0),
+                ('/v1/responses', {'type': 'function', 'name': 'bash'}, 0),
+                ('/v1/messages', {'name': 'bash', 'input_schema': {}}, 1)):
+            for stream in (False, True):
+                with self.subTest(route=route, stream=stream):
+                    with self.request(route, {'model': 'fixture', 'tools': [tool], 'stream': stream},
+                                      provider=provider) as response:
+                        check(route, response.read().decode(), stream)
+            if 'function' in tool:
+                tool['function']['name'] = 'add'
+            else:
+                tool['name'] = 'add'
+            with self.request(route, {'model': 'fixture', 'tools': [tool]}, provider=provider) as response:
+                check(route, response.read().decode(), tool=True)
+
     def test_strict_cloud_rejects_legacy_token_parameter(self):
         self.fixture.strict_openai = True
         for model in ('gpt-5.4-mini', 'gpt-6-luna'):

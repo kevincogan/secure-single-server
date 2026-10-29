@@ -90,7 +90,7 @@ else:
             'curl': '''#!/usr/bin/env python3
 import io, sys, tarfile
 with tarfile.open(sys.argv[sys.argv.index('-o') + 1], 'w:gz') as archive:
-    payload = b'#!/bin/sh\\necho openshell 0.1.4\\n'
+    payload = b'#!/bin/sh\\necho openshell 0.1.5\\n'
     member = tarfile.TarInfo('openshell'); member.size = len(payload)
     archive.addfile(member, io.BytesIO(payload))
 ''',

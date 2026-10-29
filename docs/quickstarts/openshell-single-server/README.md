@@ -1,6 +1,6 @@
 # OpenShell single-server deployment
 
-Deploy OpenCode or OpenClaw on one trusted RHEL 9 x86_64 host. Choose how to
+Deploy OpenCode or OpenClaw on one trusted RHEL 9.8+ x86_64 host. Choose how to
 install the OpenShell execution boundary:
 
 | Deployment | Use it when… |

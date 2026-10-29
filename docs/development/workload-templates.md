@@ -1,6 +1,6 @@
 # Sandbox workload templates
 
-Harness creation uses OpenShell 0.1.4 workspace templates. The catalogs in
+Harness creation uses OpenShell 0.1.5 workspace templates. The catalogs in
 [`configs/templates`](../../configs/templates) select the pinned workload image,
 CPU, memory, and nonsecret environment for each harness/profile/backend.
 Policy, provider credentials, and policy-advisor approval remain attached to each
@@ -82,10 +82,10 @@ supported for OpenCode profiles and OpenClaw `dev`.
 `OPENSHELL_SANDBOX_CPU` and `OPENSHELL_SANDBOX_MEMORY` override catalog defaults.
 CPU accepts positive cores or millicores (`2`, `0.5`, `500m`). Memory accepts the
 pinned CLI's positive integer quantities (`512Mi`, `4Gi`, `8G`, or plain bytes
-`1024`); `1024B` is not accepted by OpenShell 0.1.4.
+`1024`); `1024B` is not accepted by OpenShell 0.1.5.
 
 Changing the image, resources, environment, or identifying labels produces a new
-content-derived template name (`sss-` plus 15 hex digits, within 0.1.4's
+content-derived template name (`sss-` plus 15 hex digits, within 0.1.5's
 19-character limit). Use labels for the readable harness/profile/backend identity. Existing templates remain available for review;
 prune old ones explicitly with `openshell sandbox template delete NAME` after
 checking the complete sandbox inventory. Never put keys, tokens, or passwords in
@@ -104,7 +104,7 @@ twice. The opt-in RHEL runtime suite runs it and exercises actual template-based
 OpenCode and OpenClaw creation through the existing entry points.
 
 The verified sandbox deletion helper has a separate seven-minute default
-(`OPENSHELL_CLEANUP_TIMEOUT` overrides it). On bootc/Podman, 0.1.4 can retain
+(`OPENSHELL_CLEANUP_TIMEOUT` overrides it). On bootc/Podman, 0.1.5 can retain
 `Deleting` metadata after the container is removed until its five-minute orphan
 grace and one-minute reconciliation sweep complete. The helper still requires
 successful complete listings proving absence; it never treats container removal,

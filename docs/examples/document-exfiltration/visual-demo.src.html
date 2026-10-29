@@ -53,8 +53,8 @@ code{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:var(--t
 </style>
 <script>
 (function(){var t=null;
-try{var p=JSON.parse(localStorage.getItem('/secure-single-server/.__palette'));var s=p&&p.color&&p.color.scheme;t=s==='slate'?'dark':s==='default'?'light':null}catch(e){}
-if(!t){try{t=localStorage.getItem('site-theme')}catch(e){}}
+try{t=localStorage.getItem('site-theme')}catch(e){}
+if(t!=='dark'&&t!=='light'){t=null;try{var p=JSON.parse(localStorage.getItem('/secure-single-server/.__palette'));var s=p&&p.color&&p.color.scheme;t=s==='slate'?'dark':s==='default'?'light':null}catch(e){}}
 if(t!=='dark'&&t!=='light')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
 document.documentElement.setAttribute('data-site',t)})();
 </script>
@@ -181,7 +181,7 @@ document.documentElement.setAttribute('data-site',t)})();
 </ol>
 <button data-go="-1" aria-label="Previous step">‹</button>
 <button data-play aria-label="Replay">Play</button>
-<input type="range" min="1" max="4" value="4" aria-label="Step">
+<input type="range" min="0" max="3" value="3" aria-label="Step">
 <button data-go="1" aria-label="Next step">›</button>
 </div>
 <figcaption><span class="fig-n">Fig. 3</span>The sanctioned flow: one binary, one endpoint, one policy pair — and the results server counts the upload.</figcaption>

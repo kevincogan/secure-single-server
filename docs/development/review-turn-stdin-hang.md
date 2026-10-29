@@ -2,7 +2,7 @@
 
 Date: 2026-10-14. Branch: `feature/review-service`. Scope: the first
 end-to-end `pr-55` review run on the AWS bootc host. Workflow context:
-[review as a service](review-service.md).
+[review as a service](../examples/review-service/README.md).
 
 ## Summary
 

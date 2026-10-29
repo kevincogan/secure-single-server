@@ -16,4 +16,4 @@ endpoints:
     rules:
       - allow: {method: POST, path: /v1/chat/completions}
 binaries:
-  - /usr/local/bin/python3
+  - /usr/local/bin/python3.12

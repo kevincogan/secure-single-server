@@ -1,6 +1,6 @@
 site_name: Secure single-server AI harness
 site_description: >-
-  Run OpenCode and OpenClaw on one dedicated RHEL 9 host with OpenShell,
+  Run OpenCode and OpenClaw on one dedicated RHEL 9.8+ host with OpenShell,
   Praxis, and bootc.
 site_url: https://redhat-et.github.io/secure-single-server/
 repo_url: https://github.com/redhat-et/secure-single-server
@@ -86,19 +86,25 @@ nav:
       - Optional vLLM inference:
           - Mutable RHEL deployment: docs/quickstarts/common/vllm.md
           - Bootc image deployment: bootc/VLLM.md
-      - Experimental MaaS + PriceTag pilot:
-          - Overview: docs/testing/pricetag.md
+      - Remote gateway with PriceTag:
+          - Guided installation: docs/quickstarts/remote-gateway-pricetag/README.md
+          - Manual installation: docs/quickstarts/remote-gateway-pricetag/manual.md
+          - Providers and models: docs/quickstarts/remote-gateway-pricetag/providers.md
+          - Users, keys and budgets: docs/quickstarts/remote-gateway-pricetag/users.md
+          - Saved client configuration: docs/quickstarts/remote-gateway-pricetag/clients.md
+          - Price operations and recovery: docs/quickstarts/remote-gateway-pricetag/pricing.md
+          - Image options: docs/quickstarts/remote-gateway-pricetag/images.md
+          - Architecture and pilot limits: docs/testing/pricetag.md
           - AWS deployment runbook: docs/testing/aws-pricetag.md
           - Performance procedure: docs/testing/pricetag-perf.md
   - Scenarios:
       - Overview: docs/examples/README.md
-      - Praxis token quotas: docs/examples/praxis-quotas/README.md
       - OpenCode PR-candidate queue: docs/examples/opencode-pr-queue/README.md
-      - Demo task prompt: docs/examples/opencode-pr-queue/demo-task.md
+      - Review as a service: docs/examples/review-service/README.md
+      - Praxis token quotas: docs/examples/praxis-quotas/README.md
       - API key theft: docs/examples/api-key-theft/README.md
       - Document exfiltration: docs/examples/document-exfiltration/README.md
       - Model escalation: docs/examples/model-escalation/README.md
-      - Review as a service: docs/development/review-service.md
   - Development:
       - MaaS and PriceTag image publication: docs/development/pricetag-images.md
   - Testing:

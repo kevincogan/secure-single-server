@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure native providers and rotate a running gateway's PriceTag endpoint/key."""
+"""Configure OpenAI/external API providers and rotate their endpoint/key."""
 import argparse
 import copy
 import fcntl
@@ -10,6 +10,7 @@ from pathlib import Path
 import pwd
 import re
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -142,15 +143,41 @@ def discover_models(url, api, key):
     raise ValueError('Model catalog exceeds the pagination limit')
 
 
-def messages_auth(config, scheme):
+def print_model_catalog(catalogs, search='', page=None, page_size=20, all_models=False):
+    rows = [(api, row) for api, catalog in catalogs.items()
+            for row in sorted(catalog, key=lambda r: r['id']) if search.casefold() in row['id'].casefold()]
+    print('Model config: ' + str(ROOT / 'configs/pricetag/provider-models.json'))
+    print('Advertised IDs only; configure limits locally and verify prices in PriceTag. Nothing changed.')
+    total = max(1, (len(rows) + page_size - 1) // page_size)
+    number = page or 1
+    if number > total:
+        raise ValueError(f'Page {number} exceeds {total} pages ({len(rows)} matching models)')
+    while True:
+        selected = rows if all_models else rows[(number - 1) * page_size:number * page_size]
+        print(f'Matches: {len(rows)}; ' + ('all results' if all_models else f'page {number}/{total}'))
+        for api, row in selected:
+            print(f'{api}: {row["id"]}')
+        if all_models or page is not None or number == total or not sys.stdin.isatty() or not sys.stdout.isatty():
+            break
+        try:
+            if input('Enter: next page; q: quit: ').strip().lower() == 'q':
+                break
+        except EOFError:
+            break
+        number += 1
+    if not all_models and number < total:
+        print('Use --page NUMBER, --all, or --search TEXT to see other matches.')
+
+
+def messages_auth(config, scheme, name="pricetag"):
     """Set the upstream credential's header, independently of model selection."""
     found = []
     for chain in config['filter_chains']:
         for item in chain['filters']:
             if item['filter'] == 'credential_injection':
-                found += [c for c in item['clusters'] if c['name'] == 'pricetag-anthropic']
+                found += [c for c in item['clusters'] if c['name'] == name + '-anthropic']
     if len(found) != 1:
-        raise ValueError('Expected one PriceTag Messages credential injection')
+        raise ValueError('Expected one external Messages credential injection')
     found[0].update(header='Authorization' if scheme == 'bearer' else 'x-api-key',
                     header_prefix='Bearer ' if scheme == 'bearer' else '')
 
@@ -236,7 +263,7 @@ def check_host(allow_active=False):
         raise ValueError('Run with sudo on the gateway host')
     if DEPLOY.exists() or Path('/root/pricetag-admin').exists():
         if not allow_active or not (DEPLOY / 'bootstrap.done').is_file():
-            raise ValueError('Already prepared: only openai/pricetag --replace supports active deployment updates')
+            raise ValueError('Already prepared: only openai/external/pricetag --replace supports active deployment updates')
     if STATE.is_symlink() or (STATE.exists() and (
             not STATE.is_dir() or STATE.stat().st_uid != 0 or STATE.stat().st_mode & 0o077)):
         raise ValueError('Provider inputs must be a root-owned private directory')
@@ -258,7 +285,7 @@ def prompt(label, default=''):
     return value
 
 
-def provider_settings(name, api, url, key, urls=None):
+def provider_settings(name, api, url, key, urls=None, allocate_secret=True):
     from unified_config import validate
     urls = {dialect: normalize_url(address, dialect) for dialect, address in (urls or {api: url}).items()}
     active_urls = {}
@@ -269,8 +296,8 @@ def provider_settings(name, api, url, key, urls=None):
         try:
             discovered = discover_models(address, dialect, key)
         except ModelDiscoveryUnavailable as error:
-            if name != 'pricetag' or not ALLOW_UNVERIFIED_MODELS:
-                raise ValueError(str(error) + '; verify the URL. For a known PriceTag endpoint without '
+            if name not in ('pricetag', 'external') or not ALLOW_UNVERIFIED_MODELS:
+                raise ValueError(str(error) + '; verify the URL. For a known external endpoint without '
                                  'discovery, opt in with --allow-unverified-models') from None
             print('WARNING:', str(error))
             print('UNVERIFIED models: using configured presets; credentials, model access and served limits are not verified.')
@@ -280,7 +307,7 @@ def provider_settings(name, api, url, key, urls=None):
         enabled = 0
         for model, context, output in PRESETS[dialect]:
             if model not in available:
-                if name == 'pricetag' and (dialect, model) in PINNED_MODELS:
+                if name in ('pricetag', 'external') and (dialect, model) in PINNED_MODELS:
                     print('UNVERIFIED pin; not advertised by this catalog:', model)
                     unverified_models.append(model)
                 else:
@@ -293,8 +320,10 @@ def provider_settings(name, api, url, key, urls=None):
                         and 0 < advertised_output < advertised_context <= 2000000):
                     context, output = min(context, advertised_context), min(output, advertised_output)
             alias = name + '/' + model
-            selected[alias] = {'id': alias, 'provider': name, 'model': model,
-                               'apis': [dialect], 'context': context, 'output': output}
+            entry = selected.setdefault(alias, {'id': alias, 'provider': name, 'model': model,
+                                               'apis': [], 'context': context, 'output': output})
+            entry['apis'].append(dialect)
+            entry['context'], entry['output'] = min(entry['context'], context), min(entry['output'], output)
             prices[alias] = model
             enabled += 1
             print(f'Enabled {alias}: {dialect}, context={context}, output={output}')
@@ -303,16 +332,28 @@ def provider_settings(name, api, url, key, urls=None):
         else:
             print('No matching presets; disabled API:', dialect)
             print('Advertised models:', ', '.join(sorted(available)[:30]) or '(empty catalog)')
+            if name == 'external':
+                raise ValueError('No reviewed preset models for selected API ' + dialect + '; choose a supported API/provider')
     if not selected:
         raise ValueError('No preset models available on either endpoint; no secret saved')
     models = validate(list(selected.values()))
-    version = 1
-    while service('podman', 'secret', 'exists', f'praxis-{name}-api-key-v{version}').returncode == 0:
-        version += 1
+    secret = next_secret(name) if allocate_secret else None
     return {'models': models, 'prices': prices, 'urls': active_urls, 'unverified_apis': unverified,
             'unverified_models': unverified_models, 'messages_auth': MESSAGES_AUTH,
             'model': models[0], 'api': api, 'url': url, 'price': prices[models[0]['id']],
-            'secret': f'praxis-{name}-api-key-v{version}'}
+            'secret': secret}
+
+
+def next_secret(name):
+    version = 1
+    while True:
+        secret = f'praxis-{name}-api-key-v{version}'
+        status = service('podman', 'secret', 'exists', secret).returncode
+        if status == 1:
+            return secret
+        if status != 0:
+            raise ValueError('Cannot inspect provider secrets')
+        version += 1
 
 
 def replace_endpoints(config, urls, name='pricetag'):
@@ -337,7 +378,7 @@ def replace_endpoints(config, urls, name='pricetag'):
 def check_replacement_models(models, settings):
     available = {m['id']: m for m in settings['models']}
     if not models:
-        raise ValueError('No existing models for PriceTag')
+        raise ValueError('No existing models for this provider')
     installed = {(api, m['model']) for m in models for api in m['apis']}
     if PINNED_MODELS - installed:
         raise ValueError('Endpoint/key replacement does not add models; new pins require a separate '
@@ -351,7 +392,7 @@ def check_replacement_models(models, settings):
                              + '; no active configuration changed')
 
 
-def refresh_model_files(settings):
+def refresh_model_files(settings, name="pricetag"):
     """Rebuild native routes while retaining the deployed authentication boundary."""
     import yaml
     from provider_config import render
@@ -359,9 +400,9 @@ def refresh_model_files(settings):
     sys.path.insert(0, str(ROOT / 'scripts/pricetag'))
     from gateway import render as gateway
     old_models = validate(json.loads((DEPLOY / 'models.json').read_text()))
-    models = validate([m for m in old_models if m['provider'] != 'pricetag'] + settings['models'])
-    if any(m['provider'] != 'pricetag' for m in settings['models']):
-        raise ValueError('Refresh only accepts PriceTag models')
+    models = validate([m for m in old_models if m['provider'] != name] + settings['models'])
+    if any(m['provider'] != name for m in settings['models']):
+        raise ValueError('Refresh only accepts models owned by the selected provider')
     providers = json.loads((STATE / 'providers.json').read_text())
     current = json.loads((DEPLOY / 'gateway/gateway.json').read_text())
     # Refuse to overwrite native-chain edits made outside the provider helper.
@@ -371,7 +412,7 @@ def refresh_model_files(settings):
             raise ValueError('Native gateway settings differ from saved inputs; review them before refreshing models')
     fresh = render(yaml.safe_load((ROOT / 'configs/all-in-one/shared-gateway.yaml').read_text()),
         vllm=False, openai=False, anthropic=False,
-        custom={'pricetag': {api + '_url': url for api, url in settings['urls'].items()}})
+        custom={name: {api + '_url': url for api, url in settings['urls'].items()}})
     fresh = {c['name']: c for c in fresh['filter_chains']}
     for chain in providers['filter_chains']:
         for kind in ('load_balancer', 'credential_injection'):
@@ -382,11 +423,11 @@ def refresh_model_files(settings):
                 raise ValueError('Ambiguous native provider filters')
             if existing:
                 existing[0]['clusters'] = [c for c in existing[0]['clusters']
-                    if not c['name'].startswith('pricetag-')] + additions
+                    if not c['name'].startswith(name + '-')] + additions
             elif additions:
                 chain['filters'].append({'filter': kind, 'clusters': additions})
     if 'anthropic' in settings['urls']:
-        messages_auth(providers, settings.get('messages_auth', 'x-api-key'))
+        messages_auth(providers, settings.get('messages_auth', 'x-api-key'), name=name)
     generated = {c['name']: c for c in gateway(providers, models)['filter_chains']}
     updated = copy.deepcopy(current)
     for index, chain in enumerate(updated['filter_chains']):
@@ -409,40 +450,13 @@ def refresh_model_files(settings):
     print('Historical usage and existing prices are retained, including removed models.')
     values = {DEPLOY / 'gateway/gateway.json': updated, STATE / 'providers.json': providers,
               DEPLOY / 'models.json': models, STATE / 'models.json': models,
+              DEPLOY / 'catalog/models.json': [{k: m[k] for k in ('id', 'model', 'provider')} for m in models],
               DEPLOY / 'price-sources.json': prices, STATE / 'prices.json': prices}
     return {path: (json.dumps(value, indent=2) + '\n').encode() for path, value in values.items()}
 
 
-def migration_prices(models):
-    """Insert missing alias prices without repricing historical events or policy."""
-    statements = ['BEGIN;']
-    for model in models:
-        alias, source = model['id'], model['model']
-        if any(not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}', v) for v in (alias, source)):
-            raise ValueError('Invalid pricing alias/source')
-        statements.append(f"""DO $guard$ BEGIN
-IF NOT EXISTS (SELECT 1 FROM model_pricing WHERE model='{alias}') THEN
-  IF NOT EXISTS (SELECT 1 FROM model_pricing WHERE model='{source}') THEN
-    RAISE EXCEPTION 'Missing reviewed source price for {source}';
-  END IF;
-  IF EXISTS (SELECT 1 FROM usage_events WHERE model='{alias}') THEN
-    RAISE EXCEPTION 'Refusing to reprice historical usage for {alias}';
-  END IF;
-END IF;
-END $guard$;
-INSERT INTO model_pricing(model,provider,input_cost_per_mtok,output_cost_per_mtok,
-cache_write_cost_per_mtok,cache_read_cost_per_mtok,list_input_cost_per_mtok,
-list_output_cost_per_mtok,list_cache_write_cost_per_mtok,list_cache_read_cost_per_mtok)
-SELECT '{alias}',provider,input_cost_per_mtok,output_cost_per_mtok,
-cache_write_cost_per_mtok,cache_read_cost_per_mtok,list_input_cost_per_mtok,
-list_output_cost_per_mtok,list_cache_write_cost_per_mtok,list_cache_read_cost_per_mtok
-FROM model_pricing WHERE model='{source}' ON CONFLICT(model) DO NOTHING;""")
-    statements.append('COMMIT;')
-    return '\n'.join(statements) + '\n'
-
-
 def replacement_files(settings, name='pricetag', refresh=False):
-    files = refresh_model_files(settings) if refresh else {}
+    files = refresh_model_files(settings, name=name) if refresh else {}
     models = [m for m in json.loads((DEPLOY / 'models.json').read_text()) if m['provider'] == name]
     if not refresh:
         check_replacement_models(models, settings)
@@ -456,11 +470,11 @@ def replacement_files(settings, name='pricetag', refresh=False):
     settings['urls'] = {api: url for api, url in settings['urls'].items() if api in apis}
     for path in (() if refresh else (DEPLOY / 'gateway/gateway.json', STATE / 'providers.json')):
         updated = replace_endpoints(json.loads(path.read_text()), settings['urls'], name=name)
-        if name == 'pricetag' and 'anthropic' in settings['urls']:
-            messages_auth(updated, settings.get('messages_auth', 'x-api-key'))
+        if name in ('pricetag', 'external') and 'anthropic' in settings['urls']:
+            messages_auth(updated, settings.get('messages_auth', 'x-api-key'), name=name)
         files[path] = (json.dumps(updated, indent=2) + '\n').encode()
     uid = pwd.getpwnam('praxis-svc').pw_uid
-    target = 'OPENAI_API_KEY' if name == 'openai' else 'CUSTOM_PRICETAG_API_KEY'
+    target = 'OPENAI_API_KEY' if name == 'openai' else 'CUSTOM_' + name.upper() + '_API_KEY'
     for path in (DEPLOY / 'quadlets/pricetag-gateway.container',
                  USER_UNITS / str(uid) / 'pricetag-gateway.container',
                  STATE / 'provider-secrets.container'):
@@ -513,7 +527,7 @@ def activate_gateway():
     raise ValueError('gateway did not become healthy after replacement')
 
 
-def install_replacement(files, price_sql=None):
+def install_replacement(files, price_models=None):
     backup = Path(tempfile.mkdtemp(prefix='pricetag-replacement-', dir=STATE))
     originals, stats, manifest = {}, {}, []
     for index, path in enumerate(files):
@@ -526,11 +540,9 @@ def install_replacement(files, price_sql=None):
                          'gid': stats[path].st_gid, 'mode': stats[path].st_mode & 0o777})
     (backup / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('Private rollback backup:', backup)
-    if price_sql:
-        (backup / 'new-alias-prices.sql').write_text(price_sql)
-        service('podman', 'exec', '-i', 'pricetag-db', 'psql', '-U', 'metering', '-d', 'metering',
-                '-v', 'ON_ERROR_STOP=1', input=price_sql.encode(), check=True)
-        print('Missing alias prices inserted; existing rates and usage unchanged.')
+    if price_models:
+        from metering_admin import ensure_prices
+        ensure_prices(price_models)
 
     def write(path, contents):
         with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.replace-', delete=False) as output:
@@ -557,39 +569,87 @@ def install_replacement(files, price_sql=None):
             raise ValueError('Replacement and automatic recovery failed; restore from ' + str(backup)) from None
         raise ValueError('Replacement failed; previous files and gateway restored. Backup: ' + str(backup)) from None
     print('Provider replacement active. Users, budgets, usage and existing prices preserved.')
-    if price_sql:
-        print('PriceTag routing/catalog refreshed. New alias prices remain available if configuration is rolled back.')
+    if price_models:
+        print('PriceTag routing/catalog refreshed. New upstream price records remain available if configuration is rolled back.')
     print('Old Podman secrets retained for rollback. Verify a real inference request with your harness.')
 
 
-def add_provider(name, urls=None, replace=False, check_auth=False, check_inference=None, refresh=False):
-    if not sys.stdin.isatty():
+def read_key_file(path):
+    """Read a bounded private regular file without following its final symlink."""
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as source:
+        info = os.fstat(source.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise ValueError('Credential file must be a private regular file owned by the invoking user (root under sudo)')
+        data = source.read(16386)
+    if len(data) > 16385:
+        raise ValueError('Credential file exceeds the size limit')
+    try:
+        key = data.decode('ascii').strip()
+    except UnicodeDecodeError:
+        raise ValueError('Expected one ASCII credential line') from None
+    if not key or len(key) > 16384 or not re.fullmatch(r'[\x21-\x7e]+', key):
+        raise ValueError('Expected one nonempty credential line')
+    return key
+
+
+def provider_urls(name, urls=None, apis=None):
+    if name == 'openai':
+        return {'openai': 'https://api.openai.com/v1'}
+    overrides = {api: url for api, url in (urls or {}).items() if url}
+    if name == 'external':
+        selected = apis or ['openai', 'anthropic']
+        if set(overrides) - set(selected):
+            raise ValueError('Endpoint supplied for an unselected API')
+        result = {}
+        for dialect in selected:
+            label = 'OpenAI-compatible' if dialect == 'openai' else 'Anthropic Messages'
+            value = overrides.get(dialect)
+            if not value:
+                if not sys.stdin.isatty():
+                    raise ValueError('Supply an endpoint for each selected external API')
+                value = prompt(label + ' host or URL', next(iter(result.values()), ''))
+            result[dialect] = normalize_url(value, dialect)
+        return result
+    if len(overrides) == 2:
+        result = overrides
+    else:
+        base = next(iter(overrides.values()), None) or prompt(
+            'PriceTag host or URL (second hostname, https:// and /v1 are automatic)')
+        result = pricetag_urls(base)
+        result.update(overrides)
+    return {dialect: normalize_url(address, dialect) for dialect, address in result.items()}
+
+
+def collect_credential(name, urls, key_file=None):
+    for dialect, address in urls.items():
+        print('Credential destination:', dialect, address)
+    if len(urls) > 1:
+        print('Use one external-provider key authorized for both endpoints.')
+    if not key_file and not sys.stdin.isatty():
+        raise ValueError('Run interactively over SSH or use a private --key-file')
+    key = read_key_file(key_file) if key_file else getpass.getpass(name + ' provider key (hidden): ').strip()
+    if not key or len(key) > 16384 or not re.fullmatch(r'[\x21-\x7e]+', key):
+        raise ValueError('Expected one nonempty credential line')
+    return key
+
+
+def add_provider(name, urls=None, replace=False, check_auth=False, check_inference=None,
+                 refresh=False, key_file=None, apis=None, list_models=False, listing_options=None):
+    if not key_file and not sys.stdin.isatty():
         raise ValueError('Run interactively over SSH; never pipe provider keys')
     STATE.mkdir(mode=0o700, exist_ok=True)
     destination = STATE / ('provider-' + name + '.json')
-    if destination.exists() and not replace and not (check_auth or check_inference):
-        raise ValueError(name + ' is already configured; use --replace to update presets with a newly entered key')
+    if destination.exists() and not replace and not (check_auth or check_inference or list_models):
+        raise ValueError(name + ' is already configured; use --replace to update its key')
+    urls = provider_urls(name, urls, apis)
     api = 'openai' if name == 'openai' else 'both'
-    if name == 'openai':
-        urls = {'openai': 'https://api.openai.com'}
-    else:
-        overrides = {api: url for api, url in (urls or {}).items() if url}
-        if len(overrides) == 2:
-            urls = overrides
-        else:
-            base = next(iter(overrides.values()), None) or prompt(
-                'PriceTag host or URL (second hostname, https:// and /v1 are automatic)')
-            urls = pricetag_urls(base)
-            urls.update(overrides)
-    urls = {dialect: normalize_url(address, dialect) for dialect, address in urls.items()}
-    for dialect, address in urls.items():
-        print('Credential destination:', dialect, address)
     url = next(iter(urls.values()))
-    if len(urls) > 1:
-        print('Use one PriceTag key authorized for both URLs.')
-    key = getpass.getpass(name + ' provider key (hidden): ').strip()
-    if not key or len(key) > 16384 or not re.fullmatch(r'[\x21-\x7e]+', key):
-        raise ValueError('Expected one nonempty credential line')
+    key = collect_credential(name, urls, key_file)
+    if list_models:
+        catalogs = {dialect: discover_models(address, dialect, key) for dialect, address in urls.items()}
+        print_model_catalog(catalogs, **(listing_options or {}))
+        return
     if check_auth:
         diagnose_catalog_auth(urls, key)
         return
@@ -597,6 +657,19 @@ def add_provider(name, urls=None, replace=False, check_auth=False, check_inferen
         diagnose_inference(urls, key, check_inference)
         return
     settings = provider_settings(name, api, url, key, urls=urls)
+    save_provider(name, settings, key, replace=replace, refresh=refresh)
+
+
+def save_provider(name, settings, key, replace=False, refresh=False):
+    """Persist reviewed metadata and deliver the key only through Podman stdin."""
+    STATE.mkdir(mode=0o700, exist_ok=True)
+    destination = STATE / ('provider-' + name + '.json')
+    if destination.exists() and not replace:
+        raise ValueError(name + ' is already configured; refusing to overwrite')
+    settings = copy.deepcopy(settings)
+    if not settings.get('secret'):
+        settings['secret'] = next_secret(name)
+    api = settings.get('api', 'both')
     active = replace and (DEPLOY / 'bootstrap.done').is_file()
     files = replacement_files(settings, name=name, refresh=refresh) if active else None
     for model in settings.get('models', [settings['model']]):
@@ -606,7 +679,7 @@ def add_provider(name, urls=None, replace=False, check_auth=False, check_inferen
     if result.returncode:
         raise ValueError('Podman secret creation failed; credential values are not shown')
     if active:
-        install_replacement(files, price_sql=migration_prices(settings['models']) if refresh else None)
+        install_replacement(files, price_models=settings['models'] if refresh else None)
         return
     with tempfile.NamedTemporaryFile(mode='w', dir=STATE, prefix='.provider-', delete=False) as output:
         temporary = Path(output.name)
@@ -623,7 +696,7 @@ def export():
     from provider_config import render
     from unified_config import validate
     entries = {}
-    for name in ('openai', 'pricetag'):
+    for name in ('openai', 'pricetag', 'external'):
         path = STATE / ('provider-' + name + '.json')
         if path.is_file():
             entries[name] = json.loads(path.read_text())
@@ -631,17 +704,19 @@ def export():
         raise ValueError('Configure at least one provider before export')
     models = validate([model for entry in entries.values() for model in entry['models']])
     source = yaml.safe_load((ROOT / 'configs/all-in-one/shared-gateway.yaml').read_text())
-    custom = {'pricetag': {api + '_url': url for api, url in entries['pricetag']['urls'].items()}} if 'pricetag' in entries else {}
+    custom = {name: {api + '_url': url for api, url in entry['urls'].items()}
+              for name, entry in entries.items() if name != 'openai'}
     providers = render(source, vllm=False, openai='openai' in entries,
                        anthropic=False, custom=custom)
-    if 'pricetag' in entries and 'anthropic' in entries['pricetag']['urls']:
-        messages_auth(providers, entries['pricetag'].get('messages_auth', 'x-api-key'))
+    for name, entry in entries.items():
+        if name != 'openai' and 'anthropic' in entry['urls']:
+            messages_auth(providers, entry.get('messages_auth', 'x-api-key'), name=name)
     prices, lines = {}, ['[Container]']
     for name, entry in entries.items():
         prices.update(entry['prices'])
         if service('podman', 'secret', 'exists', entry['secret']).returncode:
             raise ValueError('Required provider secret is missing')
-        target = 'OPENAI_API_KEY' if name == 'openai' else 'CUSTOM_PRICETAG_API_KEY'
+        target = 'OPENAI_API_KEY' if name == 'openai' else 'CUSTOM_' + name.upper() + '_API_KEY'
         lines.append(f'Secret={entry["secret"]},type=env,target={target}')
     for filename, data in [('providers.json', providers), ('models.json', models), ('prices.json', prices)]:
         (STATE / filename).write_text(json.dumps(data, indent=2) + '\n')
@@ -649,33 +724,72 @@ def export():
     print(f'Exported {len(models)} models and secret references to {STATE}; no services started')
 
 
+def list_providers():
+    """Print active aliases and limits, never provider credentials."""
+    path = DEPLOY / 'models.json'
+    if not path.is_file():
+        raise ValueError('No prepared gateway; complete installation first')
+    rows = json.loads(path.read_text())
+    for name in sorted({row['provider'] for row in rows}):
+        print(name)
+        for row in rows:
+            if row['provider'] == name:
+                print(f"  {row['id']}  APIs={','.join(row['apis'])}  "
+                      f"context={row['context']}  output={row['output']}")
+
+
 def main():
     global DEBUG, ALLOW_UNVERIFIED_MODELS, CATALOG_AUTH, PINNED_MODELS, STATE, MESSAGES_AUTH
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['openai', 'pricetag', 'export'])
-    parser.add_argument('--openai-url', help='optional hosted PriceTag OpenAI endpoint override; HTTPS added if omitted')
-    parser.add_argument('--anthropic-url', help='optional hosted PriceTag Messages endpoint override')
+    parser.add_argument('command', choices=['openai', 'external', 'pricetag', 'export', 'list'])
+    parser.add_argument('--openai-url', help='external OpenAI-compatible endpoint; HTTPS added if omitted')
+    parser.add_argument('--anthropic-url', help='external Anthropic Messages endpoint')
+    parser.add_argument('--api', choices=['openai', 'anthropic', 'both'], help='external provider: supported API(s); default both')
+    parser.add_argument('--key-file', type=Path, help='root-owned mode 0400/0600 credential file; never put a key in argv')
     parser.add_argument('--replace', action='store_true', help='replace saved inputs; on an active gateway, updates this provider endpoint/key with rollback and restarts only Praxis')
     parser.add_argument('--refresh-models', action='store_true',
-                        help='with pricetag --replace: replace its routes/catalog with discovered presets plus explicit pins; retain historical pricing/usage')
+                        help='with external/pricetag --replace: replace its routes/catalog with discovered presets plus explicit pins; retain historical pricing/usage')
     parser.add_argument('--state-dir', type=Path, default=STATE,
                         help='root-owned private provider input directory from initial setup')
     parser.add_argument('--debug', action='store_true', help='print request URLs, auth header names, HTTP status and model counts; no keys or response bodies')
     parser.add_argument('--allow-unverified-models', action='store_true',
-                        help='PriceTag only: use unverified presets if initial model discovery returns 404/405/501; authentication/TLS failures still stop')
+                        help='External/legacy PriceTag only: use unverified presets if initial model discovery returns 404/405/501; authentication/TLS failures still stop')
+    parser.add_argument('--list-models', action='store_true',
+                        help='discover upstream model IDs using a prompted credential; no configuration change')
+    parser.add_argument('--search', default='', help='case-insensitive model-ID substring; with --list-models')
+    parser.add_argument('--page', type=int, help='show one page of discovered models (1-based)')
+    parser.add_argument('--page-size', type=int, default=20, help='models per display page (default 20)')
+    parser.add_argument('--all', dest='all_models', action='store_true', help='print every matching model without paging')
     parser.add_argument('--check-auth', action='store_true',
-                        help='PriceTag only: probe both catalog headers; save no key and change no provider config')
+                        help='External/legacy PriceTag only: probe both catalog headers; save no key and change no provider config')
     parser.add_argument('--check-inference', metavar='API:MODEL',
-                        help='PriceTag only: test reviewed model with at most 16 output tokens; no configuration change')
+                        help='External/legacy PriceTag only: test reviewed model with at most 16 output tokens; no configuration change')
     parser.add_argument('--messages-auth', choices=['x-api-key', 'bearer'], default='x-api-key',
-                        help='PriceTag Messages credential header for discovery and inference')
+                        help='External Messages credential header for discovery and inference')
     parser.add_argument('--catalog-auth', choices=['native', 'bearer', 'x-api-key'], default='native',
-                        help='PriceTag model-discovery header only; inference keeps its native API header')
+                        help='External model-discovery header only; inference keeps its native API header')
     parser.add_argument('--pin-model', action='append', default=[], metavar='API:MODEL',
-                        help='PriceTag only: include a reviewed preset even if omitted from a successful catalog')
+                        help='External/legacy PriceTag only: include a reviewed preset even if omitted from a successful catalog')
     args = parser.parse_args()
-    if args.refresh_models and (args.command != 'pricetag' or not args.replace or args.check_auth or args.check_inference):
-        parser.error('--refresh-models requires pricetag --replace without diagnostics')
+    if not 1 <= args.page_size <= 1000 or (args.page is not None and args.page < 1):
+        parser.error('page must be positive and page-size must be 1–1000')
+    if args.page is not None and args.all_models:
+        parser.error('choose --page or --all')
+    if (args.search or args.page is not None or args.all_models or args.page_size != 20) and not args.list_models:
+        parser.error('search and pagination options require --list-models')
+    if args.command == 'list' and args.list_models:
+        parser.error('choose openai/external/pricetag for upstream discovery')
+    if args.command == 'list':
+        list_providers()
+        return
+    if args.list_models and (args.command == 'export' or args.check_auth or args.check_inference or args.replace or args.refresh_models):
+        parser.error('--list-models is a read-only provider discovery operation')
+    if args.api and args.command != 'external':
+        parser.error('--api is only supported for external')
+    if args.key_file and args.command == 'export':
+        parser.error('--key-file is only for provider setup or diagnostics')
+    if args.refresh_models and (args.command not in ('pricetag', 'external') or not args.replace or args.check_auth or args.check_inference):
+        parser.error('--refresh-models requires external/pricetag --replace without diagnostics')
     if args.check_auth and args.check_inference:
         parser.error('Choose one diagnostic: --check-auth or --check-inference')
     probe = None
@@ -695,13 +809,13 @@ def main():
         if not separator or dialect not in PRESETS or model not in {row[0] for row in PRESETS[dialect]}:
             parser.error('--pin-model must name an API and a model in the reviewed presets')
         PINNED_MODELS.add((dialect, model))
-    if (PINNED_MODELS or CATALOG_AUTH != 'native' or MESSAGES_AUTH != 'x-api-key' or args.check_auth or probe) and args.command != 'pricetag':
-        parser.error('discovery/header options are only supported for pricetag')
+    if (PINNED_MODELS or CATALOG_AUTH != 'native' or MESSAGES_AUTH != 'x-api-key' or args.check_auth or probe) and args.command not in ('pricetag', 'external'):
+        parser.error('discovery/header options are only supported for external or pricetag')
     ALLOW_UNVERIFIED_MODELS = args.allow_unverified_models
-    if ALLOW_UNVERIFIED_MODELS and args.command != 'pricetag':
-        parser.error('--allow-unverified-models is only supported for pricetag')
+    if ALLOW_UNVERIFIED_MODELS and args.command not in ('pricetag', 'external'):
+        parser.error('--allow-unverified-models is only supported for external or pricetag')
     DEBUG = args.debug
-    check_host(allow_active=(args.command in ('openai', 'pricetag') and args.replace) or args.check_auth or bool(probe))
+    check_host(allow_active=(args.command in ('openai', 'pricetag', 'external') and args.replace) or args.check_auth or bool(probe) or args.list_models)
     os.umask(0o077)
     STATE.mkdir(mode=0o700, exist_ok=True)
     lock_fd = os.open(STATE / '.setup.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -719,7 +833,10 @@ def main():
             if value:
                 urls[api] = value
         add_provider(args.command, urls=urls, replace=args.replace, check_auth=args.check_auth,
-                     check_inference=probe, refresh=args.refresh_models)
+                     check_inference=probe, refresh=args.refresh_models, key_file=args.key_file, list_models=args.list_models,
+                     listing_options={'search': args.search, 'page': args.page, 'page_size': args.page_size,
+                                      'all_models': args.all_models},
+                     apis=['openai', 'anthropic'] if args.api in (None, 'both') else [args.api])
 
 
 if __name__ == '__main__':

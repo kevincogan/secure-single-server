@@ -53,8 +53,8 @@ code{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:var(--t
 </style>
 <script>
 (function(){var t=null;
-try{var p=JSON.parse(localStorage.getItem('/secure-single-server/.__palette'));var s=p&&p.color&&p.color.scheme;t=s==='slate'?'dark':s==='default'?'light':null}catch(e){}
-if(!t){try{t=localStorage.getItem('site-theme')}catch(e){}}
+try{t=localStorage.getItem('site-theme')}catch(e){}
+if(t!=='dark'&&t!=='light'){t=null;try{var p=JSON.parse(localStorage.getItem('/secure-single-server/.__palette'));var s=p&&p.color&&p.color.scheme;t=s==='slate'?'dark':s==='default'?'light':null}catch(e){}}
 if(t!=='dark'&&t!=='light')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
 document.documentElement.setAttribute('data-site',t)})();
 </script>

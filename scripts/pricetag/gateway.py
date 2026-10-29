@@ -6,22 +6,20 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'common'))
-from unified_config import catalog, render as unified, validate
+from unified_config import active, catalog, render as unified, validate
 
 INFERENCE = ['/v1/chat/completions', '/v1/responses', '/v1/messages']
 DASHBOARD = ['/', '/login', '/logout', '/dashboard', '/admin', '/manager', '/me', '/welcome',
-             '/whoami', '/api/v1/whoami', '/api/v1/pricing',
+             '/management', '/admin/impersonate', '/me/keys', '/whoami', '/api/v1/whoami', '/api/v1/pricing',
              '/api/v1/dashboard/overview', '/api/v1/dashboard/groups',
-             '/api/v1/dashboard/users', '/api/v1/dashboard/models',
+             '/api/v1/dashboard/users', '/api/v1/dashboard/directory-users',
+             '/api/v1/dashboard/models', '/api/v1/dashboard/tools',
              '/api/v1/dashboard/timeline', '/api/v1/dashboard/recent',
-             '/api/v1/me/quota', '/api/v1/me/quota/request',
-             '/api/v1/admin/quota/policy', '/api/v1/admin/quota/overrides',
-             '/api/v1/admin/quota/models', '/api/v1/admin/quota/denials',
-             '/api/v1/admin/people', '/api/v1/admin/identities', '/api/v1/admin/models',
-             '/api/v1/admin/org/roles', '/api/v1/admin/org/valid-groups',
-             '/api/v1/admin/users', '/api/v1/org/scope', '/api/v1/org/tree',
+             '/api/v1/admin/safety-net', '/api/v1/admin/models', '/api/v1/admin/partner-users',
+             '/api/v1/admin/model-policies', '/api/v1/admin/pricing-discounts',
+             '/api/v1/admin/pricing/refresh', '/api/v1/admin/pricing/reprice', '/api/v1/org/scope',
              '/api/v1/org/usage', '/api/v1/org/person', '/api/v1/org/charts']
-DASHBOARD_PREFIXES = ['/api/v1/admin/people/', '/api/v1/org/quota-requests']
+DASHBOARD_PREFIXES = ['/api/v1/management/', '/me/keys/', '/api/v1/admin/partner-users/', '/api/v1/admin/pricing/reprice/']
 
 
 def render(original, models, origins=None):
@@ -51,9 +49,18 @@ def render(original, models, origins=None):
             'cache_ttl_seconds': 0, 'timeout_seconds': 5}
         filters.insert(0, key_filter)
         filters.insert(1, {'filter': 'identity_header_guard', 'prefix': 'x-tenant-'})
-        filters.insert(2, {'filter': 'model_access', 'mode': 'allowlist',
-                           'models': [model['id'] for model in models if api in model['apis']],
-                           'group_metadata_key': 'x-tenant-group', 'max_body_bytes': 33554432})
+        selected = active(models, original, api)
+        # The unified renderer already denies inference for an unused API.
+        # model_access rejects an empty allowlist at startup; retain auth and
+        # the terminal 404 instead of constructing an invalid filter.
+        if selected:
+            # json_body rewrites during body pre-read, before model_access's
+            # request hook. Check upstream IDs here; the unified renderer
+            # separately rejects any unregistered client alias using the
+            # original, body-derived X-Gateway-Model header.
+            filters.insert(2, {'filter': 'model_access', 'mode': 'allowlist',
+                               'models': sorted({model['model'] for model in selected}),
+                               'group_metadata_key': 'x-tenant-group', 'max_body_bytes': 33554432})
         for i, item in enumerate(filters):
             if item['filter'] == 'token_count':
                 filters.insert(i, {'filter': 'external_metering',
@@ -61,9 +68,10 @@ def render(original, models, origins=None):
                     'internal_auth_file': '/run/secrets/pricetag-m2m',
                     'fail_open': False, 'timeout_seconds': 5, 'source': 'secure-single-server',
                     'default_username': '', 'default_model': 'unknown',
+                    'model_policy_check': True,
                     'identity_header_prefix': 'x-tenant-', 'feature_key': 'inference-tokens'})
                 break
-        if request_headers is not None:
+        if request_headers is not None and selected:
             load_balancer = next((i for i, item in enumerate(filters)
                                   if item['filter'] == 'load_balancer'), len(filters))
             filters.insert(load_balancer, request_headers)
@@ -97,7 +105,8 @@ def render(original, models, origins=None):
     dashboard = [
             {'filter': 'headers', 'request_remove': ['Authorization', 'X-Api-Key', 'X-MaaS-Username',
                 'X-MaaS-Group', 'X-MaaS-Subscription', 'X-Tenant-Username', 'X-Tenant-Group',
-                'X-Tenant-Subscription', 'X-Tenant-Model', 'X-Forwarded-User']},
+                'X-Tenant-Subscription', 'X-Tenant-Model', 'X-Forwarded-User',
+                'X-Forwarded-Groups', 'X-Forwarded-Real-User']},
             {'filter': 'router', 'routes': [{'path_prefix': '/', 'cluster': 'metering'}]},
             {'filter': 'load_balancer', 'clusters': [
                 {'name': 'metering', 'endpoints': ['pricetag-metering:8080']}]}]

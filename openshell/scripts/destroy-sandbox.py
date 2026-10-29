@@ -9,7 +9,7 @@ import sys
 import time
 
 
-# v0.1.4 may retain a removed resource's metadata for its five-minute
+# OpenShell may retain a removed resource's metadata for its five-minute
 # orphan grace plus a one-minute reconciliation sweep when watch events lag.
 DEFAULT_TIMEOUT = 420
 

@@ -1,0 +1,18 @@
+{
+  "version": "v0.1.5",
+  "release_url": "https://github.com/NVIDIA/OpenShell/releases/tag/v0.1.5",
+  "images": {
+    "gateway": "ghcr.io/nvidia/openshell/gateway@sha256:ca0bc15a045017ee20bfab682f1a561eca6e6c6ed7d021d20641da24aaa6dfb6",
+    "supervisor": "ghcr.io/nvidia/openshell/supervisor@sha256:fabcd01f656e9d23df4386f82e80b4f48b90f3452d7d5c58889007643a069161",
+    "sandbox": "ghcr.io/nvidia/openshell/sandbox@sha256:e9adf9ecde328122414ad2ee8c6fc5d5b389e4cf168daf4357c46f5a77d55851"
+  },
+  "cli_sha256": {
+    "amd64": "ca1ad6e6fbb4a6cd407e95763391b8ecff02912e7d9c467e7ca22696fe80af69",
+    "arm64": "30c949b4ac07a9c8245c1248eb82e4eb241615134fcabf3c9bf30dec7d00addf"
+  },
+  "prover_sha256": {
+    "amd64": "79e6c13db4e6cb819afc90b3d7ca8c920875e4a082cffb1984e9656a12670914",
+    "arm64": "2d7e9a1fadfdccee3a49a25a84660d7eddcbcbb3af59ab9068442d8770fdcf2f"
+  },
+  "prover_architectures": ["amd64", "arm64"]
+}

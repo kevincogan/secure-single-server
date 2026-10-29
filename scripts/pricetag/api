@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Call public PriceTag management APIs using an in-memory browser session."""
+import argparse
+import http.cookiejar
+import json
+import os
+from pathlib import Path
+import ssl
+import stat
+import urllib.error
+import urllib.parse
+import urllib.request
+
+
+class APIError(ValueError):
+    pass
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def private(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd) as source:
+        info = os.fstat(source.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            raise ValueError('input must be an owned private regular file')
+        text = source.read(256 * 1024 + 1)
+        if len(text.encode()) > 256 * 1024:
+            raise ValueError('input too large')
+        return text
+
+
+def endpoint(origin, path):
+    url = urllib.parse.urlsplit(origin)
+    if url.scheme != 'https' or not url.hostname or url.username or url.password or url.path not in ('', '/') or url.query or url.fragment:
+        raise ValueError('url must be an HTTPS origin')
+    route = urllib.parse.urlsplit(path)
+    allowed_query = route.path == '/api/v1/pricing' and route.query == 'used=0'
+    if route.scheme or route.netloc or (route.query and not allowed_query) or route.fragment or '%' in path or '..' in path or not (route.path in ('/api/v1/whoami', '/api/v1/pricing') or path.startswith(('/api/v1/management/', '/api/v1/admin/', '/api/v1/dashboard/', '/api/v1/org/', '/me/keys'))):
+        raise ValueError('path must be a supported management API route without query or traversal')
+    return origin.rstrip('/'), path
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('method', choices=('GET','POST','PUT','PATCH','DELETE'))
+    parser.add_argument('path')
+    parser.add_argument('--url', required=True)
+    parser.add_argument('--key-file', required=True, type=Path)
+    parser.add_argument('--ca-file', type=Path)
+    parser.add_argument('--input', type=Path)
+    parser.add_argument('--output', required=True, type=Path, help='new private response file; may contain a one-time key')
+    args = parser.parse_args()
+    origin, path = endpoint(args.url, args.path)
+    if args.method == 'GET' and args.input:
+        parser.error('GET cannot have an input body')
+    key = private(args.key_file).strip()
+    body = None
+    if args.input:
+        payload = json.loads(private(args.input))
+        if not isinstance(payload,dict): raise ValueError('input must be a JSON object')
+        body = json.dumps(payload).encode()
+    ctx=ssl.create_default_context(cafile=str(args.ca_file) if args.ca_file else None)
+    cookies=http.cookiejar.CookieJar()
+    client=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect(),urllib.request.HTTPSHandler(context=ctx),urllib.request.HTTPCookieProcessor(cookies))
+    # Reserve output before any side effects. Credentials/session never go to disk.
+    fd=os.open(args.output,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+    with os.fdopen(fd,'wb') as output:
+        login=urllib.request.Request(origin+'/login',urllib.parse.urlencode({'api_key':key}).encode(),headers={'Origin':origin})
+        try:
+            client.open(login,timeout=15).close()
+            raise ValueError('expected login redirect')
+        except urllib.error.HTTPError as error:
+            valid=error.code==302 and any(c.name=='metering_session' for c in cookies)
+            error.close()
+            if not valid: raise ValueError('login rejected') from None
+        req=urllib.request.Request(origin+path,body,method=args.method,headers={'Origin':origin,'Content-Type':'application/json'})
+        try:
+            with client.open(req,timeout=60) as response:
+                data=response.read(8*1024*1024+1)
+                if len(data)>8*1024*1024: raise ValueError('response exceeds output bound')
+                output.write(data); output.flush();os.fsync(output.fileno())
+        except urllib.error.HTTPError as error:
+            status=error.code;error.close()
+            raise APIError(f'API returned HTTP {status}; no automatic retry') from None
+    print('Response saved privately: '+str(args.output))
+
+
+if __name__=='__main__':
+    try:
+        main()
+    except APIError as error:
+        raise SystemExit(str(error)) from None
+    except (OSError,ValueError):
+        raise SystemExit('API operation failed; inspect server state before retrying a mutation. Credentials and response errors withheld.') from None

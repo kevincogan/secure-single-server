@@ -24,6 +24,7 @@ class StreamlitSecurityTests(unittest.TestCase):
         try:
             from model_client import call_model
 
+            arguments.setdefault("request_format", "openai")
             if opener is None:
                 return call_model(ticket, **arguments)
             with patch("urllib.request.build_opener", return_value=opener):
@@ -57,6 +58,7 @@ class StreamlitSecurityTests(unittest.TestCase):
         )
 
     def test_model_request_sends_credential_and_model_selection(self):
+        """Verify the model request carries the selected model and credential."""
         requests = []
 
         class FakeResponse:
@@ -92,6 +94,66 @@ class StreamlitSecurityTests(unittest.TestCase):
         self.assertEqual(request.headers["Authorization"], "Bearer opaque-placeholder")
         body = json.loads(request.data)
         self.assertEqual(body["model"], "gpt-5.5")
+        self.assertEqual(body["max_completion_tokens"], 1000)
+        self.assertNotIn("max_tokens", body)
+        self.assertEqual(body["temperature"], 0.1)
+
+    def test_compatible_request_keeps_legacy_parameters_and_temperature(self):
+        """Keep compatibility servers on their supported request fields."""
+        requests = []
+
+        class FakeResponse:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return False
+
+            def read(self):
+                return json.dumps(
+                    {"choices": [{"message": {"content": "Compatible summary"}}]}
+                ).encode()
+
+        class FakeOpener:
+            def open(self, request, timeout):
+                del timeout
+                requests.append(request)
+                return FakeResponse()
+
+        response = self.call_model(
+            "Checkout is slow",
+            base_url="https://inference.internal/v1",
+            api_key="opaque-placeholder",
+            model="local-model",
+            request_format="openai-compatible",
+            opener=FakeOpener(),
+        )
+
+        self.assertEqual(response, "Compatible summary")
+        body = json.loads(requests[0].data)
+        self.assertEqual(body["max_tokens"], 300)
+        self.assertEqual(body["temperature"], 0.1)
+        self.assertNotIn("max_completion_tokens", body)
+
+    def test_provider_selects_the_matching_request_format(self):
+        """Bind each documented provider alias to its endpoint dialect."""
+        sys.path.insert(0, str(DEMO))
+        try:
+            from model_client import request_format_for_provider
+
+            self.assertEqual(
+                request_format_for_provider("streamlit-demo-openai"), "openai"
+            )
+            self.assertEqual(
+                request_format_for_provider("streamlit-demo-compatible"),
+                "openai-compatible",
+            )
+            with self.assertRaisesRegex(ValueError, "not a supported"):
+                request_format_for_provider("unknown-provider")
+        finally:
+            sys.path.remove(str(DEMO))
 
     def test_model_client_rejects_credential_bearing_endpoint_urls(self):
         for url in (
@@ -223,13 +285,14 @@ class StreamlitSecurityTests(unittest.TestCase):
         )
 
     def test_provider_profiles_bind_credentials_to_native_endpoints(self):
+        """Keep provider profiles aligned with their endpoint policies."""
         openai = yaml.safe_load((DEMO / "providers/openai.yaml").read_text())
         compatible = yaml.safe_load(
             (DEMO / "providers/openai-compatible.yaml").read_text()
         )
         for profile in (openai, compatible):
             self.assertEqual(profile["credentials"][0]["env_vars"], ["OPENAI_API_KEY"])
-            self.assertEqual(profile["binaries"], ["/usr/local/bin/python3"])
+            self.assertEqual(profile["binaries"], ["/usr/local/bin/python3.12"])
             endpoint = profile["endpoints"][0]
             self.assertEqual(endpoint["protocol"], "rest")
             self.assertEqual(endpoint["enforcement"], "enforce")
@@ -248,11 +311,15 @@ class StreamlitSecurityTests(unittest.TestCase):
         self.assertIn("openshell profile import", guide)
         self.assertIn("--credential OPENAI_API_KEY", guide)
         self.assertIn("POST /v1/chat/completions", guide)
+        self.assertIn("max_completion_tokens", guide)
+        self.assertIn("max_tokens", guide)
+        self.assertIn("temperature=0.1", guide)
 
     def test_documentation_explains_where_to_run_the_demo(self):
+        """Require setup guidance to identify the host and execution location."""
         guide = (ROOT / "docs/examples/streamlit-security/README.md").read_text()
         normalized = " ".join(guide.split())
-        self.assertIn("dedicated RHEL 9 x86_64 Linux host", normalized)
+        self.assertIn("dedicated RHEL 9.8+ x86_64 Linux host", normalized)
         self.assertIn("/opt/secure-single-server", normalized)
         self.assertIn("Landlock ABI 3", normalized)
         self.assertIn("not a supported OpenShell host", normalized)
@@ -318,8 +385,18 @@ class StreamlitSecurityTests(unittest.TestCase):
         self.assertIn('document.get("next_page_token")', script)
 
     def test_safe_runner_launches_authorized_interpreter(self):
+        """Require the runner to use the Python binary allowed by its profile."""
         script = (DEMO / "run-safe.sh").read_text()
-        self.assertIn("/usr/local/bin/python3 -m streamlit", script)
+        self.assertIn("/usr/local/bin/python3.12 -m streamlit", script)
+        self.assertNotIn("/usr/local/bin/python3 -m streamlit", script)
+        self.assertIn('--env STREAMLIT_DEMO_PROVIDER="${PROVIDER}"', script)
+
+    def test_ordinary_demo_uses_the_same_authorized_interpreter_and_provider(self):
+        dockerfile = (DEMO / "Dockerfile").read_text()
+        self.assertIn('CMD ["/usr/local/bin/python3.12"', dockerfile)
+        unsafe_runner = (DEMO / "run-unsafe.sh").read_text()
+        self.assertIn("${STREAMLIT_DEMO_PROVIDER:?", unsafe_runner)
+        self.assertIn("--env STREAMLIT_DEMO_PROVIDER", unsafe_runner)
 
     def test_safe_runner_allows_gateway_websocket_origin(self):
         script = (DEMO / "run-safe.sh").read_text()

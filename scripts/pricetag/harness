@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'common'))
 from harness import configuration, write_codex_catalog
+from harness_config import opencode_model
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -34,9 +35,8 @@ def opencode_configuration(catalog, selected, api, base, caller):
         if (type(context) is not int or type(output) is not int
                 or not 0 < output < context <= 2000000 or not isinstance(apis, list)):
             continue
-        model = {'name': entry['id'], 'limit': {'context': context, 'output': output}}
         for model_api in set(apis) & grouped.keys():
-            grouped[model_api][entry['id']] = model
+            grouped[model_api][entry['id']] = opencode_model(entry, model_api)
     for model_api, models in grouped.items():
         if not models:
             continue

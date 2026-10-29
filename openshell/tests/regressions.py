@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class HarnessTests(unittest.TestCase):
     def setUp(self):
+        """Create isolated CLI and SSH stubs for regression checks."""
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.td = Path(self.temp.name)
@@ -61,7 +62,7 @@ if a[:3]==['rule','approve','regression']:
         ssh.write_text('''#!/usr/bin/env python3
 import json,os,sys
 with open(os.environ['MOCK_LOG'],'a') as f: f.write(json.dumps(sys.argv[1:])+'\\n')
-sys.stdin.read()
+sys.stdin.buffer.read()
 ''')
         ssh.chmod(0o755)
         self.env = {**os.environ, 'PATH': str(self.td)+':'+os.environ['PATH'],

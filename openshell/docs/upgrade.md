@@ -2,7 +2,7 @@
 
 Use this procedure when changing the pinned OpenShell release, including a
 bootc OS switch or rollback that changes OpenShell. Upstream's [0.1 migration
-guide](https://github.com/NVIDIA/OpenShell/blob/v0.1.4/docs/upgrade/0-1-0.mdx)
+guide](https://github.com/NVIDIA/OpenShell/blob/v0.1.5/docs/upgrade/0-1-0.mdx)
 requires coordinated component upgrades and recreation of 0.0.x sandboxes.
 This repository applies the recreation rule to every OpenShell upgrade.
 
@@ -30,7 +30,7 @@ migrated database compatible with an older release.
    removes stored managed inference routes; they cannot be automatically
    translated into per-sandbox grants. Import reviewed profiles for preserved
    providers before creating sandboxes, then explicitly attach only intended
-   providers. Follow the [upstream inference migration](https://github.com/NVIDIA/OpenShell/blob/v0.1.4/docs/how-it-works/inference.mdx#migrate-from-managed-inference-routes).
+   providers. Follow the [upstream inference migration](https://github.com/NVIDIA/OpenShell/blob/v0.1.5/docs/how-it-works/inference.mdx#migrate-from-managed-inference-routes).
    The current Praxis paths continue using their dedicated endpoint policies
    and harness provider configuration; do not add direct cloud-provider access.
 5. Recreate sandboxes from the new pinned deployment and restore only exported
@@ -43,12 +43,12 @@ For rollback, repeat export, deletion and recreation against the rollback
 release. Restore a compatible database backup when its migration requires it;
 reverting the OS alone is insufficient.
 
-The v0.1.4 deployment uses pinned upstream gateway, supervisor, and sandbox
+The v0.1.5 deployment uses pinned upstream gateway, supervisor, and sandbox
 images. The CLI comes from an architecture-matched release archive verified
 against the committed SHA-256 before installation or copying into bootc.
 OpenClaw uses the upstream v2026.9.9 image. Its application directory `/app`
 is read-only; agent files live in `/home/node/.openclaw/workspace`. Follow the
-[0.1.4 pin review](../../docs/testing/upgrade-0.1.4.md) before promotion.
+[0.1.5 pin review](../../docs/testing/upgrade-0.1.5.md) before promotion.
 
 Repository test cleanup uses `destroy-sandbox.py` to confirm absence through
 successful paginated listings. Failed deletion, failed listing, malformed output

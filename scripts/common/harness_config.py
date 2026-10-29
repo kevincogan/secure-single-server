@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import os
+import re
 from pathlib import Path
 import runpy
 import shutil
@@ -29,6 +30,28 @@ def read_json(path):
     if not isinstance(value, dict):
         raise ValueError(str(path) + ': expected a JSON object')
     return value
+
+
+def opencode_model(entry, api):
+    """Select the SDK from upstream metadata while keeping the gateway alias."""
+    meta = entry['praxis']
+    model = {'name': entry['id'], 'limit': {k: meta[k] for k in ('context', 'output')}}
+    upstream = meta['upstream_model'].lower()
+    local_qwen = meta['provider'] == 'vllm' and 'qwen' in upstream
+    if api == 'openai' and (local_qwen or upstream.startswith(('gpt-5', 'gpt-6', 'o1', 'o3', 'o4'))):
+        # The generic Chat SDK sends max_tokens, rejected by modern GPT.
+        model.update(provider={'npm': '@ai-sdk/openai'}, reasoning=True,
+                     options={'store': False, 'reasoningEffort': 'medium',
+                              'include': ['reasoning.encrypted_content']})
+    elif api in ('anthropic', 'messages') and re.match(
+            r'^claude-(?:(?:opus|sonnet)-(?:4-[678]|5)(?:-|$)|haiku-5(?:-|$))', upstream):
+        # OpenCode's automatic binding control is rejected by some Messages
+        # gateways. Keep adaptive thinking explicit: a partial thinking object
+        # replaces OpenCode defaults and otherwise drops the thinking type.
+        model['options'] = {'thinking': {'type': 'adaptive', 'blockBinding': False}}
+    elif api == 'openai' and 'qwen' in upstream:
+        model.update(reasoning=True, interleaved={'field': 'reasoning'})
+    return model
 
 
 def files(home, openai, messages, openai_port, messages_port):
@@ -69,20 +92,7 @@ def files(home, openai, messages, openai_port, messages_port):
     providers = opencode.setdefault('provider', {})
     for name, data, port, sdk in [('openai', openai, openai_port, 'openai-compatible'),
                                   ('messages', messages, messages_port, 'anthropic')]:
-        catalog_models = {m['id']: {'name': m['id'], 'limit': {k: m['praxis'][k] for k in ('context', 'output')}}
-                          for m in data}
-        for item in data:
-            model = catalog_models[item['id']]
-            upstream = item['praxis']['upstream_model'].lower()
-            local_qwen = item['praxis']['provider'] == 'vllm' and 'qwen' in upstream
-            if name == 'openai' and (local_qwen or upstream.startswith(('gpt-5', 'gpt-6', 'o1', 'o3', 'o4'))):
-                # The generic Chat SDK sends max_tokens, rejected by modern GPT.
-                # Use Responses for GPT and the qualified local Qwen backend.
-                model.update(provider={'npm': '@ai-sdk/openai'}, reasoning=True,
-                    options={'store': False, 'reasoningEffort': 'medium',
-                             'include': ['reasoning.encrypted_content']})
-            elif name == 'openai' and 'qwen' in upstream:
-                model.update(reasoning=True, interleaved={'field': 'reasoning'})
+        catalog_models = {m['id']: opencode_model(m, name) for m in data}
         providers['praxis-' + name] = {'npm': '@ai-sdk/' + sdk, 'name': 'Praxis ' + name,
             'options': {'baseURL': f'http://127.0.0.1:{port}/v1', 'apiKey': 'local-placeholder'},
             'models': catalog_models}

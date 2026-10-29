@@ -12,7 +12,7 @@ for compatibility but is deprecated for new deployments.
 
 The configured request path is **OpenCode → Praxis → vLLM**. Local vLLM
 serving and the host Praxis route can be checked independently. The sandbox
-path uses the trusted host mapping in OpenShell v0.1.4. Rebuilt OpenClaw images also support [bounded local model/tool tasks](../docs/quickstarts/openshell-praxis/openclaw.md); previously published images require a rebuild.
+path uses the trusted host mapping in OpenShell v0.1.5. Rebuilt OpenClaw images also support [bounded local model/tool tasks](../docs/quickstarts/openshell-praxis/openclaw.md); previously published images require a rebuild.
 
 ## Host requirements
 
@@ -215,7 +215,7 @@ after changing these defaults.
 
 Upstream OpenShell removed workspace-global managed inference routes and the
 `openshell inference` commands in the 0.1 series; this is not an ODH-only omission.
-The supported replacement is [provider profiles and per-sandbox attachments](https://github.com/NVIDIA/OpenShell/blob/v0.1.4/docs/how-it-works/inference.mdx#migrate-from-managed-inference-routes).
+The supported replacement is [provider profiles and per-sandbox attachments](https://github.com/NVIDIA/OpenShell/blob/v0.1.5/docs/how-it-works/inference.mdx#migrate-from-managed-inference-routes).
 This example uses an explicit **OpenCode** Praxis provider configuration plus a
 sandbox policy permitting only the Praxis endpoint. It does not yet import an
 OpenShell provider profile or attach a provider; that integration is tracked in

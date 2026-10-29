@@ -382,6 +382,24 @@ printf 'SHELL_ALIVE\\n'
                     self.assertIn("ForwardAgent=no", output)
                     self.assertIn("ec2-user@192.0.2.8", output)
 
+    def test_key_generation_is_quiet_and_keeps_passphrase_prompt(self):
+        for shell in SHELLS:
+            with self.subTest(shell=shell), tempfile.TemporaryDirectory() as directory:
+                key = Path(directory) / 'keys' / 'test-key'
+                output = self.run_shell(shell, "set -eu\nMODE=normal\n" + SETUP + f"""
+SSH_KEY={shlex.quote(str(key))}
+ssh-keygen() {{
+  case " $* " in *' -q '*) ;; *) printf 'UNEXPECTED_RANDOMART\n';; esac
+  case " $* " in *' -N '*) printf 'UNEXPECTED_PASSPHRASE_OVERRIDE\n';; esac
+  touch "$SSH_KEY" "$SSH_KEY.pub"
+}}
+aws_test_key
+printf 'SHELL_ALIVE\\n'
+""")
+                self.assertNotIn('UNEXPECTED_', output)
+                self.assertIn(str(key), output)
+                self.assertEqual(key.stat().st_mode & 0o777, 0o600)
+
     def test_key_overwrite_and_missing_settings_do_not_exit_shell(self):
         with tempfile.TemporaryDirectory() as directory:
             key = Path(directory) / "existing"

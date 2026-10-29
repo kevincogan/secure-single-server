@@ -33,6 +33,10 @@ would actually configure, with per-agent tiers (local-only models for
 some agents, approved external models for others) as the deployment
 pattern this control enables.
 
+A [visual walkthrough](visual-demo.html) draws the same story as
+figures: both sides, the catalog lookup, and the three refused
+fallbacks. It is published on the documentation site.
+
 This is one of three examples from the same incident family. The
 [API key theft](../api-key-theft/README.md) example documented the gap
 this control closes; this example is the demonstration that it is

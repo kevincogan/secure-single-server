@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en" data-register="blueprint">
+<head>
+<title>One -m flag spends the key in the open — behind the catalog it dies before credentials</title>
+<link rel="stylesheet" href="kit.css" data-ve-kit>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTEuMzUgMTQ1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJlZCBIYXQiPjx0aXRsZT5SZWQgSGF0PC90aXRsZT48cGF0aCBmaWxsPSIjZWUwMDAwIiBkPSJNMTI3LjQ3LDgzLjQ5YzEyLjUxLDAsMzAuNjEtMi41OCwzMC42MS0xNy40NmExNCwxNCwwLDAsMC0uMzEtMy40MmwtNy40NS0zMi4zNmMtMS43Mi03LjEyLTMuMjMtMTAuMzUtMTUuNzMtMTYuNkMxMjQuODksOC42OSwxMDMuNzYuNSw5Ny41MS41LDkxLjY5LjUsOTAsOCw4My4wNiw4Yy02LjY4LDAtMTEuNjQtNS42LTE3Ljg5LTUuNi02LDAtOS45MSw0LjA5LTEyLjkzLDEyLjUsMCwwLTguNDEsMjMuNzItOS40OSwyNy4xNkE2LjQzLDYuNDMsMCwwLDAsNDIuNTMsNDRjMCw5LjIyLDM2LjMsMzkuNDUsODQuOTQsMzkuNDVNMTYwLDcyLjA3YzEuNzMsOC4xOSwxLjczLDkuMDUsMS43MywxMC4xMywwLDE0LTE1Ljc0LDIxLjc3LTM2LjQzLDIxLjc3Qzc4LjU0LDEwNCwzNy41OCw3Ni42LDM3LjU4LDU4LjQ5YTE4LjQ1LDE4LjQ1LDAsMCwxLDEuNTEtNy4zM0MyMi4yNyw1MiwuNSw1NSwuNSw3NC4yMmMwLDMxLjQ4LDc0LjU5LDcwLjI4LDEzMy42NSw3MC4yOCw0NS4yOCwwLDU2LjctMjAuNDgsNTYuNy0zNi42NSwwLTEyLjcyLTExLTI3LjE2LTMwLjgzLTM1Ljc4Ii8+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTE2MCw3Mi4wN2MxLjczLDguMTksMS43Myw5LjA1LDEuNzMsMTAuMTMsMCwxNC0xNS43NCwyMS43Ny0zNi40MywyMS43N0M3OC41NCwxMDQsMzcuNTgsNzYuNiwzNy41OCw1OC40OWExOC40NSwxOC40NSwwLDAsMSwxLjUxLTcuMzNsMy42Ni05LjA2QTYuNDMsNi40MywwLDAsMCw0Mi41Myw0NGMwLDkuMjIsMzYuMywzOS40NSw4NC45NCwzOS40NSwxMi41MSwwLDMwLjYxLTIuNTgsMzAuNjEtMTcuNDZhMTQsMTQsMCwwLDAtLjMxLTMuNDJaIi8+PC9zdmc+Cg==">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+<style>
+html:root{--font-body:Roboto,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;--font-display:Roboto,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;--font-mono:"Roboto Mono",ui-monospace,Menlo,monospace}
+html:root:not([data-site]){--bg:#fff;--surface:#f5f5f5;--text:#212121;--text-dim:#666;--border:rgba(0,0,0,.07);--border-bright:#757575;--accent:#a60000;--accent-dim:rgba(166,0,0,.1)}
+@media (prefers-color-scheme:dark){html:root:not([data-site]){--bg:#1e2029;--surface:#272935;--text:#c0c0c7;--text-dim:#8c8d95;--border:rgba(255,255,255,.08);--border-bright:#8c8d95;--accent:#f56e6e;--accent-dim:rgba(245,110,110,.1)}}
+html:root[data-site="light"]{color-scheme:light;--bg:#fff;--surface:#f5f5f5;--text:#212121;--text-dim:#666;--border:rgba(0,0,0,.07);--border-bright:#757575;--accent:#a60000;--accent-dim:rgba(166,0,0,.1);--ok:#1c7443;--warn:#776300;--risk:#b0341e;--info:#145f99}
+html:root[data-site="dark"]{color-scheme:dark;--bg:#1e2029;--surface:#272935;--text:#c0c0c7;--text-dim:#8c8d95;--border:rgba(255,255,255,.08);--border-bright:#8c8d95;--accent:#f56e6e;--accent-dim:rgba(245,110,110,.1);--ok:#6fd3a0;--warn:#e8d36a;--risk:#ff7b6b;--info:#7cc0f0}
+.site-bar .end{display:flex;align-items:center;gap:var(--s-3)}
+.theme-toggle{background:none;border:0;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;width:2.4rem;height:2.4rem;border-radius:var(--r-1)}
+.theme-toggle:hover,.theme-toggle:focus-visible{background:rgba(255,255,255,.16)}
+.theme-toggle svg{width:24px;height:24px;fill:currentColor}
+.theme-toggle .to-light{display:none}
+html[data-site="dark"] .theme-toggle .to-dark{display:none}
+html[data-site="dark"] .theme-toggle .to-light{display:block}
+.site-bar{background:#ee0000;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:var(--s-4);min-height:3rem;padding:var(--s-2) var(--s-4);font-family:var(--font-body)}
+.site-bar a{color:#fff;text-decoration:none;font-weight:500;display:flex;align-items:center;gap:var(--s-3)}
+.site-bar a:hover{text-decoration:underline}
+.site-bar img{height:1.6rem;width:auto}
+.layout{display:grid;grid-template-columns:190px minmax(0,1fr);gap:var(--s-8);align-items:start}
+nav.toc{position:sticky;top:var(--s-4)}
+nav.toc a{display:block;padding:var(--s-1) 0 var(--s-1) var(--s-2);color:var(--text-dim);text-decoration:none;font-size:var(--t-small);border-left:2px solid transparent}
+nav.toc a.on{border-left-color:var(--accent);color:var(--text)}
+@media (max-width:1000px){
+.layout{display:block}
+nav.toc{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:var(--s-5);overflow-x:auto;mask-image:linear-gradient(to right,#000 92%,transparent);margin-bottom:var(--s-4)}
+nav.toc a{white-space:nowrap;border-left:0;padding:var(--s-2) 0}
+}
+section{scroll-margin-top:76px}
+.ghost .sh{stroke-dasharray:6 5}
+.wall{stroke:var(--border-bright);stroke-dasharray:6 5;fill:none;stroke-width:1.5}
+.ms{font-family:var(--font-mono,ui-monospace,Menlo,monospace)}
+svg>.sub,svg>text.ms{fill:var(--text-dim);font-weight:400}
+svg>text.cnt{fill:var(--accent)}
+.cnt{fill:var(--accent);font-weight:700}
+.okt{fill:var(--ok)}
+.ok-e{stroke:var(--ok)}
+.risk-e{stroke:var(--risk)}
+.warn-e{stroke:var(--warn)}
+.term{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:var(--t-small);background:var(--surface);border-radius:var(--r-2);padding:var(--s-4);overflow-x:auto;white-space:pre;margin:var(--s-2) 0}
+.con{font-size:var(--t-small);color:var(--text-dim);margin:var(--s-2) 0 0}
+.note{background:var(--surface);border-radius:var(--r-2);padding:var(--s-4)}
+.note ul{margin:var(--s-2) 0 0;padding-left:1.1em}
+.note li{margin:var(--s-1) 0}
+code{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:var(--t-small)}
+</style>
+<script>
+(function(){var t=null;
+try{t=localStorage.getItem('site-theme')}catch(e){}
+if(t!=='dark'&&t!=='light'){t=null;try{var p=JSON.parse(localStorage.getItem('/secure-single-server/.__palette'));var s=p&&p.color&&p.color.scheme;t=s==='slate'?'dark':s==='default'?'light':null}catch(e){}}
+if(t!=='dark'&&t!=='light')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+document.documentElement.setAttribute('data-site',t)})();
+</script>
+</head>
+<body>
+<div class="site-bar">
+<a href="../../../"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTEuMzUgMTQ1IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlJlZCBIYXQiPjx0aXRsZT5SZWQgSGF0PC90aXRsZT48ZGVmcz48bWFzayBpZD0iYmFuZCI+PHJlY3QgeD0iLTEwIiB5PSItMTAiIHdpZHRoPSIyMjAiIGhlaWdodD0iMTcwIiBmaWxsPSIjZmZmIi8+PHBhdGggZmlsbD0iIzAwMCIgZD0iTTE2MCw3Mi4wN2MxLjczLDguMTksMS43Myw5LjA1LDEuNzMsMTAuMTMsMCwxNC0xNS43NCwyMS43Ny0zNi40MywyMS43N0M3OC41NCwxMDQsMzcuNTgsNzYuNiwzNy41OCw1OC40OWExOC40NSwxOC40NSwwLDAsMSwxLjUxLTcuMzNsMy42Ni05LjA2QTYuNDMsNi40MywwLDAsMCw0Mi41Myw0NGMwLDkuMjIsMzYuMywzOS40NSw4NC45NCwzOS40NSwxMi41MSwwLDMwLjYxLTIuNTgsMzAuNjEtMTcuNDZhMTQsMTQsMCwwLDAtLjMxLTMuNDJaIi8+PC9tYXNrPjwvZGVmcz48cGF0aCBmaWxsPSIjZmZmIiBtYXNrPSJ1cmwoI2JhbmQpIiBkPSJNMTI3LjQ3LDgzLjQ5YzEyLjUxLDAsMzAuNjEtMi41OCwzMC42MS0xNy40NmExNCwxNCwwLDAsMC0uMzEtMy40MmwtNy40NS0zMi4zNmMtMS43Mi03LjEyLTMuMjMtMTAuMzUtMTUuNzMtMTYuNkMxMjQuODksOC42OSwxMDMuNzYuNSw5Ny41MS41LDkxLjY5LjUsOTAsOCw4My4wNiw4Yy02LjY4LDAtMTEuNjQtNS42LTE3Ljg5LTUuNi02LDAtOS45MSw0LjA5LTEyLjkzLDEyLjUsMCwwLTguNDEsMjMuNzItOS40OSwyNy4xNkE2LjQzLDYuNDMsMCwwLDAsNDIuNTMsNDRjMCw5LjIyLDM2LjMsMzkuNDUsODQuOTQsMzkuNDVNMTYwLDcyLjA3YzEuNzMsOC4xOSwxLjczLDkuMDUsMS43MywxMC4xMywwLDE0LTE1Ljc0LDIxLjc3LTM2LjQzLDIxLjc3Qzc4LjU0LDEwNCwzNy41OCw3Ni42LDM3LjU4LDU4LjQ5YTE4LjQ1LDE4LjQ1LDAsMCwxLDEuNTEtNy4zM0MyMi4yNyw1MiwuNSw1NSwuNSw3NC4yMmMwLDMxLjQ4LDc0LjU5LDcwLjI4LDEzMy42NSw3MC4yOCw0NS4yOCwwLDU2LjctMjAuNDgsNTYuNy0zNi42NSwwLTEyLjcyLTExLTI3LjE2LTMwLjgzLTM1Ljc4Ii8+PC9zdmc+Cg==" alt="" width="34" height="26">Secure single-server AI harness</a>
+<div class="end">
+<a href="./">← Scenario write-up</a>
+<button class="theme-toggle" type="button" aria-label="Switch to dark mode"><svg class="to-dark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg><svg class="to-light" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg></button>
+</div>
+</div>
+<main>
+<header>
+<p class="eyebrow">Security demo · model escalation</p>
+<h1>One <span class="ms">-m</span> flag spends the key in the open — behind the catalog it dies before credentials</h1>
+<p class="lead">The same agent image, run twice. In a plain container the wrong-model pick is <b>honored end to end</b> and nothing refuses or records it. Behind the boundary, the catalog lists exactly the approved models: the same pick gets <b>404 before credentials</b>, forged headers are stripped, and the direct path dies at <b>connect()</b>.</p>
+<p class="meta">secure-single-server · OpenShell sandbox · docs/examples/model-escalation</p>
+</header>
+<figure>
+<div class="frame">
+<svg class="ve-svg" viewBox="0 0 1000 540" aria-label="Left, a plain container with no boundary: the agent's wrong-model pick reaches the stand-in provider with the key attached and nothing refuses it. Right, the OpenShell sandbox: the only model path is the gateway, whose catalog refuses the pick with 404 before credentials; the direct provider path dies at the wall with EACCES.">
+<rect class="ve-bnd" x="40" y="60" width="500" height="150"/>
+<text class="ve-bnd-t" x="56" y="84">plain container · no boundary</text>
+<rect class="ve-bnd" x="40" y="270" width="500" height="230"/>
+<text class="ve-bnd-t" x="56" y="294">sandbox · execution boundary</text>
+<path class="ve-e is-hot risk-e" d="M240 142H700"/>
+<text class="ve-el" x="400" y="132" text-anchor="middle">-m gpt-6-sol + key</text>
+<path class="risk-e" fill="none" d="M240 350H700"/>
+<text class="ve-x" x="680" y="356" text-anchor="middle">✕</text>
+<text class="ve-el" x="400" y="340" text-anchor="middle">model: gpt-6-sol</text>
+<text class="sub" x="400" y="374" text-anchor="middle">404 before credentials</text>
+<path class="risk-e" fill="none" d="M240 378H300V462H700"/>
+<text class="ve-x" x="542" y="468" text-anchor="middle">✕</text>
+<text class="ve-el" x="400" y="452" text-anchor="middle">direct · skips gateway</text>
+<text class="sub" x="400" y="486" text-anchor="middle">EACCES at connect()</text>
+<g class="ve-n"><rect class="sh" x="70" y="110" width="170" height="64"/><text x="155" y="138" text-anchor="middle">agent</text><text class="sub ms" x="155" y="158" text-anchor="middle">key in env</text></g>
+<g class="ve-n"><rect class="sh" x="700" y="110" width="260" height="64"/><text x="830" y="138" text-anchor="middle">stand-in provider</text><text class="sub" x="830" y="158" text-anchor="middle">3 requests · canary attached</text></g>
+<text class="sub" x="830" y="204" text-anchor="middle">no refusal · no audit</text>
+<g class="ve-n"><rect class="sh" x="70" y="330" width="170" height="64"/><text x="155" y="358" text-anchor="middle">agent</text><text class="sub" x="155" y="378" text-anchor="middle">same image</text></g>
+<g class="ve-n is-key"><rect class="sh" x="700" y="300" width="260" height="100"/><text x="830" y="334" text-anchor="middle">Praxis gateway</text><text class="sub" x="830" y="356" text-anchor="middle">catalog lists</text><text class="sub ms" x="830" y="378" text-anchor="middle">gpt-4.1-mini only</text></g>
+<g class="ve-n"><rect class="sh" x="700" y="430" width="260" height="64"/><text x="830" y="458" text-anchor="middle">api.openai.com</text><text class="sub" x="830" y="478" text-anchor="middle">the real provider</text></g>
+</svg>
+</div>
+<figcaption><span class="fig-n">Fig. 1</span>Side A honors the flag end to end — a real provider would bill and tell no one. Side B's only model path is the gateway: the catalog answers 404 before credential injection, and the direct provider path dies at connect().</figcaption>
+</figure>
+<div class="layout">
+<nav class="toc" aria-label="Sections">
+<p class="ve-label caps">Contents</p>
+<a href="#move">The move</a>
+<a href="#side-a">No boundary</a>
+<a href="#catalog">The catalog</a>
+<a href="#fallbacks">Three fallbacks</a>
+<a href="#sanctioned">Sanctioned flow</a>
+<a href="#evidence">The evidence</a>
+<a href="#claims">Not claimed</a>
+<a href="#remember">Remember</a>
+</nav>
+<div>
+<section id="move">
+<p class="ve-label caps">The move</p>
+<h2>Same credential, same endpoint — only the model field changes</h2>
+<p>Spending a found key on a <b>different provider</b> is key theft. Spending it on a <b>stronger model at the legitimate provider</b> is model escalation: same credential, same endpoint, one field. The September 2026 benchmark made the move famous — the model outsourced part of its task to stronger models and outscored itself.</p>
+<figure>
+<div class="frame">
+<svg class="ve-svg" viewBox="0 0 1000 220" aria-label="Two request bodies identical except the model field: gpt-4.1-mini, budget and approved, versus gpt-6-sol, premium and never approved.">
+<path class="ve-e is-async" d="M430 120H570"/>
+<text class="ve-el" x="500" y="111" text-anchor="middle">one field</text>
+<g class="ve-n"><rect class="sh" x="60" y="80" width="370" height="80"/><text class="ms" x="245" y="112" text-anchor="middle">{"model": "gpt-4.1-mini"}</text><text class="sub" x="245" y="140" text-anchor="middle">budget · approved</text></g>
+<g class="ve-n is-key"><rect class="sh" x="570" y="80" width="370" height="80"/><text class="ms" x="755" y="112" text-anchor="middle">{"model": "gpt-6-sol"}</text><text class="sub" x="755" y="140" text-anchor="middle">premium · never approved</text></g>
+</svg>
+</div>
+<figcaption><span class="fig-n">Fig. 2</span>The escalation move is one field in the request body. A boundary that validates paths, credentials, and quotas but not this field does not stop it — that was the gap the API-key-theft demo recorded, and the catalog is the fix that shipped.</figcaption>
+</figure>
+</section>
+<section id="side-a">
+<p class="ve-label caps">No boundary</p>
+<h2>The client's config owns the model list — and it is honored</h2>
+<p>Side A runs the agent image as a plain container: a provider key in the environment, unrestricted network, a stand-in provider on the host playing the real provider's role. The client-side model list is the user's own config file — the user who owns the config owns the list.</p>
+<p class="ve-label">the stand-in provider's own request log</p>
+<pre class="term">the agent ran its bash tool, wrote the proof file, and confirmed completion on gpt-6-sol
+stand-in provider records: 3 completion request(s) for gpt-6-sol, canary credential attached to each</pre>
+<p>The choice was honored verbatim, the key traveled with every request, and nothing refused or logged a violation. A real provider would bill for this and tell no one.</p>
+</section>
+<section id="catalog">
+<p class="ve-label caps">The mechanism</p>
+<h2>The model field is a lookup key, not a command</h2>
+<p>Behind the boundary, every path to a model runs through the Praxis gateway. Its unified model catalog answers <code>/v1/models</code> from the administrator's configuration, and the request's model field is checked against it <b>before credentials are injected</b>.</p>
+<figure class="ve-steps">
+<ve-flow label="The gateway pre-reads the body, strips caller copies of the routing header, looks the body's model up in the catalog, and only then injects credentials and forwards upstream.">
+<ve-node id="m-agent" at="1 1" key>agent</ve-node>
+<ve-node id="m-gw" at="2 1" sub="body pre-read" data-s="1">gateway</ve-node>
+<ve-node id="m-cat" at="2 2" shape="db" data-s="2" sub="approved models">catalog</ve-node>
+<ve-node id="m-up" at="3 1" data-s="4">provider</ve-node>
+<ve-edge from="m-agent" to="m-gw" label="sends" data-s="1"/>
+<ve-edge from="m-gw" to="m-cat" label="looks up" data-s="2"/>
+<ve-edge from="m-gw" to="m-up" label="forwards" data-s="4" hot/>
+</ve-flow>
+<div class="ve-player">
+<ol class="ve-cap">
+<li data-n="1/4">Body pre-read: caller copies of the routing header X-Gateway-Model are stripped — the body's model decides.</li>
+<li data-n="2/4">Catalog lookup: the model field is matched against the administrator's approved set.</li>
+<li data-n="3/4">Not in the catalog: static 404 Unknown model — before credentials, before the upstream.</li>
+<li data-n="4/4">In the catalog: the real credential is injected and the request is forwarded.</li>
+</ol>
+<button data-go="-1" aria-label="Previous step">‹</button>
+<button data-play aria-label="Replay">Play</button>
+<input type="range" min="0" max="3" value="3" aria-label="Step">
+<button data-go="1" aria-label="Next step">›</button>
+</div>
+<figcaption><span class="fig-n">Fig. 3</span>The catalog check runs first: an unknown model never reaches credential injection, so no client-side change can reach the routable set.</figcaption>
+</figure>
+</section>
+<section id="fallbacks">
+<p class="ve-label caps">The fallbacks</p>
+<h2>The same pick, three ways — all refused</h2>
+<p>Side B tries the escalation three ways: in the request body, forged into the routing header, and by skipping the gateway entirely.</p>
+<figure>
+<div class="cases">
+<div class="case" data-st="risk">
+<span class="chip risk">404</span>
+<h3>wrong model in the body</h3>
+<svg class="ve-mini" viewBox="0 0 240 136" aria-label="The gateway looks the body's model up in the catalog and refuses the unknown model with 404.">
+<path class="ve-e is-st" d="M114 66H150"/>
+<text class="ve-x" x="132" y="72" text-anchor="middle">✕</text>
+<g class="ve-n"><rect class="sh" x="10" y="46" width="104" height="40"/><text x="62" y="64" text-anchor="middle">agent</text><text class="sub ms" x="62" y="80" text-anchor="middle">gpt-6-sol</text></g>
+<g class="ve-n"><rect class="sh" x="150" y="46" width="84" height="40"/><text x="192" y="64" text-anchor="middle">gateway</text><text class="sub" x="192" y="80" text-anchor="middle">catalog</text></g>
+<text class="sub" x="120" y="128" text-anchor="middle">404 Unknown model</text>
+</svg>
+</div>
+<div class="case" data-st="risk">
+<span class="chip risk">stripped</span>
+<h3>forged routing header</h3>
+<svg class="ve-mini" viewBox="0 0 240 136" aria-label="A forged X-Gateway-Model header is stripped during body pre-read; the body's model decides, and it is refused.">
+<path class="ve-e is-st" d="M114 66H150"/>
+<text class="ve-x" x="132" y="72" text-anchor="middle">✕</text>
+<g class="ve-n"><rect class="sh" x="10" y="46" width="104" height="40"/><text x="62" y="64" text-anchor="middle">agent</text><text class="sub" x="62" y="80" text-anchor="middle">fake header</text></g>
+<g class="ve-n"><rect class="sh" x="150" y="46" width="84" height="40"/><text x="192" y="64" text-anchor="middle">gateway</text><text class="sub" x="192" y="80" text-anchor="middle">strips it</text></g>
+<text class="sub" x="120" y="128" text-anchor="middle">body decides → 404</text>
+</svg>
+</div>
+<div class="case" data-st="risk">
+<span class="chip risk">EACCES</span>
+<h3>skip the gateway</h3>
+<svg class="ve-mini" viewBox="0 0 240 136" aria-label="The direct connection to the provider is denied at the wall with EACCES.">
+<path class="wall" d="M136 14V118"/>
+<path class="ve-e is-st" d="M114 66H150"/>
+<text class="ve-x" x="136" y="72" text-anchor="middle">✕</text>
+<g class="ve-n"><rect class="sh" x="10" y="46" width="104" height="40"/><text x="62" y="64" text-anchor="middle">agent</text><text class="sub" x="62" y="80" text-anchor="middle">direct</text></g>
+<g class="ve-n"><rect class="sh" x="150" y="46" width="84" height="40"/><text x="192" y="64" text-anchor="middle">provider</text><text class="sub ms" x="192" y="80" text-anchor="middle">:443</text></g>
+<text class="sub" x="120" y="128" text-anchor="middle">EACCES at connect()</text>
+</svg>
+</div>
+</div>
+<figcaption><span class="fig-n">Fig. 4</span>Three fallbacks, three refusals: the catalog answers the body's model with 404, the header never survives pre-read, and the direct path is the key-theft vector one layer down — it dies the same way.</figcaption>
+</figure>
+</section>
+<section id="sanctioned">
+<p class="ve-label caps">The sanctioned flow</p>
+<h2>The approved model answers</h2>
+<p>The demo's sanctioned pick is a budget model — the budget-versus-premium tiering an administrator would actually configure. Through the catalog it works exactly as intended:</p>
+<p class="ve-label">side B, through the catalog</p>
+<pre class="term">the approved model answered: I am the GPT-4.1-mini language model.</pre>
+<p>Side B makes exactly one real completion request — the sanctioned model, a few tokens. The wrong-model requests are refused before credentials, and no key ever exists inside the sandbox to transmit.</p>
+</section>
+<section id="evidence">
+<p class="ve-label caps">The evidence</p>
+<h2>The refusal is the gateway's own answer, not the client's</h2>
+<div class="kpis">
+<div class="kpi"><span class="ve-label">models in the catalog</span><span class="val"><span data-count="1">1</span></span><span class="ve-label">gpt-4.1-mini</span></div>
+<div class="kpi"><span class="ve-label">wrong-model requests that reached a provider</span><span class="val"><span data-count="0">0</span></span><span class="ve-label">refused before credentials</span></div>
+<div class="kpi"><span class="ve-label">provider credentials inside the sandbox</span><span class="val"><span data-count="0">0</span></span><span class="ve-label">placeholder only</span></div>
+</div>
+<p>As the user experiences it, opencode wraps the refusal in a generic <code>UnknownError</code> — it cannot attribute the refusal. The raw request from the sandbox's sanctioned runtime shows whose answer it is:</p>
+<p class="ve-label">the raw request, at the wall of the gateway</p>
+<pre class="term">HTTP 404
+Unknown model</pre>
+<p class="ve-label">the direct provider path</p>
+<pre class="term">connect error: EACCES</pre>
+<p class="ve-label">the audit record</p>
+<pre class="term">[1792602895.804] [sandbox] [OCSF ] [ocsf] NET:OPEN [MED] DENIED /usr/bin/node-26(0) -&gt; api.openai.com:443 [reason:transparent_tcp_policy_denied]</pre>
+<p>Every other failure happens inside the client or inside an allowed connection; the audit record holds the one network denial side B produces.</p>
+</section>
+<section id="claims">
+<p class="ve-label caps">What this demo does not claim</p>
+<h2>The catalog decides which — not how much</h2>
+<div class="note">
+<span class="chip warn">scope</span>
+<ul>
+<li>The catalog is per-gateway. Every sandbox behind one gateway shares the routable set; per-agent tiers are a deployment pattern, not something this demo demonstrates.</li>
+<li>The client contract constrains the catalog. The deployed client path sends the legacy max_tokens parameter, which current premium families reject; the sanctioned model must be one the qualified client can actually call.</li>
+<li>Quota and audit are the spend controls. The catalog decides which models are routable; rolling-day token limits and per-request access logs decide and record how much.</li>
+</ul>
+</div>
+</section>
+<section id="remember">
+<p class="ve-label caps">What to remember</p>
+<h2>Agents may use only the models the administrator approved</h2>
+<ol>
+<li>The model field is a catalog lookup key, not a command. The gateway refuses unknown models with a static 404 before credential injection.</li>
+<li>The refusal happens where the credential lives. No provider key exists inside the sandbox, so there is nothing to spend on any model.</li>
+<li>Headers do not route. Caller copies of X-Gateway-Model are stripped during body pre-read; the body's model decides.</li>
+</ol>
+</section>
+<section class="sources" aria-label="Sources">
+<p class="ve-label caps">Sources</p>
+<p><code>docs/examples/model-escalation/README.md</code> — the scenario</p>
+<p><code>openshell/scripts/model-misuse-demo.sh</code> — runs both sides in one sandbox, destroyed on exit</p>
+<p><code>openshell/scripts/model-misuse-catalog.json</code> — the shipped single-model catalog</p>
+<p><code>scripts/common/unified_config.py</code> — the unified model catalog</p>
+<p>Sibling examples in the same incident family: API key theft, document exfiltration. The side-A provider is a host-side stand-in; the planted key is a synthetic canary.</p>
+</section>
+</div>
+</div>
+</main>
+<script>
+const links=[...document.querySelectorAll('nav.toc a')];
+const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){for(const l of links)l.classList.toggle('on',l.hash==='#'+e.target.id)}},{rootMargin:'-10% 0px -80% 0px'});
+for(const l of links){const s=document.querySelector(l.hash);if(s)io.observe(s)}
+const tb=document.querySelector('.theme-toggle');
+function setTheme(t){document.documentElement.setAttribute('data-site',t);tb.setAttribute('aria-label',t==='dark'?'Switch to light mode':'Switch to dark mode')}
+setTheme(document.documentElement.getAttribute('data-site')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+tb.addEventListener('click',()=>{const t=document.documentElement.getAttribute('data-site')==='dark'?'light':'dark';setTheme(t);try{localStorage.setItem('site-theme',t)}catch(e){}});
+</script>
+</body>
+</html>

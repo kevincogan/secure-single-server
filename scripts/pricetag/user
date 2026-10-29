@@ -1,44 +1,26 @@
 #!/usr/bin/env python3
 """Provision a MaaS user key and optional PriceTag monthly USD override."""
 import argparse
-import hashlib
-import http.cookiejar
-import json
 import math
-import os
 from pathlib import Path
 import re
-import ssl
 import subprocess
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
+
+from metering_admin import provision
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
-def private(path):
-    if path.is_symlink() or not path.is_file() or path.stat().st_mode & 0o077:
-        raise ValueError(f'{path}: use a private regular file with mode 0600 or 0400')
-    return path.read_text().strip()
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--subject', required=True)
-    p.add_argument('--name', help='display name when creating a new PriceTag person')
-    p.add_argument('--monthly-usd', type=float, help='optional per-person override; rotation otherwise leaves it unchanged')
+    p.add_argument('--name', help='display name for the local partner identity')
+    p.add_argument('--monthly-usd', type=float, help='optional per-login USD allowance; rotation otherwise leaves it unchanged')
+    p.add_argument('--bootstrap-admin', action='store_true', help='SSH-only initial administrator role setup')
     p.add_argument('--rotate', action='store_true', help='replace the same named MaaS key')
-    p.add_argument('--output', type=Path, required=True, help='new private path for the one-time MaaS key')
-    p.add_argument('--admin-key', type=Path, default=Path('/root/pricetag-admin/admin.key'))
-    p.add_argument('--gateway', default='https://localhost:8443')
-    p.add_argument('--ca', type=Path, default=Path('/etc/praxis-pricetag/ca.pem'))
+    p.add_argument('--output', type=Path, help='new private path for the one-time MaaS key')
+    p.add_argument('--no-key', action='store_true', help='create/update the PriceTag identity and budget without issuing or rotating a key')
     p.add_argument('--maas-url', default='http://127.0.0.1:18086')
     p.add_argument('--key-lifetime', default='90d')
     args = p.parse_args()
@@ -46,55 +28,15 @@ def main():
         p.error('invalid subject')
     if args.monthly_usd is not None and (not math.isfinite(args.monthly_usd) or not 0 < args.monthly_usd <= 10000):
         p.error('monthly-usd must be greater than zero and at most 10000')
-    if args.output.exists() or args.output.is_symlink():
+    if args.no_key and (args.rotate or args.output):
+        p.error('--no-key cannot be combined with --rotate or --output')
+    if not args.no_key and args.output is None:
+        p.error('key creation requires --output; use --no-key for identity/budget changes only')
+    if args.output and (args.output.exists() or args.output.is_symlink()):
         p.error('choose a new output path; existing credentials are never overwritten')
-    if args.ca.is_symlink() or not args.ca.is_file():
-        p.error('--ca must be an existing regular certificate file')
-    endpoint = urllib.parse.urlsplit(args.gateway)
-    if endpoint.scheme != 'https' or not endpoint.hostname or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment or endpoint.path not in ('', '/'):
-        p.error('gateway must be an HTTPS origin')
-    admin_key = private(args.admin_key)
-    context = ssl.create_default_context(cafile=str(args.ca))
-    jar = http.cookiejar.CookieJar()
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(),
-                                         urllib.request.HTTPCookieProcessor(jar),
-                                         urllib.request.HTTPSHandler(context=context))
-
-    login = urllib.request.Request(args.gateway.rstrip('/') + '/login',
-        data=urllib.parse.urlencode({'api_key': admin_key}).encode(),
-        headers={'Content-Type': 'application/x-www-form-urlencoded', 'Origin': args.gateway.rstrip('/')})
-    try:
-        opener.open(login, timeout=15)
-    except urllib.error.HTTPError as error:
-        if error.code != 302 or not any(cookie.name == 'metering_session' for cookie in jar):
-            raise ValueError('administrator dashboard login failed') from None
-
-    def api(path, body=None, method=None):
-        payload = None if body is None else json.dumps(body).encode()
-        req = urllib.request.Request(args.gateway.rstrip('/') + path, data=payload, method=method,
-            headers={'Origin': args.gateway.rstrip('/'), 'Content-Type': 'application/json'})
-        with opener.open(req, timeout=15) as response:
-            return json.load(response)
-
-    identities = api('/api/v1/admin/identities') or []
-    matches = [row for row in identities if row.get('username') == args.subject]
-    if len(matches) > 1:
-        raise ValueError('ambiguous existing PriceTag identity; review it before provisioning')
-    if matches:
-        slug = matches[0]['person_slug']
-    else:
-        slug = 'maas_' + hashlib.sha256(args.subject.encode()).hexdigest()[:24]
-        try:
-            api('/api/v1/admin/people/' + urllib.parse.quote(slug, safe=''))
-        except urllib.error.HTTPError as error:
-            if error.code != 404:
-                raise
-            created = api('/api/v1/admin/people', {'slug': slug, 'full_name': args.name or args.subject})
-            slug = created['slug']
-        api('/api/v1/admin/identities', {'username': args.subject, 'person_slug': slug})
-    if args.monthly_usd is not None:
-        api('/api/v1/admin/quota/overrides', {'scope': 'user', 'principal': slug,
-            'monthly_usd': args.monthly_usd}, 'PUT')
+    if args.bootstrap_admin and (args.subject != 'admin' or not args.no_key):
+        p.error('--bootstrap-admin requires --subject admin --no-key')
+    provision(args.subject, args.name, args.monthly_usd, admin=args.bootstrap_admin)
 
     command = [sys.executable, str(ROOT / 'scripts/pricetag/maas-key'),
         'rotate' if args.rotate else 'create', '--subject', args.subject,
@@ -102,16 +44,15 @@ def main():
         '--url', args.maas_url, '--output', str(args.output)]
     if args.subject == 'admin':
         command.append('--admin')
-    subprocess.run(command, check=True)
-    print(f'PriceTag identity {slug} is linked to MaaS subject {args.subject}.')
+    if not args.no_key:
+        subprocess.run(command, check=True)
+    print(f'PriceTag partner identity is linked to MaaS subject {args.subject}.')
     if args.monthly_usd is not None:
-        print(f'Monthly USD override set to ${args.monthly_usd:.2f}.')
+        print(f'Monthly USD override set to ${args.monthly_usd:.2f}; enforcement cache refreshes within 15 seconds.')
 
 
 if __name__ == '__main__':
     try:
         main()
-    except urllib.error.HTTPError as error:
-        raise SystemExit(f'PriceTag administration returned HTTP {error.code}; inspect current state before retrying') from None
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         raise SystemExit(str(error)) from None

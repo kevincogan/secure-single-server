@@ -73,6 +73,12 @@ Omitted type/disk defaults depend on inference: `none` uses `m7i.2xlarge`
 retains its explicit type/disk, so edit all three or choose the matching preset.
 Unknown keys, wrong types, small disks and incompatible architectures fail.
 
+For OpenShell deployment or runtime qualification, use an official RHEL 9.8+
+AMI. Pass its ID with `--ami-id`: automatic AMI selection has chosen an older
+RHEL 9 minor version in this region. See the
+[v0.1.5 validation record](upgrade-0.1.5.md) for the tested image and Podman
+version.
+
 To edit reusable settings without changing a tracked preset, copy a file to
 an ignored `*.local` path:
 

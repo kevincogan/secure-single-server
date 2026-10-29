@@ -7,8 +7,8 @@
 > [redhat-et.github.io/secure-single-server](https://redhat-et.github.io/secure-single-server/).
 
 Secure single-server AI harness runs [OpenCode](https://github.com/anomalyco/opencode)
-and [OpenClaw](https://github.com/openclaw/openclaw) on one dedicated RHEL 9
-x86_64 host. [OpenShell](https://github.com/NVIDIA/OpenShell/tree/v0.1.4/docs)
+and [OpenClaw](https://github.com/openclaw/openclaw) on one dedicated RHEL 9.8+
+x86_64 host. [OpenShell](https://github.com/NVIDIA/OpenShell/tree/v0.1.5/docs)
 enforces the execution boundary. For the integrated harness paths,
 [Praxis](https://github.com/praxis/praxis) routes model traffic, while
 the optional [Red Hat bootc deployment](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/using_image_mode_for_rhel_to_build_deploy_and_manage_operating_systems/index)
@@ -18,6 +18,9 @@ The simplest way to understand what OpenShell can add to your environment is
 the [Streamlit before-and-after demo](docs/examples/streamlit-security/README.md).
 It runs the same app in an ordinary container and an OpenShell sandbox to show
 credential substitution and filesystem confinement.
+
+A short [overview slide deck](docs/slides/secure-single-server-overview.html)
+summarizes the stack and its security story.
 
 > [!IMPORTANT]
 > This is an experimental demonstration, not a production-ready platform. Use
@@ -54,11 +57,20 @@ Deploy the stack as a bootc image or install it manually with Podman. Both
 methods support the [post-deployment scenarios](docs/examples/README.md). See
 [Deployment methods](docs/deployment-methods.md) for the guides.
 
-For an alternative OpenShift deployment, see the
-[OpenShift agent security example](examples/openshift-agent-security/README.md).
-It demonstrates attested workload identity, certificate-bound delegation,
-protected MCP tools, exact-action approval and audit using synthetic workflows,
-with separate prerequisites and setup instructions.
+## Remote gateway with user budgets
+
+To connect local harnesses to a shared RHEL gateway, follow the
+[MaaS and PriceTag deployment guide](docs/quickstarts/remote-gateway-pricetag/README.md).
+It covers AWS or an existing RHEL host, one-command or manual installation,
+real providers, USD budgets, dashboards and local OpenCode. Praxis routes
+inference, MaaS manages finite-lived user keys, and PriceTag meters spending.
+
+- [Provider configuration](docs/quickstarts/remote-gateway-pricetag/providers.md): endpoints,
+  hidden credential prompts, protected-file automation and replacement.
+- [User and key administration](docs/quickstarts/remote-gateway-pricetag/users.md): budgets,
+  key lifecycle and available UI/API operations.
+- [Mock benchmarks](docs/testing/pricetag-perf.md): separate test-host setup,
+  configurable load and accounting/resource checks.
 
 ## What can I do with this setup?
 
@@ -94,6 +106,12 @@ repository checkout: on a bootc image, use
 `/opt/secure-single-server`. Published image tags contain only the reviewed
 revision from their build time, so use a rebuilt image or an updated manual
 checkout when trying newer examples.
+
+For an OpenShift agent-security evaluation, see the
+[OpenShift agent security example](examples/openshift-agent-security/README.md).
+It demonstrates attested workload identity, certificate-bound MCP access,
+exact-action approval and audit using synthetic workflows.
+The example has its own prerequisites and setup instructions.
 
 ## Explore Further
 

@@ -81,7 +81,7 @@ credentialless upstream pattern through Praxis.
 
 ## Sources and qualification
 
-The pinned [OpenShell provider contract](https://github.com/NVIDIA/OpenShell/blob/v0.1.4/docs/how-it-works/inference.mdx)
+The pinned [OpenShell provider contract](https://github.com/NVIDIA/OpenShell/blob/v0.1.5/docs/how-it-works/inference.mdx)
 defines profile-bound credential substitution and custom endpoints. OpenCode's
 [provider configuration](https://opencode.ai/docs/providers/#custom-provider) and
 [environment substitution](https://opencode.ai/docs/config/#env-vars) define

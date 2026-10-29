@@ -344,7 +344,7 @@ aws_test_deploy all-in-one-cloud "${ALL_IN_ONE_CLOUD_VM[@]}" \
 
 Uses HTTPS/JWT to reach external providers; no model download or GPU.
 For the PriceTag dashboard/metering deployment and its larger disk preset,
-follow [AWS remote gateway with PriceTag](aws-pricetag.md).
+follow [AWS remote gateway with PriceTag](../quickstarts/remote-gateway-pricetag/README.md).
 
 ```console
 REMOTE_GATEWAY_CLOUD_VM=(configs/aws/no-vllm.json --scenario remote-gateway "${REMOTE_GATEWAY_ACCESS[@]}")

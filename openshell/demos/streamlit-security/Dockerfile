@@ -16,4 +16,4 @@ ENV PYTHONUNBUFFERED=1 \
     DEMO_MARKER=demo-not-a-real-secret
 
 EXPOSE 8501
-CMD ["/usr/local/bin/python3", "-m", "streamlit", "run", "/opt/openshell-demo/app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]
+CMD ["/usr/local/bin/python3.12", "-m", "streamlit", "run", "/opt/openshell-demo/app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true"]

@@ -138,7 +138,7 @@ aws_test_key() {
       return 1 ;;
   esac
   install -d -m 0700 "$test_key_dir" || return 1
-  ssh-keygen -t ed25519 -f "$SSH_KEY" -C "${RUN_PREFIX:-secure-single-server-test}" || return 1
+  ssh-keygen -q -t ed25519 -f "$SSH_KEY" -C "${RUN_PREFIX:-secure-single-server-test}" || return 1
   chmod 0600 "$SSH_KEY" || return 1
   printf 'Private test key: %s\nOnly %s.pub will be imported.\n' "$SSH_KEY" "$SSH_KEY"
 }

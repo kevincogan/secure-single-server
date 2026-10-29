@@ -35,7 +35,11 @@ def vllm_only(original, models):
     return config, selected
 
 
-def mock_inputs():
+def mock_inputs(managed=False):
+    if managed:
+        from demo_config import mock_configuration, native_inputs
+        document = mock_configuration()
+        return native_inputs(document), document['models']
     models = [{'id': 'fixture', 'provider': 'vllm', 'model': 'fixture',
                'apis': ['openai', 'anthropic'], 'context': 32768, 'output': 4096}]
     config = {'filter_chains': [{'name': api, 'filters': [
@@ -44,24 +48,6 @@ def mock_inputs():
          'endpoints': ['pricetag-provider:' + port]}]}]}
         for api, port in [('openai', '18080'), ('anthropic', '18081')]]}
     return config, models
-
-
-def bootstrap(models, sources, budget):
-    statements = ['BEGIN;',
-        'CREATE UNIQUE INDEX IF NOT EXISTS uq_usage_events_event_id ON usage_events(event_id);',
-        f"UPDATE quota_policy SET enforced=true, default_monthly_usd={budget}, "
-        "allowed_over_limit_models='{}', over_cap_ceiling_usd=NULL;"]
-    fields = 'input_cost_per_mtok,output_cost_per_mtok,cache_write_cost_per_mtok,cache_read_cost_per_mtok'
-    for model in models:
-        alias, source = literal(model['id']), literal(sources.get(model['id'], model['model']))
-        statements += [
-            f"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM model_pricing WHERE model={source}) "
-            f"THEN RAISE EXCEPTION 'Missing reviewed price for model %', {alias}; END IF; END $$;",
-            f'INSERT INTO model_pricing(model,provider,{fields}) '
-            f'SELECT {alias},{literal(model["provider"])},{fields} FROM model_pricing WHERE model={source} '
-            'ON CONFLICT(model) DO NOTHING;']
-    statements += ['COMMIT;']
-    return '\n'.join(statements) + '\n'
 
 
 def postgres_bootstrap(metering_password, maas_password):
@@ -106,6 +92,10 @@ def main():
                         help='expose only local vLLM; do not mount cloud provider secrets')
     mode.add_argument('--mock-provider', action='store_true',
                       help='isolated synthetic provider for a fresh performance-test VM')
+    parser.add_argument('--managed-mock', action='store_true', help='authenticated mock providers for the management demo')
+    parser.add_argument('--mock-secret', default='pricetag-mock-ui-v1', help='existing synthetic credential Podman secret')
+    parser.add_argument('--sample-users', action=argparse.BooleanOptionalAction, default=True,
+                        help='create sample users on start; admin is always created')
     parser.add_argument('--monthly-usd', type=int, default=5)
     parser.add_argument('--price-sources', type=Path, required=True,
                         help='JSON mapping gateway aliases to reviewed PriceTag pricing model IDs')
@@ -114,6 +104,10 @@ def main():
     args = parser.parse_args()
     if os.geteuid() != 0:
         parser.error('run as root on the RHEL host')
+    if args.managed_mock and not args.mock_provider:
+        parser.error('--managed-mock requires --mock-provider')
+    if args.managed_mock and not re.fullmatch(r'pricetag-mock-ui-v[0-9]+', args.mock_secret):
+        parser.error('managed mock requires a versioned synthetic secret reference')
     if not args.mock_provider and args.provider_unit is None:
         parser.error('--provider-unit is required unless --mock-provider is selected')
     if not all(re.fullmatch(r'sha256:[0-9a-f]{64}', image)
@@ -126,7 +120,7 @@ def main():
             parser.error('use new absolute directories without whitespace or percent signs')
     owner = pwd.getpwnam('praxis-svc')
     if args.mock_provider:
-        original, models = mock_inputs()
+        original, models = mock_inputs(managed=args.managed_mock)
     else:
         models = json.loads(args.models.read_text())
         original = json.loads(args.providers.read_text())
@@ -137,9 +131,9 @@ def main():
     sources = json.loads(args.price_sources.read_text())
     if not isinstance(sources, dict) or any(not isinstance(v, str) for v in sources.values()):
         parser.error('price-sources must map aliases to model names')
-    if any(m['id'] == sources.get(m['id'], m['model']) for m in models):
+    if not args.mock_provider and any(m['id'] == sources.get(m['id'], m['model']) for m in models):
         parser.error('use distinct gateway aliases to keep their initial pricing snapshot stable')
-    provider_secrets = []
+    provider_secrets = [f'Secret={args.mock_secret},type=env,target=CUSTOM_MOCK_API_KEY'] if args.managed_mock else []
     for line in ([] if args.mock_provider else args.provider_unit.read_text().splitlines()):
         if re.fullmatch(r'Secret=[A-Za-z0-9_.-]+,type=env,target=[A-Z0-9_]+_API_KEY', line):
             provider_secrets.append(line)
@@ -181,17 +175,31 @@ def main():
     (initdb / '10-create-databases.sql').write_text(
         postgres_bootstrap(metering_password, maas_password))
     m2m_secret = secrets.token_urlsafe(48)
+    management_secret = secrets.token_urlsafe(48)
     env('metering.env', {'DATABASE_URL': f'postgres://metering:{metering_password}@pricetag-db:5432/metering?sslmode=disable',
         'M2M_AUTH_REQUIRED': 'true', 'M2M_SHARED_SECRET': m2m_secret,
         'SESSION_SECRET': secrets.token_urlsafe(48),
+        'MANAGEMENT_API_SECRET': management_secret,
+        'MANAGEMENT_PUBLIC_ORIGIN': f'https://{args.hostname}:8443',
+        'USER_DASHBOARDS_ENABLED': 'true',
+        'GATEWAY_MODELS_FILE': '/etc/gateway-catalog/models.json',
+        'KEY_SERVICE_URL': 'http://pricetag-maas:8080',
+        'KEY_SERVICE_USER_HEADER': 'X-MaaS-Username',
+        'KEY_SERVICE_GROUPS_HEADER': 'X-MaaS-Group',
+        'PARTNER_USER_KEY_GROUP': 'system:authenticated',
         'SUPERADMIN_USERS': 'admin', 'MONTHLY_TOKEN_QUOTA': '10000000000', 'TZ': 'UTC',
         'MAAS_VALIDATE_URL': 'http://pricetag-maas:8080/internal/v1/api-keys/validate'})
     (args.directory / 'm2m-secret').write_text(m2m_secret + '\n')
     (args.directory / 'maas-db-url').write_text(
         f'postgres://maas:{maas_password}@pricetag-db:5432/maas?sslmode=disable\n')
+    (args.directory / 'sample-users').write_text('yes\n' if args.sample_users else 'no\n')
     (args.directory / 'admin-directory').write_text(str(args.admin_directory) + '\n')
-    (args.directory / 'bootstrap.sql').write_text(bootstrap(models, sources, args.monthly_usd))
+    (args.directory / 'management-secret').write_text(management_secret + '\n')
+    (args.directory / 'bootstrap.json').write_text(json.dumps({'models': models, 'sources': sources, 'monthly_usd': args.monthly_usd}) + '\n')
     (args.directory / 'models.json').write_text(json.dumps(models, indent=2) + '\n')
+    catalog = args.directory / 'catalog'
+    catalog.mkdir(mode=0o750)
+    (catalog / 'models.json').write_text(json.dumps([{k: m[k] for k in ('id', 'model', 'provider')} for m in models]) + '\n')
     (args.directory / 'price-sources.json').write_text(json.dumps(sources, indent=2) + '\n')
     (units / 'pricetag.network').write_text(
         '[Network]\nNetworkName=pricetag-private\nDriver=bridge\nSubnet=10.77.0.0/24\n')
@@ -225,7 +233,8 @@ def main():
         'Environment=METRICS_SECURE=false\nEnvironment=METRICS_ADDRESS=127.0.0.1:9090\n' + app, '1G')
     container('pricetag-metering', 'PriceTag metering and dashboards', 'pricetag-db.service',
         f'Image={args.metering_image}\nPull=never\nNetworkAlias=pricetag-metering\n'
-        f'EnvironmentFile={args.directory}/metering.env\n' + app, '2G',
+        f'EnvironmentFile={args.directory}/metering.env\nPublishPort=127.0.0.1:18087:8080\n'
+        f'Volume={args.directory}/catalog:/etc/gateway-catalog:ro\n' + app, '2G',
         network='pricetag.network:ip=10.77.0.12')
     dependencies = 'pricetag-metering.service'
     if args.mock_provider:
@@ -236,7 +245,8 @@ def main():
         shutil.copyfile(ROOT / 'tests/common/provider.py', fixtures / 'provider.py')
         shutil.copyfile(ROOT / 'tests/pricetag/provider.py', fixtures / 'run.py')
         container('pricetag-provider', 'Synthetic LLM for performance testing only', '',
-            f'Image={PYTHON}\nVolume={fixtures}:/fixtures:ro\nEnvironment=MOCK_STREAM_DELAY=1\n'
+            f'Image={PYTHON}\nVolume={fixtures}:/fixtures:ro\nEnvironment=MOCK_STREAM_DELAY=1\n' +
+            ('Environment=MOCK_MANAGEMENT=1\n' if args.managed_mock else '') +
             'Exec=python3 /fixtures/run.py\n' + app, '1G', network='pricetag-mock.network')
         dependencies += ' pricetag-provider.service'
     container('pricetag-gateway', 'Praxis HTTPS gateway with MaaS identity and USD budgets',
@@ -246,6 +256,7 @@ def main():
     for path in [args.directory, *args.directory.rglob('*')]:
         os.chown(path, 0, owner.pw_gid)
         path.chmod(0o750 if path.is_dir() else 0o640)
+    (args.directory / 'management-secret').chmod(0o600)
     print(f'Prepared {args.directory}; no services started. Administrator credentials: {args.admin_directory}')
 
 

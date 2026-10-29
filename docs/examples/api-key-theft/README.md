@@ -17,6 +17,10 @@ agent shell with a planted key
   → the denials are recorded as audit events
 ```
 
+A [visual walkthrough](visual-demo.html) draws the same story as
+figures: the two moves, credential custody, and the per-binary wall.
+It is published on the documentation site.
+
 This is one of three examples from the same incident family; the
 others are
 [document exfiltration](../document-exfiltration/README.md) and

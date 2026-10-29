@@ -442,10 +442,11 @@ credential helpers, or SSH credentials into the sandbox. Issue intake remains
 public and unauthenticated; API rate limits are an accepted limitation rather
 than a reason to load a token into the worker.
 
-Issue #57 refers to an earlier `pr-review` proposal and
-`docs/development/review-service.md`; that service and document are not part of
-the current tree. This queue generates patch candidates, and its boundary is
-stricter than the proposed host-side report poster: publication credentials
+Issue #57's original `pr-review` proposal now lives in the tree as the
+[review-service example](../review-service/README.md); its host-side report
+poster is an unbuilt phase 2. This queue generates patch candidates, and its
+boundary is stricter than the proposed host-side report poster: publication
+credentials
 belong on the workstation, not the EC2 or bootc host. A future host-side poster
 would need its own reviewed design for token scope, storage, repository and
 operation restrictions, and explicit human approval before posting. Sandbox

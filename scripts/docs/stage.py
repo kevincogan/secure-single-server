@@ -47,6 +47,8 @@ EXCLUDED_SOURCES = (
     ROOT / "docs/development/sandbox-use-case-analysis.md",
     ROOT / "docs/development/review-turn-stdin-hang.md",
     ROOT / "docs/development/documentation-site.md",
+    ROOT / "docs/slides/secure-single-server-overview.md",
+    ROOT / "docs/examples/opencode-pr-queue/demo-task.md",
 )
 
 
@@ -57,13 +59,18 @@ def markdown_files(source: Path) -> list[Path]:
 
 
 def static_pages() -> list[Path]:
-    """Return each scenario's rendered visual demo.
+    """Return the self-contained HTML pages published with the docs.
 
-    These self-contained HTML pages are published next to their scenario
-    write-up. Staging them keeps them in the MkDocs file set, so links to them
-    stay relative. The ``visual-demo.src.html`` sources are not published.
+    These are each scenario's rendered visual demo and the slide decks. Staging
+    them keeps them in the MkDocs file set, so links to them stay relative. The
+    ``visual-demo.src.html`` sources are not published.
     """
-    return sorted((ROOT / "docs/examples").glob("*/visual-demo.html"))
+    return sorted(
+        [
+            *(ROOT / "docs/examples").glob("*/visual-demo.html"),
+            *(ROOT / "docs/slides").glob("*.html"),
+        ]
+    )
 
 
 def navigation_paths() -> set[str]:

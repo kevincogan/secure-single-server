@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Mock-only capacity sweep: independent users/streams, rate limits and telemetry."""
+import argparse
+import fcntl
+import importlib.machinery
+import importlib.util
+import json
+import os
+from pathlib import Path
+import pwd
+import subprocess
+import sys
+import time
+import uuid
+
+ROOT = Path(__file__).resolve().parents[2]
+DEPLOY = Path('/etc/praxis-pricetag')
+
+
+def load(name):
+    loader = importlib.machinery.SourceFileLoader(name, str(ROOT / 'scripts/pricetag' / name))
+    spec = importlib.util.spec_from_loader(name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def suspend_synthetic(prefixes, request):
+    """Suspend only accounts created by this sweep, including partial cases."""
+    if not prefixes:
+        return True
+    try:
+        rows = request('GET', 'users')
+    except Exception as error:
+        print(f'Could not list synthetic accounts for cleanup: {error}', file=sys.stderr)
+        return False
+    clean = True
+    for row in rows:
+        subject = row.get('user_id') if isinstance(row, dict) else None
+        if not isinstance(subject, str):
+            print('Could not identify a user in cleanup response', file=sys.stderr)
+            clean = False
+            continue
+        if any(subject.startswith(prefix + '-') for prefix in prefixes):
+            try:
+                request('PUT', 'users', {'subject': subject, 'active': False})
+            except Exception as error:
+                print(f'Could not suspend synthetic account {subject}: {error}', file=sys.stderr)
+                clean = False
+    return clean
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--rates', nargs='+', type=int, default=[30, 1000])
+    parser.add_argument('--cases', nargs='+', default=['1x16', '20x1', '20x4', '20x16', '50x8'], help='users x simultaneous request streams per user')
+    parser.add_argument('--requests', type=int, default=30, help='requests per stream; mock streaming lasts about 3 seconds')
+    parser.add_argument('--keep-alive', action='store_true')
+    parser.add_argument('--duration', type=int, choices=range(1, 601), help='optional per-phase duration cap')
+    parser.add_argument('--json', action='store_true', help='fast non-streaming workload; report separately from streaming')
+    args = parser.parse_args()
+    cases = [tuple(map(int, c.split('x'))) for c in args.cases]
+    if os.geteuid() or any(not 1 <= u <= 100 or not 1 <= n <= 32 or u*n > 512 for u,n in cases) or not 1 <= args.requests <= 1000 or any(not 1 <= r <= 2000 for r in args.rates):
+        parser.error('requires root, 1–100 users, 1–32 streams/user, at most 512 streams, rates 1–2000, requests 1–1000')
+    bench, observer = load('benchmark'), load('observe')
+    bench.require_mock(DEPLOY)
+    sys.path.insert(0,str(ROOT/'scripts/pricetag'))
+    from metering_admin import request
+    uid = pwd.getpwnam('praxis-svc').pw_uid
+    prefix = ['sudo','-u','praxis-svc','env', f'XDG_RUNTIME_DIR=/run/user/{uid}',f'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus']
+    os.umask(0o077)
+    output = Path('/root/pricetag-admin') / ('capacity-' + uuid.uuid4().hex[:12])
+    output.mkdir(mode=0o700)
+    print('Results: ' + str(output), flush=True)
+    lock = os.open('/root/pricetag-provider-inputs/.setup.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    config_path = DEPLOY / 'gateway/gateway.json'
+    original = config_path.read_bytes()
+    (output/'gateway-original.json').write_bytes(original)
+    model = json.loads((DEPLOY/'models.json').read_text())[0]['id']
+    summary = {'mock_only': True, 'generator_on_gateway_host': True, 'streaming': not args.json, 'cases': []}
+    (output/'host.json').write_text(json.dumps({'cpu_count':os.cpu_count(),'uname':list(os.uname()),'generator_on_gateway_host':True},indent=2))
+    command = [sys.executable, str(ROOT/'scripts/pricetag/perf')]
+    provisioned_prefixes = set()
+    def restart():
+        subprocess.run(prefix+['systemctl','--user','restart','pricetag-gateway.service'],check=True,cwd='/tmp')
+        # Readiness over verified TLS; public catalog is the deployment contract.
+        import ssl, urllib.request
+        ctx=ssl.create_default_context(cafile=str(DEPLOY/'ca.pem'))
+        for _ in range(30):
+            try:
+                with urllib.request.urlopen('https://localhost:8443/v1/models', context=ctx,timeout=2) as r:
+                    if r.status==200: return
+            except OSError: pass
+            time.sleep(1)
+        raise RuntimeError('gateway did not recover')
+    try:
+        for rate in args.rates:
+            config=json.loads(original)
+            edge=next(c for c in config['filter_chains'] if c['name']=='edge')
+            limiter=next(f for f in edge['filters'] if f['filter']=='rate_limit')
+            limiter.update(rate=rate,burst=rate*4)
+            config_path.write_text(json.dumps(config,indent=2)+'\n')
+            restart()
+            for users,lanes in cases:
+                case=output/f'r{rate}-u{users}-l{lanes}'
+                case.mkdir(mode=0o700)
+                subject_prefix = 'perf-' + uuid.uuid4().hex[:12]
+                provisioned_prefixes.add(subject_prefix)
+                subprocess.run(command+['users','--tokens',str(case/'keys'),'--prefix',subject_prefix,'--count',str(users),'--monthly-usd','10000'],check=True,cwd='/tmp')
+                baseline=observer.sample(prefix)
+                restarts=bench.check_sample(baseline)
+                request_cmd=command+['run','--url','https://localhost:8443','--ca',str(DEPLOY/'ca.pem'),'--model',model,'--tokens',str(case/'keys'),'--output',str(case/'requests.json'),'--concurrency',str(users),'--lanes',str(lanes),'--requests',str(args.requests),'--think','0','--allow-rate-limited']
+                if args.json: request_cmd.append('--json')
+                if args.keep_alive: request_cmd.append('--keep-alive')
+                if args.duration: request_cmd += ['--duration', str(args.duration)]
+                started=time.monotonic()
+                process=subprocess.Popen(request_cmd,cwd='/tmp')
+                with (case/'observe.jsonl').open('w') as telemetry:
+                    telemetry.write(json.dumps(baseline)+'\n')
+                    try:
+                        while process.poll() is None:
+                            sample=observer.sample(prefix)
+                            telemetry.write(json.dumps(sample)+'\n');telemetry.flush()
+                            if bench.check_sample(sample)!=restarts: raise RuntimeError('service restart during load')
+                            if sample['memory']['MemAvailable_kib'] < sample['memory']['MemTotal_kib']*.1: raise RuntimeError('less than 10% memory available')
+                            if time.monotonic()-started>max(180,args.requests*15): raise RuntimeError('phase time bound exceeded')
+                            try: process.wait(timeout=5)
+                            except subprocess.TimeoutExpired: pass
+                        if process.returncode: raise RuntimeError('unexpected load errors; inspect report')
+                    finally:
+                        if process.poll() is None:
+                            process.terminate()
+                            try: process.wait(timeout=10)
+                            except subprocess.TimeoutExpired: process.kill();process.wait()
+                    telemetry.write(json.dumps(observer.sample(prefix))+'\n')
+                subprocess.run(command+['verify','--report',str(case/'requests.json'),'--database','pricetag-db','--service-user','praxis-svc'],check=True,cwd='/tmp')
+                phase=json.loads((case/'requests.json').read_text())['phases'][0]
+                summary['cases'].append({'rate':rate,'burst':rate*4,'directory':case.name,**{k:v for k,v in phase.items() if k!='samples'}})
+                (output/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+                if suspend_synthetic({subject_prefix}, request):
+                    provisioned_prefixes.discard(subject_prefix)
+    finally:
+        failure_in_progress = sys.exc_info()[0] is not None
+        try:
+            # Provisioning can fail after creating an account but before writing
+            # its key. The management API includes these partial cases.
+            cleanup_ok = suspend_synthetic(provisioned_prefixes, request)
+            try:
+                config_path.write_bytes(original)
+                restart()
+            except Exception as error:
+                if not failure_in_progress:
+                    raise
+                print(f'Could not restore original gateway configuration: {error}',file=sys.stderr)
+            if not cleanup_ok and not failure_in_progress:
+                raise RuntimeError('synthetic account cleanup failed; inspect the capacity result directory')
+        finally:
+            os.close(lock)
+    print('PASS: capacity sweep and exact accounting; original limiter restored. '+str(output),flush=True)
+
+
+if __name__ == '__main__':
+    main()

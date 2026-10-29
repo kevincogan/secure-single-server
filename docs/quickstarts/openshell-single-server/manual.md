@@ -1,6 +1,6 @@
 # Manual single-server container deployment
 
-Install OpenShell and a harness sandbox on a dedicated RHEL 9 x86_64 VM or
+Install OpenShell and a harness sandbox on a dedicated RHEL 9.8+ x86_64 VM or
 bare-metal host. Run every shell block in Bash on that host, logged in as the
 administrator, unless a command uses `sudo` or `os_run`. Keep one shell session
 open from the repository checkout through the setup so `repo` and `os_run`
@@ -12,8 +12,11 @@ an optional, separately installed model gateway. Review the
 
 ## 1. Install OpenShell
 
-Use a dedicated RHEL 9 x86_64 host. For first qualification, use a disposable
-instance before changing a long-lived server. Install Git, Podman, Python 3,
+Use a dedicated RHEL 9.8+ x86_64 host. The full scenario was validated on
+RHEL 9.8 with Podman 5.8.2; see the
+[validation record](../../testing/upgrade-0.1.5.md). For first qualification,
+use a disposable instance before changing a long-lived server. Install Git,
+Podman, Python 3,
 OpenSSH clients, curl, and the SELinux management tools. RHEL 9 does not
 package `ripgrep`, so install the pinned static binary used by the image:
 

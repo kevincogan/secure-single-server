@@ -59,11 +59,10 @@ def users(args):
     for index in range(args.count):
         subject = f'{args.prefix}-{index:02d}'
         command = [str(ROOT / 'scripts/pricetag/user'), '--subject', subject,
-                   '--monthly-usd', '100', '--output', str(args.tokens / (subject + '.key')),
-                   '--admin-key', str(args.admin_key), '--gateway', args.gateway,
-                   '--ca', str(args.ca), '--maas-url', args.maas_url]
+                   '--monthly-usd', str(args.monthly_usd), '--output', str(args.tokens / (subject + '.key')),
+                   '--maas-url', args.maas_url]
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
-    print(f'Created {args.count} distinct users with $100 test allowances; credentials: {args.tokens}')
+    print(f'Created {args.count} distinct users with ${args.monthly_usd} synthetic allowances; credentials: {args.tokens}')
 
 
 def run(args):
@@ -77,21 +76,27 @@ def run(args):
     body = json.dumps({'model': args.model, 'messages': [{'role': 'user', 'content': 'synthetic performance probe'}],
                        'max_tokens': 32, 'stream': not args.json, 'stream_options': {'include_usage': True}})
     report = {'url': args.url, 'model': args.model, 'stream': not args.json, 'requests_per_user': args.requests,
-              'think_seconds': args.think, 'connection_policy': 'new TLS connection per request', 'phases': []}
+              'duration_seconds': args.duration, 'requests_in_flight_per_user': args.lanes, 'think_seconds': args.think, 'connection_policy': 'reuse HTTP/1.1 connections' if args.keep_alive else 'new TLS connection per request', 'phases': []}
     os.umask(0o077)
     with args.output.open('x') as output:
         for concurrency in args.concurrency:
-            barrier = threading.Barrier(concurrency)
+            barrier = threading.Barrier(concurrency * args.lanes)
+            deadline = time.monotonic() + args.duration if args.duration else None
 
             def worker(caller):
                 subject, token = caller
                 samples = []
                 barrier.wait()
+                connection = None
                 for _ in range(args.requests):
+                    if deadline is not None and time.monotonic() >= deadline:
+                        break
                     start = time.monotonic()
-                    connection = http.client.HTTPSConnection(endpoint.hostname, endpoint.port or 443,
-                                                             context=context, timeout=args.timeout)
-                    sample = {'subject': subject, 'status': 0, 'ok': False}
+                    if connection is None:
+                        connection = http.client.HTTPSConnection(endpoint.hostname, endpoint.port or 443,
+                                                                 context=context, timeout=args.timeout)
+                    sample = {'subject': subject, 'status': 0, 'ok': False, 'reused_connection': connection.sock is not None}
+                    completed = False
                     try:
                         connection.request('POST', '/v1/chat/completions', body,
                             {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
@@ -101,23 +106,36 @@ def run(args):
                         data = first + response.read(1048576)
                         sample['ok'] = response.status == 200 and valid_reply(data, not args.json)
                         sample['bytes'] = len(data)
-                    except (OSError, ValueError, http.client.HTTPException):
+                        completed = True
+                        if response.status == 429:
+                            sample['denial_kind'] = 'budget' if b'token budget exhausted' in data.lower() else 'request-limit-or-other'
+                        if response.status == 502:
+                            sample['error'] = 'upstream-502'
+                    except (OSError, ValueError, http.client.HTTPException) as error:
                         sample['error'] = 'transport-or-protocol'
+                        sample['error_class'] = type(error).__name__
+                        if isinstance(getattr(error, 'errno', None), int):
+                            sample['errno'] = error.errno
                     finally:
-                        connection.close()
+                        if not args.keep_alive or not completed:
+                            connection.close()
+                            connection = None
                     sample['seconds'] = time.monotonic() - start
                     samples.append(sample)
                     time.sleep(args.think)
+                if connection is not None:
+                    connection.close()
                 return samples
 
             started = time.monotonic()
-            with ThreadPoolExecutor(max_workers=concurrency) as pool:
-                samples = [s for result in pool.map(worker, callers[:concurrency]) for s in result]
+            with ThreadPoolExecutor(max_workers=concurrency * args.lanes) as pool:
+                samples = [s for result in pool.map(worker, callers[:concurrency] * args.lanes) for s in result]
             elapsed = time.monotonic() - started
             good = [s for s in samples if s['ok']]
             latencies = [s['seconds'] for s in good]
-            phase = {'users': concurrency, 'elapsed_seconds': elapsed, 'attempts': len(samples),
-                     'successes': len(good), 'successful_requests_per_second': len(good) / elapsed,
+            phase = {'users': concurrency, 'lanes_per_user': args.lanes, 'in_flight_limit': concurrency * args.lanes, 'started_monotonic': started, 'ended_monotonic': time.monotonic(), 'elapsed_seconds': elapsed, 'attempts': len(samples),
+                     'new_connection_attempts': sum(not s['reused_connection'] for s in samples),
+                     'reused_connection_requests': sum(s['reused_connection'] for s in samples), 'successes': len(good), 'successful_requests_per_second': len(good) / elapsed,
                      'p50_seconds': percentile(latencies, .5), 'p95_seconds': percentile(latencies, .95),
                      'p99_seconds': percentile(latencies, .99),
                      'p95_first_byte_seconds': percentile([s['first_byte_seconds'] for s in good], .95),
@@ -126,7 +144,8 @@ def run(args):
             report['phases'].append(phase)
             print(json.dumps({k: v for k, v in phase.items() if k != 'samples'}), flush=True)
             output.seek(0); json.dump(report, output, indent=2); output.truncate(); output.flush()
-    return int(any(p['successes'] != p['attempts'] for p in report['phases']))
+    return int(any(not s['ok'] and not (args.allow_rate_limited and s['status'] == 429 and s.get('denial_kind') != 'budget')
+                   for p in report['phases'] for s in p['samples']))
 
 
 def verify(args):
@@ -163,16 +182,18 @@ def main():
     p = commands.add_parser('users')
     p.add_argument('--tokens', type=Path, required=True)
     p.add_argument('--prefix', required=True)
-    p.add_argument('--count', type=int, choices=range(1, 21), default=20)
-    p.add_argument('--admin-key', type=Path, default=Path('/root/pricetag-admin/admin.key'))
-    p.add_argument('--gateway', default='https://localhost:8443')
-    p.add_argument('--ca', type=Path, default=Path('/etc/praxis-pricetag/ca.pem'))
+    p.add_argument('--monthly-usd', type=int, choices=range(1, 10001), default=100)
+    p.add_argument('--count', type=int, choices=range(1, 101), default=20)
     p.add_argument('--maas-url', default='http://127.0.0.1:18086')
     p = commands.add_parser('run')
     p.add_argument('--url', required=True); p.add_argument('--ca', type=Path, required=True)
     p.add_argument('--tokens', type=Path, required=True); p.add_argument('--output', type=Path, required=True)
     p.add_argument('--model', default='fixture')
-    p.add_argument('--concurrency', type=int, nargs='+', choices=range(1, 21), default=[1, 5, 10, 20])
+    p.add_argument('--concurrency', type=int, nargs='+', choices=range(1, 101), default=[1, 5, 10, 20])
+    p.add_argument('--keep-alive', action='store_true', help='reuse each worker connection when the server permits it')
+    p.add_argument('--duration', type=int, choices=range(1, 601), help='stop each phase after this many seconds, also bounded by requests per stream')
+    p.add_argument('--lanes', type=int, choices=range(1, 33), default=1, help='simultaneous request streams per user')
+    p.add_argument('--allow-rate-limited', action='store_true', help='record expected 429s without failing the phase')
     p.add_argument('--requests', type=int, choices=range(1, 1001), default=20)
     p.add_argument('--think', type=float, default=1)
     p.add_argument('--timeout', type=float, default=30)
@@ -182,6 +203,8 @@ def main():
     p.add_argument('--database', default='praxis-pricetag-db')
     p.add_argument('--service-user')
     args = parser.parse_args()
+    if args.command == 'run' and max(args.concurrency) * args.lanes > 512:
+        parser.error('at most 512 simultaneous request streams')
     if args.command == 'run' and (not math.isfinite(args.think) or not 0 <= args.think <= 60 or not math.isfinite(args.timeout) or not 0 < args.timeout <= 300):
         parser.error('think must be 0–60 seconds and timeout greater than zero, at most 300')
     return {'users': users, 'run': run, 'verify': verify}[args.command](args) or 0

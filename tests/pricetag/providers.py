@@ -5,6 +5,7 @@ import importlib.util
 import importlib.machinery
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -23,6 +24,153 @@ from gateway import render as gateway
 
 
 class SetupTest(unittest.TestCase):
+    def test_list_shows_active_models_without_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            deploy = Path(directory)
+            (deploy / 'models.json').write_text(json.dumps([{'id': 'external/test',
+                'provider': 'external', 'apis': ['openai'], 'context': 1000, 'output': 100}]))
+            output = io.StringIO()
+            with patch.object(setup, 'DEPLOY', deploy), contextlib.redirect_stdout(output):
+                setup.list_providers()
+            self.assertIn('external/test', output.getvalue())
+            self.assertIn('1000', output.getvalue())
+
+    def test_discovery_listing_does_not_save_or_replace_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            saved = state / 'provider-external.json'
+            saved.write_text('existing configuration')
+            output = io.StringIO()
+            with patch.object(setup, 'STATE', state), \
+                    patch.object(setup.sys.stdin, 'isatty', return_value=True), \
+                    patch.object(setup, 'collect_credential', return_value='SECRET_SENTINEL'), \
+                    patch.object(setup, 'discover_models', return_value=[{'id': 'model-a'}]), \
+                    patch.object(setup, 'save_provider', side_effect=AssertionError('must not save')), \
+                    patch.object(setup, 'service', side_effect=AssertionError('must not mutate host')), \
+                    contextlib.redirect_stdout(output):
+                setup.add_provider('external', urls={'openai': 'https://provider.example'},
+                                   apis=['openai'], list_models=True)
+            self.assertIn('model-a', output.getvalue())
+            self.assertNotIn('SECRET_SENTINEL', output.getvalue())
+            self.assertEqual(saved.read_text(), 'existing configuration')
+
+    def test_listing_only_prints_ids_and_configuration_path(self):
+        catalogs = {'openai': [{'id': 'unknown'}, {'id': 'gpt-6-luna'},
+            {'id': 'custom', 'praxis': {'context': 10000, 'output': 1000}}]}
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            setup.print_model_catalog(catalogs, all_models=True)
+        text = output.getvalue()
+        for model in ('unknown', 'gpt-6-luna', 'custom'):
+            self.assertIn('openai: ' + model, text)
+        self.assertNotIn('1050000', text)
+        self.assertNotIn('10000', text)
+        self.assertIn(str(ROOT / 'configs/pricetag/provider-models.json'), text)
+
+    def test_listing_search_and_page_do_not_drop_matching_rows(self):
+        catalogs = {'openai': [{'id': name} for name in ['z', 'GPT-b', 'gpt-c', 'gpt-a']]}
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            setup.print_model_catalog(catalogs, search='GpT', page=2, page_size=2)
+        self.assertIn('Matches: 3; page 2/2', output.getvalue())
+        self.assertIn('gpt-c', output.getvalue())
+        self.assertNotIn('gpt-a', output.getvalue())
+        with self.assertRaisesRegex(ValueError, 'exceeds'):
+            setup.print_model_catalog(catalogs, page=99)
+
+    def test_listing_interactive_next_and_quit(self):
+        rows = {'openai': [{'id': f'model-{i}'} for i in range(3)]}
+        output = io.StringIO()
+        with patch.object(setup.sys.stdin, 'isatty', return_value=True), \
+                patch.object(setup.sys.stdout, 'isatty', return_value=True), \
+                patch('builtins.input', return_value='q'), contextlib.redirect_stdout(output):
+            # StringIO is not a terminal: explicitly supply the terminal output contract.
+            output.isatty = lambda: True
+            setup.print_model_catalog(rows, page_size=1)
+        self.assertIn('model-0', output.getvalue())
+        self.assertNotIn('model-1', output.getvalue())
+
+    def test_external_export_messages_uses_generic_secret_and_routes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory)
+            record = {'models': [{'id': 'external/claude-sonnet-5', 'provider': 'external',
+                'model': 'claude-sonnet-5', 'apis': ['anthropic'], 'context': 128000, 'output': 8192}],
+                'prices': {'external/claude-sonnet-5': 'claude-sonnet-5'},
+                'urls': {'anthropic': 'https://provider.example'}, 'secret': 'test-external',
+                'messages_auth': 'bearer'}
+            (state / 'provider-external.json').write_text(json.dumps(record))
+            with patch.object(setup, 'STATE', state), \
+                    patch.object(setup, 'service', return_value=SimpleNamespace(returncode=0)):
+                setup.export()
+            config = json.loads((state / 'providers.json').read_text())
+            injected = [cluster for chain in config['filter_chains'] for item in chain['filters']
+                        if item['filter'] == 'credential_injection' for cluster in item['clusters']]
+            self.assertTrue(any(c['name'] == 'external-anthropic' and c['header'] == 'Authorization'
+                                for c in injected))
+            self.assertIn('CUSTOM_EXTERNAL_API_KEY', (state / 'provider-secrets.container').read_text())
+            self.assertIn('external/claude-sonnet-5', json.dumps(gateway(config, record['models'])))
+
+    def test_external_url_selection_is_explicit(self):
+        self.assertEqual(setup.provider_urls('external', {'openai': 'example.com'}, ['openai']),
+                         {'openai': 'https://example.com/v1'})
+        with self.assertRaises(ValueError):
+            setup.provider_urls('external', {'anthropic': 'example.com'}, ['openai'])
+
+    def test_external_api_selection_does_not_probe_unselected_api(self):
+        for dialect in ('openai', 'anthropic'):
+            preset = setup.PRESETS[dialect][0][0]
+            with patch.object(setup, 'discover_models', return_value=[{'id': preset}]) as discover, \
+                    patch.object(setup, 'service', side_effect=AssertionError('no host mutation during discovery')):
+                settings = setup.provider_settings('external', dialect, 'https://provider.example',
+                    'synthetic', urls={dialect: 'https://provider.example'}, allocate_secret=False)
+            self.assertEqual(discover.call_count, 1)
+            self.assertEqual(settings['models'][0]['provider'], 'external')
+            self.assertEqual(set(settings['urls']), {dialect})
+
+    def test_selected_external_api_without_presets_is_an_error(self):
+        with patch.object(setup, 'discover_models', return_value=[]):
+            with self.assertRaisesRegex(ValueError, 'selected API'):
+                setup.provider_settings('external', 'openai', 'https://provider.example',
+                                        'synthetic', allocate_secret=False)
+
+    def test_unattended_key_is_sent_only_through_secret_stdin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            key = Path(directory) / 'key'
+            key.write_text('SECRET_SENTINEL')
+            key.chmod(0o600)
+            output = io.StringIO()
+            with patch.object(setup, 'STATE', Path(directory)), \
+                    patch.object(setup.sys.stdin, 'isatty', return_value=False), \
+                    patch.object(setup.getpass, 'getpass', side_effect=AssertionError('unexpected prompt')), \
+                    patch.object(setup, 'provider_settings', return_value={'secret': 'example', 'model': {'id': 'model-a'}}), \
+                    patch.object(setup, 'service', return_value=SimpleNamespace(returncode=0)) as secret, \
+                    contextlib.redirect_stdout(output):
+                setup.add_provider('openai', key_file=key)
+            self.assertEqual(secret.call_args.kwargs['input'], b'SECRET_SENTINEL')
+            self.assertNotIn('SECRET_SENTINEL', output.getvalue())
+            self.assertNotIn('SECRET_SENTINEL', (Path(directory) / 'provider-openai.json').read_text())
+
+    def test_private_key_file_rejects_public_symlink_and_oversized_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            key = Path(directory) / 'key'
+            key.write_text('synthetic-secret\n')
+            key.chmod(0o600)
+            self.assertEqual(setup.read_key_file(key), 'synthetic-secret')
+            key.chmod(0o644)
+            with self.assertRaises(ValueError):
+                setup.read_key_file(key)
+            key.chmod(0o600)
+            link = Path(directory) / 'link'
+            link.symlink_to(key)
+            with self.assertRaises(OSError):
+                setup.read_key_file(link)
+            key.write_text('x' * 16386)
+            with self.assertRaises(ValueError):
+                setup.read_key_file(key)
+            with patch.object(setup.os, 'geteuid', return_value=os.geteuid() + 1):
+                with self.assertRaises(ValueError):
+                    setup.read_key_file(key)
+
     def test_gateway_activation_accepts_public_catalog_and_requires_auth_for_inference(self):
         requests = []
 
@@ -87,18 +235,23 @@ class SetupTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'inference request did not fail closed'):
                 setup.activate_gateway()
 
-    def test_refresh_replaces_only_pricetag_models_and_preserves_security_boundary(self):
+    def test_refresh_preserves_security_boundary_for_external_and_legacy_profiles(self):
+        for provider_name in ('external', 'pricetag'):
+            with self.subTest(provider=provider_name):
+                self.assert_refresh_boundary(provider_name)
+
+    def assert_refresh_boundary(self, provider_name):
         import yaml
         from provider_config import render
         old = [
             {'id':'openai/gpt-6-luna','provider':'openai','model':'gpt-6-luna',
              'apis':['openai'],'context':1050000,'output':128000},
-            {'id':'pricetag/old-model','provider':'pricetag','model':'old-model',
+            {'id':provider_name + '/old-model','provider':provider_name,'model':'old-model',
              'apis':['openai'],'context':32768,'output':8192}]
-        new = {'id':'pricetag/rits/zai-org/glm-5-3','provider':'pricetag','model':'rits/zai-org/glm-5-3',
+        new = {'id':provider_name + '/rits/zai-org/glm-5-3','provider':provider_name,'model':'rits/zai-org/glm-5-3',
                'apis':['anthropic'],'context':262144,'output':65536}
         original = render(yaml.safe_load((ROOT/'configs/all-in-one/shared-gateway.yaml').read_text()),
-            vllm=False, openai=True, anthropic=False, custom={'pricetag':{'openai_url':'https://old.example'}})
+            vllm=False, openai=True, anthropic=False, custom={provider_name:{'openai_url':'https://old.example'}})
         deployed = gateway(original, old, origins=['https://gateway.example:8443'])
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory); state=root/'inputs'; deploy=root/'deploy'
@@ -110,9 +263,12 @@ class SetupTest(unittest.TestCase):
             settings={'models':[new], 'urls':{'anthropic':'https://new.example'}, 'messages_auth':'x-api-key'}
             with patch.object(setup, 'STATE', state), patch.object(setup, 'DEPLOY', deploy), \
                     contextlib.redirect_stdout(io.StringIO()):
-                files=setup.refresh_model_files(settings)
+                files=setup.refresh_model_files(settings, name=provider_name)
             models=json.loads(files[deploy/'models.json'])
             self.assertEqual(models,[old[0],new])
+            catalog=json.loads(files[deploy/'catalog/models.json'])
+            self.assertEqual(catalog,[{k:m[k] for k in ('id','model','provider')} for m in models])
+            self.assertTrue(all(set(m)=={'id','model','provider'} for m in catalog))
             updated=json.loads(files[deploy/'gateway/gateway.json'])
             self.assertEqual(updated['listeners'],deployed['listeners'])
             before={c['name']:c for c in deployed['filter_chains']}
@@ -137,18 +293,8 @@ class SetupTest(unittest.TestCase):
             self.assertNotIn('old.example',serialized)
             self.assertNotIn('token_rate_limit',serialized)
             self.assertNotIn('manual_jwt',serialized)
-            self.assertIn('CUSTOM_PRICETAG_API_KEY',serialized)
+            self.assertIn(f'CUSTOM_{provider_name.upper()}_API_KEY',serialized)
             self.assertIn('api.openai.com',serialized)
-
-    def test_migration_prices_only_insert_missing_aliases(self):
-        sql=setup.migration_prices([{'id':'pricetag/rits/zai-org/glm-5-3',
-                                     'model':'rits/zai-org/glm-5-3'}])
-        self.assertTrue(sql.startswith('BEGIN;'))
-        self.assertIn('ON CONFLICT(model) DO NOTHING',sql)
-        self.assertIn('usage_events',sql)
-        self.assertNotIn('DELETE ',sql)
-        self.assertNotIn('UPDATE ',sql)
-        self.assertNotIn('quota',sql)
 
     def test_messages_bearer_header_is_used_for_discovery_and_inference(self):
         seen = []
@@ -421,7 +567,7 @@ class SetupTest(unittest.TestCase):
             self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_export_supports_each_provider_independently(self):
-        for name in ('openai', 'pricetag'):
+        for name in ('openai', 'pricetag', 'external'):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
                 state = Path(directory)
                 alias = name + '/gpt-5.4-mini'
@@ -438,7 +584,7 @@ class SetupTest(unittest.TestCase):
                 self.assertIn(alias, json.dumps(config))
                 unit = (state / 'provider-secrets.container').read_text()
                 self.assertEqual(unit.count('Secret='), 1)
-                self.assertIn('target=' + ('OPENAI_API_KEY' if name == 'openai' else 'CUSTOM_PRICETAG_API_KEY'), unit)
+                self.assertIn('target=' + ('OPENAI_API_KEY' if name == 'openai' else 'CUSTOM_' + name.upper() + '_API_KEY'), unit)
 
     def test_replace_failure_retains_previous_provider_record(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -504,7 +650,8 @@ class SetupTest(unittest.TestCase):
             for path in state.iterdir():
                 self.assertNotIn('SECRET_SENTINEL', path.read_text())
             models = json.loads((state / 'models.json').read_text())
-            self.assertEqual(len(models), 10)
+            self.assertEqual(len(models), len(setup.PRESETS['openai']) +
+                             len({row[0] for rows in setup.PRESETS.values() for row in rows}))
             config = gateway(json.loads((state / 'providers.json').read_text()), models)
             serialized = json.dumps(config)
             for expected in ('messages.example', 'chat.example', '/v1/messages', '/v1/responses'):
@@ -523,7 +670,7 @@ class SetupTest(unittest.TestCase):
             for alias, cluster, path in (
                     ('openai/gpt-6-luna', 'openai', '/v1/responses'),
                     ('pricetag/gpt-6-luna', 'pricetag-openai', '/v1/responses'),
-                    ('pricetag/claude-sonnet-5', 'pricetag-anthropic', '/v1/messages')):
+                    ('pricetag/claude-sonnet-5-5', 'pricetag-anthropic', '/v1/messages')):
                 self.assertIn({'path': path, 'headers': {'X-Gateway-Model': alias},
                                'cluster': cluster}, nodes)
                 self.assertTrue(any(
