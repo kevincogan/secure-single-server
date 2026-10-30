@@ -13,7 +13,21 @@ import pytest
 
 import probe_native_exchange as native
 import identity_demo_management_session as session
-from checks.test_management_profile import source_profile
+def source_profile(tmp_path: Path) -> Path:
+    root = tmp_path / 'source'
+    target = root / 'openshell/gateways/identity-demo-runtime'
+    (target / 'mtls').mkdir(parents=True)
+    metadata = {'name': 'identity-demo-runtime', 'auth_mode': 'oidc',
+                'gateway_endpoint': 'https://127.0.0.1:18443',
+                'oidc_issuer': 'https://issuer.example.test/realms/identity-demo',
+                'oidc_client_id': 'fixture-runtime-operator', 'oidc_audience': 'identity-demo-runtime'}
+    (target / 'metadata.json').write_text(json.dumps(metadata))
+    (target / 'oidc_token.json').write_text(json.dumps({'access_token': 'do-not-copy-fixture-token', 'expires_at': 1}))
+    (target / 'mtls/ca.crt').write_text('public-ca-fixture')
+    (target / 'last_sandbox').write_text('another-user-context')
+    for path in (root, *root.rglob('*')):
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    return root
 
 
 def harness(tmp_path: Path, monkeypatch, operation=None, health=None) -> tuple:

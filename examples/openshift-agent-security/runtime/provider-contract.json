@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "configured": false,
+  "chat_request_url": "https://inference.example.test/v1/messages",
+  "chat_model": "approved-chat-model",
+  "workload_image": "registry.example.test/demo/cve-workload@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "diagnostic_runtime_image": "registry.example.test/demo/jira-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

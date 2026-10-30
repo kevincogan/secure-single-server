@@ -64,7 +64,7 @@ async def native(credentials: dict, username: str, private_context: dict | None 
     import httpx
     from mcp import ClientSession
     from checks.test_gateway_oauth import _native_login_workflow
-    import checks.test_components as components
+    import identity_demo_fixture_http as components
 
     events: list[dict] = []
     reads: list[dict] = []
@@ -170,7 +170,7 @@ async def native(credentials: dict, username: str, private_context: dict | None 
 def deterministic(credentials: dict, username: str, *, token: str | None = None,
                   protocol: str = "2025-03-26") -> dict:
     """Use the same HTTPS resource and fixture arguments with the simple client."""
-    import checks.test_components as components
+    import identity_demo_fixture_http as components
     if protocol not in PROTOCOLS:
         raise ValueError("Supported diagnostic protocol required")
     supplied = token is not None

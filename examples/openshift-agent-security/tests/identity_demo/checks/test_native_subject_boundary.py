@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import unittest
+import pytest
 import json
 import time
 
@@ -30,20 +31,8 @@ class NativeSubjectBoundaryTests(unittest.TestCase):
         data = b"\x00" + len(message).to_bytes(4, "big") + message
         self.assertEqual(token_from_response(data), "synthetic-token")
 
-    def test_truncated_envelope(self) -> None:
-        """A missing gRPC frame cannot prove credential receipt."""
-        with self.assertRaises(ValueError):
-            token_from_response(b"\x00\x00")
 
-    def test_compressed_envelope(self) -> None:
-        """The diagnostic did not negotiate response compression."""
-        with self.assertRaises(ValueError):
-            token_from_response(b"\x01\x00\x00\x00\x00")
 
-    def test_missing_token(self) -> None:
-        """A valid empty message is not a grant."""
-        with self.assertRaises(ValueError):
-            token_from_response(b"\x00\x00\x00\x00\x00")
 
     def test_duplicate_token(self) -> None:
         """Ambiguous credential fields must fail rather than select the last."""
@@ -200,3 +189,10 @@ class DiagnosticAssertionVerificationTests(unittest.TestCase):
         value["keys"][0]["kid"] = "other-key"
         with self.assertRaises(ValueError):
             verify_diagnostic_assertion(self.assertion(), self.subject, self.audience, value)
+
+
+@pytest.mark.parametrize('data',[b'\x00\x00',b'\x01\x00\x00\x00\x00',b'\x00\x00\x00\x00\x00'],ids=['truncated-envelope','unnegotiated-compression','missing-token'])
+def test_malformed_grant_envelopes(data):
+    """Distinct malformed/compressed/empty grants must all fail closed."""
+    with pytest.raises(ValueError):
+        token_from_response(data)

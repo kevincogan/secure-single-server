@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Parameterize the exported fixed provider/image templates without reading keys.
+"""Configure one reviewed public provider contract without reading keys.
 
-Plans by default. Apply only to pristine generic source templates; a changed or
-previously configured file is refused. Reconfiguration uses a fresh source export.
-No runtime endpoint selection, secret handling or cluster action is introduced.
+Plans by default. Changed or previously configured inputs are refused.
+Application/test source and Containerfiles are never rewritten. Reconfiguration
+uses a fresh export; credentials remain in the private inference configuration.
 """
 from __future__ import annotations
 import argparse
@@ -12,26 +12,18 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import sys
-from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts/identity_demo'))
+sys.path.insert(0, str(ROOT / 'runtime'))
 from deployment_profile import in_source_checkout
-IMAGE = re.compile(r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{1,5})?/[a-z0-9]+(?:[._/-][a-z0-9]+)*@sha256:([a-f0-9]{64})')
+from provider_contract import unique, validate as validate_provider
 FIELDS = {'schema_version', 'chat_request_url', 'chat_model', 'workload_image', 'diagnostic_runtime_image', 'credential_file'}
 
 
 def load_json(path: Path) -> dict:
     """Reject duplicate configuration keys rather than resolving ambiguity."""
-    def unique(pairs: list) -> dict:
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ValueError('Duplicate JSON field')
-            result[key] = value
-        return result
     return json.loads(path.read_text(), object_pairs_hook=unique)
 
 
@@ -45,53 +37,42 @@ def private(path: Path, *, directory: bool = False) -> Path:
 
 
 def validate(config: dict) -> dict[str, str]:
-    """Preserve fixed HTTPS Messages and canonical pinned-image restrictions."""
+    """Share transport/image validation with runtime; keep secrets external."""
     if not isinstance(config, dict) or set(config) != FIELDS or type(config['schema_version']) is not int or config['schema_version'] != 1:
         raise ValueError('Exact schema version 1 fields required')
-    url = config['chat_request_url']
-    if not isinstance(url, str) or not url.isascii() or any(c.isspace() for c in url) or '\\' in url:
-        raise ValueError('Canonical endpoint required')
-    u = urlsplit(url)
-    if (u.scheme != 'https' or not u.hostname or u.username is not None or u.password is not None
-            or u.port is not None or u.path != '/v1/messages' or u.query or u.fragment
-            or url != 'https://' + u.hostname + '/v1/messages'
-            or len(u.hostname)>253 or not all(re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?',part) for part in u.hostname.split('.'))
-            or u.hostname in {'inference.example.test', 'localhost'} or u.hostname.endswith('.invalid')
-            or re.fullmatch(r'[0-9.]+',u.hostname)):
-        raise ValueError('Reviewed DNS HTTPS endpoint on port 443 at /v1/messages required')
-    model=config['chat_model']
-    if not isinstance(model,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_./:-]{0,127}',model) or model=='approved-chat-model':
-        raise ValueError('Explicit canonical model ID required')
-    for field in ('workload_image','diagnostic_runtime_image'):
-        v=config[field];m=IMAGE.fullmatch(v) if isinstance(v,str) and len(v)<=512 else None
-        if not m or m[1]=='0'*64 or v.startswith('registry.example.test/'):
-            raise ValueError('Actual approved digest image required')
+    public = validate_provider({k: v for k, v in config.items() if k != 'credential_file'} | {'configured': True})
     if not isinstance(config['credential_file'],str):
         raise ValueError('Private credential path required')
     private(Path(config['credential_file']))
-    return {'endpoint_host':u.hostname,'model':model,'workload_image':config['workload_image'],
-            'diagnostic_image':config['diagnostic_runtime_image']}
+    return public
 
 
 def plan(config: dict) -> list[tuple[Path, bytes, bytes]]:
     """Verify the full immutable target list before any source file changes."""
-    values=validate(config)
-    targets=load_json(ROOT/'config/configuration-targets.json')
-    substitutions={v:values[k] for k,v in targets['tokens'].items()}
-    changes=[]
+    public=validate(config)
+    targets=load_json(ROOT/'export-manifest.json')
+    if targets.get('schema_version') != 1 or not isinstance(targets.get('files'), list):
+        raise ValueError('Reviewed source inventory required')
+    contract = 'runtime/provider-contract.json'
+    observed = set()
+    contract_before = None
     for item in targets['files']:
-        p=ROOT/item['path']
-        if p.is_symlink() or not p.resolve().is_relative_to(ROOT) or not p.is_file():
+        name = item['path']
+        p=ROOT/name
+        if (name in observed or Path(name).is_absolute() or '..' in Path(name).parts
+                or p.is_symlink() or not p.resolve().is_relative_to(ROOT) or not p.is_file()):
             raise ValueError('Regular source target required')
+        observed.add(name)
         before=p.read_bytes()
         if hashlib.sha256(before).hexdigest()!=item['sha256']:
             raise ValueError('Source template changed or already configured; start with a fresh export')
-        after=before.decode()
-        for token,replacement in substitutions.items():
-            after=after.replace(token,replacement)
-        if after.encode()!=before:changes.append((p,before,after.encode()))
-    if not changes:raise ValueError('No template targets found')
-    return changes
+        if name == contract:
+            contract_before = before
+    if (contract_before is None or 'runtime/provider_contract.py' not in observed
+            or load_json(ROOT/contract).get('configured') is not False):
+        raise ValueError('Pristine fixed provider contract required')
+    return [(ROOT/contract, contract_before,
+             (json.dumps(public, indent=2) + '\n').encode())]
 
 
 def run(args: argparse.Namespace) -> dict:
@@ -107,8 +88,10 @@ def run(args: argparse.Namespace) -> dict:
     result={'planned':True,'source_files':len(changes),'applied':False,'cluster_changed':False,'credential_bytes_read':False}
     if not args.apply:return result
     output.mkdir(mode=0o700)
-    receipt={'schema_version':1,'files':[{'path':str(p.relative_to(ROOT)),'before_sha256':hashlib.sha256(b).hexdigest(),
-             'after_sha256':hashlib.sha256(a).hexdigest()} for p,b,a in changes],
+    changed = {str(p.relative_to(ROOT)): hashlib.sha256(a).hexdigest() for p,b,a in changes}
+    receipt={'schema_version':1,'files':[{'path':item['path'],'before_sha256':item['sha256'],
+             'after_sha256':changed.get(item['path'],item['sha256'])}
+             for item in load_json(ROOT/'export-manifest.json')['files']],
              'contract_sha256':hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest()}
     def save(name: str, value: dict) -> None:
         with (output/name).open('x') as stream:json.dump(value,stream,indent=2)

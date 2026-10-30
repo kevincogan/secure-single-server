@@ -43,6 +43,8 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Route
 
+from agent_security_service import RunService, VerifiedActor
+
 import identity_demo_console as console
 from identity_demo_console_store import ConsoleStore
 
@@ -53,6 +55,9 @@ from identity_demo_run_store import (
     read_call,
     strict_json,
 )
+
+if __import__("sys").flags.optimize:
+    raise RuntimeError("Optimized interpreter is unsupported for security execution")
 
 COOKIE = "__Host-identity-demo"
 STATE_COOKIE = "__Host-identity-login"
@@ -332,6 +337,7 @@ class Driver:
                        for v in config.presenter_subjects) or len(set(config.presenter_subjects)) != len(config.presenter_subjects)):
             raise ValueError('Explicit bounded presenter subject allowlist required')
         self.store = RunStore(config.database)
+        self.actions = RunService(self.store)
         self.console = ConsoleStore(self.store)
         self.store.recover_dispatched()
         self.sessions: dict[str, dict] = {}
@@ -1168,11 +1174,12 @@ class Driver:
             raise Denied("approval_fields")
         run = request.path_params["run"]
         owner = session["claims"]["sub"]
-        original_deadline = self.store.describe(run, owner)["run"]["expires"]
-        self.store.approve(
+        record = self.store.describe(run, owner)["run"]
+        original_deadline = record["expires"]
+        self.actions.approve(
+            VerifiedActor(owner, record["workload"]),
             run,
             fields["action"],
-            owner,
             fields["digest"],
             min(int(session["claims"]["exp"]), self.session_deadline(session), original_deadline),
         )
@@ -1372,7 +1379,7 @@ class Driver:
         if run["id"] != data["run_id"]:
             raise Denied("run_binding")
         self.store.save_assessment(run["id"], run["user"], data["assessment"])
-        proposal = self.store.propose(run["id"], run["user"], data["arguments"])
+        proposal = self.actions.propose(VerifiedActor(run["user"], run["workload"]), run["id"], data["arguments"])
         return JSONResponse(proposal)
 
     async def credentials(self, request: Request) -> Response:

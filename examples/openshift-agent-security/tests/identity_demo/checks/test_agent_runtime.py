@@ -13,6 +13,7 @@ import pytest
 
 import agent_runtime
 import probe_native_exchange as native
+from provider_contract import MODEL
 from identity_demo_run_store import Denied, read_call
 from identity_demo_jira_action_adapter import BODY_KEY
 from checks.test_jira_action_adapter import context, instance
@@ -92,7 +93,7 @@ def observation(project: str = "SERVICE") -> dict:
 
 
 def test_runner_uses_sandbox_model_turns_and_native_governed_reads(tmp_path) -> None:
-    commands, events = [], []
+    commands, events, programs = [], [], []
     turns = iter(
         [
             {"kind": "read", "id": "read_1", "jql": "project = SERVICE"},
@@ -111,10 +112,14 @@ def test_runner_uses_sandbox_model_turns_and_native_governed_reads(tmp_path) -> 
             and words[words.index("--name") + 1] == "owned-sandbox"
         )
         assert "--credential" not in words and kwargs == {"json_output": True}
-        if "from inference import request_messages" in words[-1]:
+        import base64
+        argv = words[words.index("--") + 1:]
+        program = argv[2] if len(argv) == 3 else base64.b64decode("".join(argv[3:])).decode()
+        programs.append(program)
+        if "from inference import request_messages" in program:
             import ast
             # The provider request must match the parser's single-action contract.
-            body_line = next(line.strip() for line in words[-1].splitlines() if line.strip().startswith("body="))
+            body_line = next(line.strip() for line in program.splitlines() if line.strip().startswith("body="))
             body = ast.literal_eval(body_line.removeprefix("body="))
             assert "CVE-2099-0001" in body["messages"][0]["content"]
             assert "Rollback and triggers" in body["messages"][0]["content"]
@@ -124,7 +129,7 @@ def test_runner_uses_sandbox_model_turns_and_native_governed_reads(tmp_path) -> 
             return {
                 "action": next(turns),
                 "inference": {
-                    "model": "approved-chat-model",
+                    "model": MODEL,
                     "http_status": 200,
                     "tls_verified": True,
                     "follow_redirects": False,
@@ -132,8 +137,8 @@ def test_runner_uses_sandbox_model_turns_and_native_governed_reads(tmp_path) -> 
                 },
             }
         assert (
-            "step56_jira_readJiraProject" in words[-1]
-            and "project = SERVICE" in words[-1]
+            "step56_jira_readJiraProject" in program
+            and "project = SERVICE" in program
         )
         return {
             "read_passed": True,
@@ -154,7 +159,7 @@ def test_runner_uses_sandbox_model_turns_and_native_governed_reads(tmp_path) -> 
         "https://fixture-mcp-bound.example.svc.cluster.local/mcp",
         SimpleNamespace(sandbox_name="owned-sandbox"),
     )
-    assert len(commands) == 3 and "SERVICE-1" in commands[-1][-1]
+    assert len(commands) == 3 and "SERVICE-1" in programs[-1]
     assert (
         result["agent"]["reads"] == 1
         and result["proposed_create"]["project"] == "SERVICE"
@@ -344,7 +349,7 @@ def test_agent_progress_contract_reaches_the_real_console_store(
             return {
                 "action": next(turns),
                 "inference": {
-                    "model": "approved-chat-model",
+                    "model": MODEL,
                     "http_status": 200,
                     "tls_verified": True,
                     "follow_redirects": False,

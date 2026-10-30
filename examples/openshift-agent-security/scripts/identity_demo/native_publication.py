@@ -118,14 +118,17 @@ def console_publication(args: argparse.Namespace) -> dict:
         raise ValueError('Exact reviewed console Containerfile required')
     hashes = receipt['context_sha256']
     actual = {str(p.relative_to(directory)) for p in directory.rglob('*') if p.is_file()}
-    if actual != set(hashes) or len(actual) > 1000:
+    source_root = Path(__file__).resolve().parents[2]
+    reviewed = set(read_json(source_root/'config/runtime-sources.json')['files']) | {
+        'tools/oc', 'tools/openshell', 'requirements-lock.txt', 'Containerfile'}
+    if actual != set(hashes) or actual != reviewed or len(actual) > 1000:
         raise ValueError('Exact recorded console build context required')
     for name, expected in hashes.items():
         item = directory/name
         if not item.resolve().is_relative_to(directory) or item.is_symlink() or digest(item) != expected:
             raise ValueError('Console context changed after verification')
         parts = item.relative_to(directory).parts
-        if parts[0] not in {'scripts', 'tests', 'workloads', 'infra', 'tools', 'requirements-lock.txt', 'Containerfile'}:
+        if parts[0] not in {'scripts', 'runtime', 'workloads', 'infra', 'tools', 'requirements-lock.txt', 'Containerfile'}:
             raise ValueError('Unreviewed console build input')
     args.native_build_receipt = str(path)
     args.native_build_sha256 = args.runtime_build_sha256

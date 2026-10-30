@@ -166,6 +166,44 @@ def test_unexpected_failure_cannot_be_dormant_policy() -> None:
     assert not connected.inactive_catalog_policy(None, [], {"failures": ["Secret/example"]})
 
 
+@pytest.mark.parametrize("names", [
+    ["fixture-mcp-auth"], ["fixture-mcp-tools-auth"],
+    ["fixture-mcp-auth", "fixture-mcp-tools-auth"],
+])
+@pytest.mark.parametrize("fault", [None, "spec", "accepted", "generation", "message", "extra", "duplicate"])
+def test_each_dormant_bootstrap_policy_is_independently_verified(monkeypatch, names, fault):
+    """Two absent-route policies may be dormant; another failure still stops setup."""
+    from copy import deepcopy
+    desired = [{"kind": "AuthPolicy", "metadata": {
+        "name": name, "labels": dict(LEGACY.labels)}, "spec": {
+        "targetRef": {"sectionName": "mcps" if name.endswith("tools-auth") else "mcp"}}}
+        for name in names]
+    observed = {o["metadata"]["name"]: deepcopy(o) for o in desired}
+    for current in observed.values():
+        current["metadata"]["generation"] = 2
+        current["status"] = {"observedGeneration": 2, "conditions": [
+            {"type": "Accepted", "status": "True"},
+            {"type": "Enforced", "status": "False",
+             "message": "AuthPolicy is not in the path to any existing routes"}]}
+    altered = observed[names[-1]]
+    if fault == "spec":
+        altered["spec"]["targetRef"]["sectionName"] = "bound"
+    elif fault == "accepted":
+        altered["status"]["conditions"][0]["status"] = "False"
+    elif fault == "generation":
+        altered["status"]["conditions"][0]["observedGeneration"] = 1
+    elif fault == "message":
+        altered["status"]["conditions"][1]["message"] = "Authentication failed"
+    failures = ["AuthPolicy/" + name for name in names]
+    if fault == "extra":
+        failures.append("AuthPolicy/fixture-mcp-bound")
+    elif fault == "duplicate":
+        failures.append(failures[0])
+    monkeypatch.setattr(connected.setup, "get", lambda args, obj: observed[obj["metadata"]["name"]])
+    assert connected.inactive_catalog_policy(argparse.Namespace(profile=LEGACY), desired,
+                                            {"failures": failures}) is (fault is None)
+
+
 @pytest.mark.parametrize("change", ["none", "spec", "generation", "message", "owner"])
 def test_dormant_policy_exception_is_exact(monkeypatch: pytest.MonkeyPatch, change: str) -> None:
     """Current controller status can be top-level; drift still fails closed."""
@@ -225,6 +263,38 @@ def test_presenter_metadata_refuses_ambiguous_or_wrong_user(change):
     if change=='invalid-id':user['id']='not-an-id'
     obj={'kind':'Secret','metadata':{'name':'fixture-keycloak-upstream-realm'},'data':{'realm.json':base64.b64encode(json.dumps({'users':users}).encode()).decode()}}
     with pytest.raises(ValueError):connected.presenter_subject([obj])
+
+
+def test_real_inference_precheck_needs_no_test_tree(harness, monkeypatch, tmp_path):
+    """Run the real preflight child process with only its declared runtime paths."""
+    from provider_contract import MODEL, URL
+
+    key = tmp_path / 'synthetic.key'
+    key.write_text('synthetic-offline-only')
+    key.chmod(0o600)
+    config = tmp_path / 'inference.private.json'
+    config.write_text(json.dumps({'chat': {
+        'request_url': URL, 'model': MODEL, 'tls_verify': True,
+        'follow_redirects': False, 'http_method': 'POST', 'ca_file': None,
+        'authentication': {'header_name': 'x-api-key'}, 'credential_file': str(key),
+    }}))
+    config.chmod(0o600)
+    harness.args.inference_config = str(config)
+    original_run = connected.subprocess.run
+    children = []
+
+    def run(command, **options):
+        paths = options['env']['PYTHONPATH'].split(connected.os.pathsep)
+        assert not any('/tests/' in path for path in paths)
+        children.append(command)
+        return original_run(command, **options)
+
+    monkeypatch.setattr(connected.subprocess, 'run', run)
+    assert connected.connected_install(harness.args)['ready']
+    assert len(children) == 1
+    receipt = json.loads((harness.out / 'inference-reference-check.json').read_text())
+    assert receipt['passed'] and not receipt['credential_bytes_read']
+    assert not receipt['model_request_made']
 
 
 def test_optional_inference_check_uses_clean_profile_and_keeps_only_path(harness,monkeypatch):

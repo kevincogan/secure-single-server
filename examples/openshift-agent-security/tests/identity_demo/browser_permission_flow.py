@@ -15,13 +15,14 @@ from urllib.parse import urlparse
 from identity_demo_action_policy import DRIVER
 from boundary_flow import BoundaryFlow
 from permission_flow import PermissionFlow
+from gateway_evidence_flow import GatewayEvidenceFlow
 import probe_native_exchange as native
-from checks.test_components import LoginForm
+from identity_demo_fixture_http import LoginForm
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
-class BrowserPermissionFlow(PermissionFlow):
+class BrowserPermissionFlow(GatewayEvidenceFlow):
     """Exercise real sign-in, workload selection, review and approval in Chrome."""
 
     def authenticate(self) -> None:
@@ -164,29 +165,6 @@ class BrowserPermissionFlow(PermissionFlow):
         if hasattr(self, "playwright"):
             self.playwright.stop()
 
-    def accept(self, execute: object, resource: str, context: object) -> dict:
-        """Capture real gateway configuration while its temporary route is active."""
-        from gateway_overview import overview, catalog_schemas
-
-        self.progress("discovering_tools")
-        try:
-            gateway = {**overview(self.args), **catalog_schemas(self.args), "passed": True}
-        except Exception as error:
-            # Presentation capture is independent of security acceptance. Keep
-            # the failed receipt visible and still prove the permission flow;
-            # the complete walkthrough must resolve this separate gate.
-            gateway = {"passed": False, "failure_kind": type(error).__name__,
-                "details_withheld": True}
-        native.private_write(self.args.output_dir / (self.args.label + ".gateway.summary.json"), gateway)
-        if gateway.get("passed") and gateway.get("registration_ready"):
-            self.progress("tools_discovered", {"gateway_ready": bool(gateway.get("passed") and gateway.get("registration_ready")),
-                "tool_names": [t["name"] for t in gateway.get("published_tool_schemas", [])],
-                "tool_schemas": gateway.get("published_tool_schemas", []),
-                "gateway_backend_services": gateway.get("backend_services", []),
-                **{key: bool(gateway.get(key)) for key in ("live_run_identity_check", "actual_arguments_and_approval_check", "scoped_adapter_service_token_delivery")}})
-        result = PermissionFlow.accept(self, execute, resource, context)
-        result["gateway_introduction"] = gateway
-        return result
 
 
 class BrowserBoundaryPermissionFlow(BrowserPermissionFlow, BoundaryFlow):

@@ -16,7 +16,7 @@ from deployment_artifacts import configured_native_image
 
 
 WORKLOAD_NAMESPACE = active_profile().core_namespace
-CVE_IMAGE = "registry.example.test/demo/cve-workload@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+from provider_contract import WORKLOAD_IMAGE as CVE_IMAGE
 GATEWAY_IMAGE = "ghcr.io/nvidia/openshell/gateway@sha256:ea14aa4db0980fab4769fb6b5509ac42ae3dc8495e645b1ba1fe1ada49892fa6"
 SUPERVISOR_IMAGE = "ghcr.io/nvidia/openshell/supervisor@sha256:4ab2b970cdb02c7518ba4ccbbadb4861ae9a8d0b8770e5b160697f0453b0a8e4"
 CLASS = "zero-trust-workload-identity-manager-spire"

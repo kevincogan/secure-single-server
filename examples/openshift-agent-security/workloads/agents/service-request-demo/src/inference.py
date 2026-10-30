@@ -17,8 +17,7 @@ import ssl
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener, HTTPSHandler
 
-MODEL = "approved-chat-model"
-URL = "https://inference.example.test/v1/messages"
+from provider_contract import MODEL, URL
 SYNTHETIC_TEXT = (
     "Synthetic request SERVICE-0001: prepare a temporary read-only workspace "
     "for a training exercise using synthetic records. No customer data, "

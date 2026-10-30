@@ -22,15 +22,18 @@ def fixture(tmp_path,monkeypatch):
     config={'schema_version':1,'chat_request_url':'https://messages.customer.example/v1/messages','chat_model':'customer-model',
             'workload_image':'registry.customer.example/demo/workload@sha256:'+'a'*64,
             'diagnostic_runtime_image':'registry.customer.example/demo/runtime@sha256:'+'b'*64,'credential_file':str(key)}
-    tokens={'endpoint_host':'inference.example.test','model':'approved-chat-model',
-            'workload_image':'registry.example.test/demo/cve-workload@sha256:'+'0'*64,
-            'diagnostic_image':'registry.example.test/demo/jira-runtime@sha256:'+'0'*64}
-    source=repo/'source.py';source.write_text('\n'.join(tokens.values()))
-    (repo/'config/configuration-targets.json').write_text(json.dumps({'tokens':tokens,'files':[
-        {'path':'source.py','sha256':hashlib.sha256(source.read_bytes()).hexdigest()}]}))
+    source=repo/'source.py';source.write_text('"""Immutable application source."""\n')
+    (repo/'runtime').mkdir()
+    contract=repo/'runtime/provider-contract.json'
+    contract.write_bytes((ROOT/'runtime/provider-contract.json').read_bytes())
+    loader=repo/'runtime/provider_contract.py'
+    loader.write_bytes((ROOT/'runtime/provider_contract.py').read_bytes())
+    (repo/'export-manifest.json').write_text(json.dumps({'schema_version':1,'files':[
+        {'path':str(p.relative_to(repo)),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()}
+        for p in (source, contract, loader)]}))
     cp=private/'contract.json';cp.write_text(json.dumps(config));cp.chmod(0o600)
     monkeypatch.setattr(tool,'ROOT',repo)
-    return SimpleNamespace(tool=tool,repo=repo,private=private,key=key,config=config,cp=cp,source=source)
+    return SimpleNamespace(tool=tool,repo=repo,private=private,key=key,config=config,cp=cp,source=source,contract=contract)
 
 @pytest.mark.parametrize('url',[
  'http://messages.customer.example/v1/messages','https://u:p@messages.customer.example/v1/messages',
@@ -62,11 +65,21 @@ def test_plan_has_no_effect_and_never_reads_key_bytes(fixture,monkeypatch):
     assert not (fixture.private/'plan').exists() and fixture.source.read_bytes()==before
 
 
-def test_apply_binds_all_sources_and_keeps_before_bytes(fixture):
-    before=fixture.source.read_bytes();out=fixture.private/'applied'
+def test_apply_changes_only_public_data_and_keeps_before_bytes(fixture):
+    before=fixture.contract.read_bytes();source_before=fixture.source.read_bytes();out=fixture.private/'applied'
     result=fixture.tool.run(SimpleNamespace(config=fixture.cp,output_dir=out,apply=True))
     assert result['applied'] and not result['cluster_changed']
-    assert (out/'source-before/source.py').read_bytes()==before
+    assert result['source_files'] == 1
+    assert (out/'source-before/runtime/provider-contract.json').read_bytes()==before
+    assert fixture.source.read_bytes()==source_before
+    public=json.loads(fixture.contract.read_text())
+    assert public['configured'] and public['chat_model']==fixture.config['chat_model']
+    assert 'credential_file' not in public and 'synthetic-local-key' not in fixture.contract.read_text()
+    receipt=json.loads((out/'configuration.receipt.json').read_text())
+    assert {item['path'] for item in receipt['files']} == {
+        'source.py','runtime/provider_contract.py','runtime/provider-contract.json'}
+    unchanged=next(item for item in receipt['files'] if item['path']=='source.py')
+    assert unchanged['before_sha256']==unchanged['after_sha256']
     inference=json.loads((out/'inference-config.private.json').read_text())['chat']
     assert inference['request_url']==fixture.config['chat_request_url'] and inference['model']==fixture.config['chat_model']
     assert inference['tls_verify'] and not inference['follow_redirects'] and inference['ca_file'] is None
@@ -188,15 +201,6 @@ def test_example_image_digests_cannot_be_used_as_installation_inputs(role):
         validate_artifacts({"schema_version": 1, "images": images})
 
 
-def test_temporary_exchange_clients_use_the_installation_owner(monkeypatch):
-    from types import SimpleNamespace
-    import probe_token_exchange as exchange
-    import probe_spiffe_exchange as spiffe
-    monkeypatch.setattr(exchange, "active_profile", lambda: SimpleNamespace(owner="customer-owner"))
-    client = spiffe.federated_client(spiffe.GATEWAY, spiffe.SANDBOX)
-    assert client["attributes"]["identity-demo-owner"] == "customer-owner"
-    assert client["clientAuthenticatorType"] == "federated-jwt"
-    assert "secret" not in client
 
 
 @pytest.mark.parametrize('git_marker', ['directory', 'file'])

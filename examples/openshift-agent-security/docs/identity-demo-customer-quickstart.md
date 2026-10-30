@@ -86,7 +86,11 @@ target-built images before deployment. Do not insert passwords into this file.
 Create `public-trust/` containing `service-ca.pem`, `spire-ca.pem`,
 `upstream-ca.pem`, `kubernetes-ca.pem` and `application-ca.pem`. These contain
 **public certificates only**. SPIRE client trust and the application serving CA
-remain separate. Put only the approved model API key in the mode-0600 file
+remain separate. Use approved SPIRE anchors with enough remaining lifetime for
+builds, installation and acceptance. A rollover anchor expiring between render
+stages changes the trust hash and stops setup. Preserve that checkpoint and
+prepare fresh approved inputs; never bypass the trust check or replay a failed stage.
+Put only the approved model API key in the mode-0600 file
 `inference.key`. Keep kubeconfigs, generated credentials, receipts and backups
 outside Git. Do not share the private directory with the source package.
 

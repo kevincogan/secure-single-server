@@ -14,7 +14,7 @@ COPY source/ /app/
 RUN echo "${SOURCE_MANIFEST_SHA256}  export-manifest.json" | sha256sum -c - && \
     python3.12 -m pip install --no-cache-dir --no-deps -r tests/identity_demo/requirements-lock.txt PyYAML==6.0.3
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/scripts/identity_demo:/app/tests/identity_demo HOME=/state/private
+    PYTHONPATH=/app/runtime:/app/runtime/identity_demo:/app/scripts/identity_demo HOME=/state/private
 RUN python3.12 scripts/verify-source.py --inventory && \
     python3.12 scripts/check-public-safety.py && \
     python3.12 -m installer_tools > /usr/share/installer-tools.json && \

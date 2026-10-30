@@ -188,7 +188,7 @@ def setup(args: argparse.Namespace) -> None:
     apply_owned(args, service(args, "fixture-keycloak", [("http", 8080)]))
     bootstrap = resource("ConfigMap", "jira-fixture-bootstrap", args.namespace)
     bootstrap["data"] = {"start_jira_fixture.py": (
-        Path(__file__).resolve().parents[2] / "tests/identity_demo/start_jira_fixture.py").read_text()}
+        Path(__file__).resolve().parents[2] / "runtime/identity_demo/start_jira_fixture.py").read_text()}
     apply_owned(args, bootstrap)
     jira = {"env": [env("AUTH_MODE", "strict"), secret_env("ADMIN_PASSWORD", "jira-admin"),
                     env("JIRA_SERVER", "http://127.0.0.1:8080"), env("JIRA_USER", "admin"),

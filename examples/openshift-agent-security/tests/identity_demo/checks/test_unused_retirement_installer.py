@@ -147,7 +147,7 @@ def test_installer_protocol_uses_real_transactions_and_verified_live_source(tmp_
         assert command[:1] == ['oc'] and command[-3:-1] == ['python', '-c']
         env = {**os.environ, 'IDENTITY_DEMO_CONFIG': str(profile_path),
                'DRIVER_DATABASE': str(driver.store.path),
-               'PYTHONPATH': str(execution.ROOT/'scripts/identity_demo')+':'+str(execution.ROOT/'tests/identity_demo')}
+               'PYTHONPATH': os.pathsep.join(str(execution.ROOT/p) for p in ('runtime','runtime/identity_demo','scripts/identity_demo','tests/identity_demo'))}
         return real_run([sys.executable, '-c', command[-1]], env=env, **kwargs)
     monkeypatch.setattr(unused.subprocess, 'run', local_program)
     assert unused.state(args, context, value, 'plan')['eligible']

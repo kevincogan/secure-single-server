@@ -11,6 +11,78 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_image_launcher_packages_reviewed_runtime_before_any_cluster_write(tmp_path):
+    """Exercise the real inventory, stopping at the first read-only cluster call."""
+    import hashlib
+    import os
+
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    checkpoint = tmp_path / "packaging-complete"
+    unexpected = tmp_path / "unexpected-operation"
+    fake = tools / "oc"
+    program = """import sys
+from pathlib import Path
+args = sys.argv[1:]
+if 'create' in args and '--dry-run=client' in args:
+    expression = args[-1]
+    values = {
+        'jsonpath={.metadata.namespace}': 'owned-core',
+        'jsonpath={.metadata.labels.identity-demo-owner}': 'test-owner',
+        'jsonpath={.metadata.labels.identity-demo-installation}': 'owned-install',
+        'jsonpath={.kind}': 'ConfigMap',
+        'jsonpath={.configuration.profile.expected_server}': 'https://api.reviewed.example.test:443',
+    }
+    if 'data.installation' in expression:
+        print('{"profile":{"expected_server":"https://api.reviewed.example.test:443"}}')
+    elif expression in values:
+        print(values[expression])
+    else:
+        raise SystemExit(80)
+elif 'config' in args and 'view' in args:
+    print('https://api.reviewed.example.test:443')
+elif 'get' in args and 'namespace' in args and 'owned-core-build' in args:
+    Path(CHECKPOINT).write_text('stopped before server dry run or creation')
+    raise SystemExit(79)
+else:
+    Path(UNEXPECTED).write_text(repr(args))
+    raise SystemExit(81)
+"""
+    fake.write_text(
+        "#!" + sys.executable + "\n"
+        + program.replace("CHECKPOINT", repr(str(checkpoint))).replace(
+            "UNEXPECTED", repr(str(unexpected))
+        )
+    )
+    fake.chmod(0o700)
+    config = tmp_path / "config.json"
+    config.write_text("{}")
+    kubeconfig = tmp_path / "access.json"
+    kubeconfig.write_text("{}")
+    output = tmp_path / "output"
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts/install.sh"), "build", "--config", str(config),
+         "--kubeconfig", str(kubeconfig), "--output-dir", str(output)],
+        env=dict(os.environ, PATH=str(tools) + os.pathsep + os.environ["PATH"]),
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 79, result.stderr
+    assert checkpoint.exists() and not unexpected.exists()
+    source = output / "context/source"
+    inventory = json.loads((ROOT / "export-manifest.json").read_text())["files"]
+    expected = {entry["path"] for entry in inventory} | {"export-manifest.json"}
+    packaged = {str(path.relative_to(source)) for path in source.rglob("*") if path.is_file()}
+    assert packaged == expected
+    for entry in inventory:
+        assert hashlib.sha256((source / entry["path"]).read_bytes()).hexdigest() == entry["sha256"]
+    assert {
+        "runtime/agent_security.py", "runtime/agent_security_service.py",
+        "runtime/provider_contract.py", "runtime/provider-contract.json",
+        "examples/document-agent/agent.py", "examples/document-agent/host.py",
+    } <= packaged
+    assert not (output / "namespace.plan.json").exists()
+
+
 @pytest.mark.parametrize(
     "mode", ["different-cluster", "conflicting-declaration", "missing-target"]
 )

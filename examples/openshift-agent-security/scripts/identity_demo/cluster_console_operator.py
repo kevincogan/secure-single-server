@@ -210,7 +210,7 @@ def demo_configuration(workload_image=None):
         raise Denied("pool_native_artifacts")
     policy = yaml.safe_load(
         (
-            setup.ROOT / "tests/identity_demo/cve-runtime-policy.yaml"
+            setup.ROOT / "runtime/identity_demo/cve-runtime-policy.yaml"
         ).read_text()
     )
     base = {

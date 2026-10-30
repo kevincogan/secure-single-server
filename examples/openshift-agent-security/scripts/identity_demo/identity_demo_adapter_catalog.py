@@ -29,7 +29,7 @@ from deployment_profile import active_profile
 
 NS = active_profile().core_namespace
 TRUST = "fixture-adapter-catalog-trust-v1"
-DIRECTORY = Path(__file__).resolve().parents[2] / "tests/identity_demo"
+DIRECTORY = Path(__file__).resolve().parents[2] / "runtime/identity_demo"
 
 
 def kube(args: argparse.Namespace, *words: str, payload: dict | list | None = None) -> dict:

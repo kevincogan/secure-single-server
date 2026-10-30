@@ -87,6 +87,36 @@ def test_missing_effective_filter_cannot_authorize_sending_credentials() -> None
     assert not any(probe.configuration_checks({}, "public-ca").values())
 
 
+@pytest.mark.parametrize("change,expected", [
+    ("fresh-private-http", True), ("legacy-http-host", True),
+    ("unsafe-https-host", False), ("unsafe-http-host", False),
+    ("missing-bound-listener", False), ("duplicate-bound-listener", False),
+    ("no-other-hosts", False), ("duplicate-http-listener", False),
+])
+def test_native_isolation_checks_both_listeners(change, expected):
+    """A fresh private-only HTTP listener still requires isolated HTTPS peers."""
+    host, name = route.READ_HOST, route.FILTER + "-step4"
+    def virtual(domain, disabled):
+        return {"domains": [domain], "typed_per_filter_config": {name: {"disabled": disabled}}}
+    http = {"name": "http.8080", "virtual_hosts": [virtual(host, False)]}
+    https = {"name": "https.8443.bound", "virtual_hosts": [
+        virtual(host, False), virtual("owned-bound.example.test", True)]}
+    configs = [http, https]
+    if change in {"legacy-http-host", "unsafe-http-host", "missing-bound-listener"}:
+        http["virtual_hosts"].append(virtual("owned-http.example.test", change != "unsafe-http-host"))
+    if change == "unsafe-https-host":
+        https["virtual_hosts"][-1]["typed_per_filter_config"][name].pop("disabled")
+    if change == "missing-bound-listener":configs.remove(https)
+    if change == "duplicate-bound-listener":configs.append(https)
+    if change == "duplicate-http-listener":configs.append(http)
+    if change == "no-other-hosts":https["virtual_hosts"].pop()
+    dump = {"routes": [{"route_config": v} for v in configs], "http_filters": [
+        {"name": "envoy.filters.http.wasm"}, {"name": name}, {"name": "envoy.filters.http.router"}]}
+    checks = probe.configuration_checks(dump, "public-ca", host=host,
+                                        filter_name=name, bound_listener=True)
+    assert checks["existing-hosts-disable-extra-filter"] is expected
+
+
 def test_native_backend_requires_verified_run_before_replacing_credentials() -> None:
     """The private grant checks signed user/workload context, lifetime and run state."""
     run = ReadRun("test-run", "https://issuer.example.test/realms/demo", "analyst",

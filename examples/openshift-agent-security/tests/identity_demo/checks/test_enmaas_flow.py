@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from enmaas_flow import profile
+from provider_contract import HOST
 
 SOURCE = Path(__file__).resolve().parents[3] / "workloads/agents/service-request-demo/src/inference.py"
 spec = importlib.util.spec_from_file_location("bounded_inference", SOURCE)
@@ -56,7 +57,7 @@ def test_profile_scopes_key_and_network() -> None:
                                     "auth_style": "header", "header_name": "x-api-key"}]
     assert len(value["endpoints"]) == 1
     endpoint = value["endpoints"][0]
-    assert endpoint["host"] == "inference.example.test"
+    assert endpoint["host"] == HOST
     assert endpoint["rules"] == [{"allow": {"method": "POST", "path": "/v1/messages"}}]
     assert "credential_file" not in json.dumps(value)
 

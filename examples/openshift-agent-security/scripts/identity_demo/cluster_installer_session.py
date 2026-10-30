@@ -524,7 +524,7 @@ def build_session(args):
                 "IDENTITY_DEMO_REGISTRATION_MODE": "controller",
                 "PYTHONPATH": os.pathsep.join(
                     str(control.stage_root / p)
-                    for p in ("scripts/identity_demo", "tests/identity_demo")
+                    for p in ("runtime", "runtime/identity_demo", "scripts/identity_demo")
                 ),
             }
             # Only this parent changes the lease. The existing stage runner kills

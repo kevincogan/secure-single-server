@@ -104,9 +104,9 @@ def verify(*, include_inventory: bool = False) -> dict:
     for entry in lock['patches']:
         p=ROOT/'infra/openshell/patches'/entry['file']
         if not p.is_file() or hashlib.sha256(p.read_bytes()).hexdigest()!=entry['sha256']:errors.append('Native patch hash mismatch')
-    # All modules used by launchd snapshot selection and source templates must exist.
-    for d in ('scripts/identity_demo','tests/identity_demo','infra/identity-demo','infra/openshell/patches','workloads/agents/service-request-demo/src'):
-        if not (ROOT/d).is_dir():errors.append('Missing runtime directory: '+d)
+    # Runtime, qualification and deployment sources have separate ownership.
+    for d in ('runtime','runtime/identity_demo','scripts/identity_demo','tests/identity_demo','infra/identity-demo','infra/openshell/patches','workloads/agents/service-request-demo/src'):
+        if not (ROOT/d).is_dir():errors.append('Missing delivery directory: '+d)
     if include_inventory:errors.extend(inventory_errors(ROOT))
     return {'verified':not errors,'counts':counts,'inventory_checked':include_inventory,'errors':errors}
 

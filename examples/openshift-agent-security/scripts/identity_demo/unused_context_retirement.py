@@ -166,8 +166,11 @@ def state(args, context, value, phase, absence_sha256=''):
     """Invoke only reviewed live store methods with existing installer exec access."""
     import identity_demo_execution_setup as execution
     root = execution.ROOT/'scripts/identity_demo'
-    modules = ('identity_demo_warm_pool', 'identity_demo_run_store')
-    hashes = {n: hashlib.sha256((root/(n+'.py')).read_bytes()).hexdigest() for n in modules}
+    modules = {'identity_demo_warm_pool':root/'identity_demo_warm_pool.py',
+               'identity_demo_run_store':root/'identity_demo_run_store.py',
+               'agent_security':execution.ROOT/'runtime/agent_security.py',
+               'agent_security_contracts':execution.ROOT/'runtime/agent_security_contracts.py'}
+    hashes = {n: hashlib.sha256(p.read_bytes()).hexdigest() for n,p in modules.items()}
     payload = {'phase': phase, 'workload': context.workload, 'identity': asdict(context),
                'reservation': value['reservation'], 'context_sha256': value['pool_context_sha256'],
                'review_sha256': args.review_sha256, 'absence_sha256': absence_sha256,
@@ -176,9 +179,10 @@ def state(args, context, value, phase, absence_sha256=''):
 from pathlib import Path
 import identity_demo_warm_pool as warm
 import identity_demo_run_store as runs
+import agent_security,agent_security_contracts
 value=runs.strict_json(sys.stdin.buffer.read())
 assert json.loads(Path(os.environ['IDENTITY_DEMO_CONFIG']).read_text())==value['profile']
-for module in (warm,runs):
+for module in (warm,runs,agent_security,agent_security_contracts):
  assert hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()==value['modules'][module.__name__], 'Reviewed durable guards must be deployed first'
 store=runs.RunStore.__new__(runs.RunStore);store.path=Path(os.environ['DRIVER_DATABASE'])
 phase=value['phase'];assert phase in ('plan','begin','eligible','finish')

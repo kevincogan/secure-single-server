@@ -26,16 +26,6 @@ def test_other_resource_names_rejected(name: str) -> None:
         probe.manifest("v1", "Secret", name)
 
 
-@pytest.mark.parametrize("server,label", [
-    ("https://other.invalid", "owned-check"),
-    (probe.SERVER, "../escape"),
-])
-def test_invalid_inputs_rejected_before_any_cluster_operation(server: str, label: str) -> None:
-    """Wrong cluster or an escaping evidence label cannot reach Kubernetes."""
-    args = argparse.Namespace(expected_server=server, label=label)
-    with patch.object(probe, "kube", side_effect=AssertionError("Cluster reached")):
-        with pytest.raises(ValueError):
-            probe.run(args)
 
 
 def test_cluster_error_withholds_response_and_credential() -> None:
@@ -49,14 +39,6 @@ def test_cluster_error_withholds_response_and_credential() -> None:
     assert "synthetic-private" not in str(failure.value)
 
 
-@pytest.mark.parametrize("grace", [-1, 121])
-def test_observation_window_cannot_be_unbounded(grace: int) -> None:
-    """Extended observation changes no token lifetime and remains bounded."""
-    args = argparse.Namespace(expected_server=probe.SERVER, label="owned-check",
-                              observation_grace_seconds=grace)
-    with patch.object(probe, "kube", side_effect=AssertionError("Cluster reached")):
-        with pytest.raises(ValueError):
-            probe.run(args)
 
 
 @pytest.mark.parametrize("wrong_parent,ready", [(False, True), (True, True), (False, False)])

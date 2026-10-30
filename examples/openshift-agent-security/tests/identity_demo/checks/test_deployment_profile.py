@@ -151,7 +151,7 @@ import probe_native_identity as identity
 from argparse import Namespace
 from contextlib import nullcontext
 from types import SimpleNamespace
-import checks.test_components as components
+import identity_demo_fixture_http as components
 import identity_demo_runtime as runtime
 import identity_demo_offline_inventory as offline
 import probe_runtime_management as management
@@ -191,8 +191,7 @@ print(json.dumps([adapter.DRIVER,adapter.JIRA,policy.DRIVER,workspaces.PLATFORM,
     concurrency.RESOURCE]))'''
     root = Path(__file__).resolve().parents[3]
     env = {**os.environ, "IDENTITY_DEMO_CONFIG": str(path),
-           "PYTHONPATH": str(root / "scripts/identity_demo") + os.pathsep
-                        + str(root / "tests/identity_demo")}
+           "PYTHONPATH": os.pathsep.join(str(root / p) for p in ("runtime", "runtime/identity_demo", "scripts/identity_demo", "tests/identity_demo"))}
     result = subprocess.run([sys.executable, "-c", program], env=env,
                             text=True, capture_output=True, timeout=15, check=True)
     values = json.loads(result.stdout)
@@ -239,7 +238,9 @@ def test_private_paths_cover_source_archive_without_git(tmp_path: Path) -> None:
 ])
 def test_standalone_probe_cli_does_not_require_operator_imports(name: str) -> None:
     """Pod probes and their help entry points must not import checkout-only helpers."""
-    source = Path(__file__).resolve().parents[3] / "tests/identity_demo" / name
+    root = Path(__file__).resolve().parents[3]
+    folder = "runtime/identity_demo" if name in ("probe_adapter_tls.py", "probe_protected_adapter.py") else "tests/identity_demo"
+    source = root / folder / name
     env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
     result = subprocess.run([sys.executable, str(source), "--help"], env=env,
                             capture_output=True, text=True, timeout=15)

@@ -13,6 +13,8 @@ No helper success implies security/licensing or production approval.
 
 Run `make test PYTHON=<operator-python>` and `make check PYTHON=<operator-python>`
 after relevant changes. Integration checks require explicit private inputs.
-`scripts/identity_demo/` and `tests/identity_demo/` are both runtime dependencies.
-Do not delete tests/identity_demo because of its name. The legacy service-request
-workflow identifier is the Remediation change request UI workflow.
+Runtime code lives in `runtime/` and `scripts/identity_demo/`; runtime images use
+the reviewed `config/runtime-sources.json` allowlist. `tests/identity_demo/`
+contains automated checks and optional browser/qualification tools, which must
+not become runtime imports. The legacy service-request workflow identifier is
+the Remediation change request UI workflow.

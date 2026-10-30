@@ -20,15 +20,15 @@ from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 from uuid import uuid4
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tests' / 'identity_demo'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'runtime' / 'identity_demo'))
 
 from identity_demo_action_policy import DRIVER
 from identity_demo_operator_access import OperatorAccessUnavailable
 from identity_demo_runtime import guard
 from identity_demo_runtime_cli import private_path
 from permission_flow import PermissionFlow
-from browser_permission_flow import BrowserPermissionFlow
-from enmaas_flow import EnmaasFlow, private_inference
+from gateway_evidence_flow import GatewayEvidenceFlow
+from model_execution import ModelExecutionFlow, private_inference
 from execution_context import ExecutionContext
 import probe_native_exchange as native
 
@@ -225,11 +225,11 @@ class AttachedFlow:
         return result
 
 
-class ConsoleCveFlow(AttachedFlow, BrowserPermissionFlow):
+class ConsoleCveFlow(AttachedFlow, GatewayEvidenceFlow):
     """Keep the original CVE proposal producer and native permission path."""
 
 
-class ConsoleModelFlow(AttachedFlow, EnmaasFlow):
+class ConsoleModelFlow(AttachedFlow, ModelExecutionFlow):
     """Keep the original native Messages provider and protected Jira path."""
 
 

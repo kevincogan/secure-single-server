@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+import pytest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts" / "identity_demo"))
@@ -106,16 +107,12 @@ class RuntimePreparationTests(unittest.TestCase):
         mapper = value["protocolMappers"][0]
         self.assertEqual(mapper["config"]["included.custom.audience"], runtime.AUDIENCE)
 
-    def test_permission_denial_is_preserved(self) -> None:
-        """oc returns exit 1 for a real denial; this is not an unknown result."""
-        args = argparse.Namespace(kubeconfig="/private/config")
-        with patch.object(runtime.subprocess, "run", return_value=argparse.Namespace(
-                         returncode=1, stdout="no\n")):
-            self.assertEqual(runtime.permission(args, "get", "nodes"), "no")
 
-    def test_permission_query_failure_is_unknown(self) -> None:
-        """A timeout/error cannot be interpreted as an authorization decision."""
-        args = argparse.Namespace(kubeconfig="/private/config")
-        with patch.object(runtime.subprocess, "run", return_value=argparse.Namespace(
-                         returncode=1, stdout="")):
-            self.assertEqual(runtime.permission(args, "get", "nodes"), "unknown")
+
+
+@pytest.mark.parametrize('stdout,expected',[('no\n','no'),('','unknown')],ids=['explicit-denial','query-failure'])
+def test_permission_query_preserves_denial_vs_unknown(stdout,expected):
+    """An explicit no is distinct from failed/uncertain authorization queries."""
+    args=argparse.Namespace(kubeconfig='/private/config')
+    with patch.object(runtime.subprocess,'run',return_value=argparse.Namespace(returncode=1,stdout=stdout)):
+        assert runtime.permission(args,'get','nodes') == expected

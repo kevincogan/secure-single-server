@@ -334,13 +334,13 @@
       "apiVersion": "v1",
       "data": {
         "adapter_auth.py": {
-          "$source": "tests/identity_demo/adapter_auth.py"
+          "$source": "runtime/identity_demo/adapter_auth.py"
         },
         "adapter_discovery.py": {
-          "$source": "tests/identity_demo/adapter_discovery.py"
+          "$source": "runtime/identity_demo/adapter_discovery.py"
         },
         "adapter_live_auth.py": {
-          "$source": "tests/identity_demo/adapter_live_auth.py"
+          "$source": "runtime/identity_demo/adapter_live_auth.py"
         },
         "identity_demo_jira_action_adapter.py": {
           "$source": "scripts/identity_demo/identity_demo_jira_action_adapter.py"
@@ -350,13 +350,13 @@
         },
         "jwks.json": "{\"keys\":[]}",
         "probe_adapter_tls.py": {
-          "$source": "tests/identity_demo/probe_adapter_tls.py"
+          "$source": "runtime/identity_demo/probe_adapter_tls.py"
         },
         "probe_protected_adapter.py": {
-          "$source": "tests/identity_demo/probe_protected_adapter.py"
+          "$source": "runtime/identity_demo/probe_protected_adapter.py"
         },
         "start_protected_adapter.py": {
-          "$source": "tests/identity_demo/start_protected_adapter.py"
+          "$source": "runtime/identity_demo/start_protected_adapter.py"
         },
         "deployment_profile.py": {
           "$source": "scripts/identity_demo/deployment_profile.py"
@@ -375,6 +375,15 @@
         },
         "deployment_artifacts.py": {
           "$source": "scripts/identity_demo/deployment_artifacts.py"
+        },
+        "agent_security_service.py": {
+          "$source": "runtime/agent_security_service.py"
+        },
+        "agent_security.py": {
+          "$source": "runtime/agent_security.py"
+        },
+        "agent_security_contracts.py": {
+          "$source": "runtime/agent_security_contracts.py"
         }
       },
       "immutable": true,
@@ -449,6 +458,21 @@
         },
         "deployment_artifacts.py": {
           "$source": "scripts/identity_demo/deployment_artifacts.py"
+        },
+        "agent_security_service.py": {
+          "$source": "runtime/agent_security_service.py"
+        },
+        "agent_security.py": {
+          "$source": "runtime/agent_security.py"
+        },
+        "agent_security_contracts.py": {
+          "$source": "runtime/agent_security_contracts.py"
+        },
+        "provider_contract.py": {
+          "$source": "runtime/provider_contract.py"
+        },
+        "provider-contract.json": {
+          "$source": "runtime/provider-contract.json"
         }
       },
       "immutable": true,
@@ -467,7 +491,7 @@
       "apiVersion": "v1",
       "data": {
         "start_jira_fixture.py": {
-          "$source": "tests/identity_demo/start_jira_fixture.py"
+          "$source": "runtime/identity_demo/start_jira_fixture.py"
         },
         "deployment_profile.py": {
           "$source": "scripts/identity_demo/deployment_profile.py"
@@ -563,20 +587,20 @@
       "apiVersion": "v1",
       "data": {
         "adapter_auth.py": {
-          "$source": "tests/identity_demo/adapter_auth.py"
+          "$source": "runtime/identity_demo/adapter_auth.py"
         },
         "adapter_live_auth.py": {
-          "$source": "tests/identity_demo/adapter_live_auth.py"
+          "$source": "runtime/identity_demo/adapter_live_auth.py"
         },
         "jwks.json": "{\"keys\":[]}",
         "probe_adapter_tls.py": {
-          "$source": "tests/identity_demo/probe_adapter_tls.py"
+          "$source": "runtime/identity_demo/probe_adapter_tls.py"
         },
         "probe_protected_adapter.py": {
-          "$source": "tests/identity_demo/probe_protected_adapter.py"
+          "$source": "runtime/identity_demo/probe_protected_adapter.py"
         },
         "start_protected_adapter.py": {
-          "$source": "tests/identity_demo/start_protected_adapter.py"
+          "$source": "runtime/identity_demo/start_protected_adapter.py"
         },
         "deployment_profile.py": {
           "$source": "scripts/identity_demo/deployment_profile.py"
@@ -2369,18 +2393,6 @@
             "port": 8080,
             "protocol": "TCP",
             "targetPort": 8080
-          },
-          {
-            "name": "sse",
-            "port": 8081,
-            "protocol": "TCP",
-            "targetPort": 8081
-          },
-          {
-            "name": "streamable",
-            "port": 8082,
-            "protocol": "TCP",
-            "targetPort": 8082
           }
         ],
         "selector": {
@@ -2577,18 +2589,6 @@
       "spec": {
         "internalTrafficPolicy": "Cluster",
         "ports": [
-          {
-            "name": "streamable",
-            "port": 8083,
-            "protocol": "TCP",
-            "targetPort": 8083
-          },
-          {
-            "name": "sse",
-            "port": 8084,
-            "protocol": "TCP",
-            "targetPort": 8084
-          },
           {
             "name": "https",
             "port": 8443,
@@ -3015,164 +3015,6 @@
                     "name": "rest-tls",
                     "readOnly": true
                   },
-                  {
-                    "name": "installation-profile",
-                    "mountPath": "/configuration/installation.json",
-                    "subPath": "installation.json",
-                    "readOnly": true
-                  }
-                ]
-              },
-              {
-                "command": [
-                  "python",
-                  "-c",
-                  "import asyncio; from mcp_servers.atlassian_jira import mcp; tools=asyncio.run(mcp.list_tools()); [mcp.remove_tool(t.name) for t in tools if t.name not in (\"searchJiraIssuesUsingJql\", \"getJiraIssue\")]; mcp.run(transport=\"sse\")"
-                ],
-                "env": [
-                  {
-                    "name": "JIRA_SERVER",
-                    "value": "http://127.0.0.1:8080"
-                  },
-                  {
-                    "name": "JIRA_USER",
-                    "value": "admin"
-                  },
-                  {
-                    "name": "JIRA_TOKEN",
-                    "valueFrom": {
-                      "secretKeyRef": {
-                        "key": "jira-admin",
-                        "name": "fixture-credentials"
-                      }
-                    }
-                  },
-                  {
-                    "name": "MCP_HOST",
-                    "value": "0.0.0.0"
-                  },
-                  {
-                    "name": "MCP_PORT",
-                    "value": "8081"
-                  },
-                  {
-                    "name": "PYTHONDONTWRITEBYTECODE",
-                    "value": "1"
-                  },
-                  {
-                    "name": "IDENTITY_DEMO_CONFIG",
-                    "value": "/configuration/installation.json"
-                  }
-                ],
-                "image": "${image.jira_runtime}",
-                "imagePullPolicy": "IfNotPresent",
-                "name": "adapter-sse",
-                "ports": [
-                  {
-                    "containerPort": 8081,
-                    "protocol": "TCP"
-                  }
-                ],
-                "resources": {
-                  "limits": {
-                    "cpu": "300m",
-                    "memory": "256Mi"
-                  },
-                  "requests": {
-                    "cpu": "50m",
-                    "memory": "128Mi"
-                  }
-                },
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                },
-                "terminationMessagePath": "/dev/termination-log",
-                "terminationMessagePolicy": "File",
-                "volumeMounts": [
-                  {
-                    "name": "installation-profile",
-                    "mountPath": "/configuration/installation.json",
-                    "subPath": "installation.json",
-                    "readOnly": true
-                  }
-                ]
-              },
-              {
-                "command": [
-                  "python",
-                  "-c",
-                  "import asyncio; from mcp_servers.atlassian_jira import mcp; tools=asyncio.run(mcp.list_tools()); [mcp.remove_tool(t.name) for t in tools if t.name not in (\"searchJiraIssuesUsingJql\", \"getJiraIssue\")]; mcp.run(transport=\"streamable-http\")"
-                ],
-                "env": [
-                  {
-                    "name": "JIRA_SERVER",
-                    "value": "http://127.0.0.1:8080"
-                  },
-                  {
-                    "name": "JIRA_USER",
-                    "value": "admin"
-                  },
-                  {
-                    "name": "JIRA_TOKEN",
-                    "valueFrom": {
-                      "secretKeyRef": {
-                        "key": "jira-admin",
-                        "name": "fixture-credentials"
-                      }
-                    }
-                  },
-                  {
-                    "name": "MCP_HOST",
-                    "value": "0.0.0.0"
-                  },
-                  {
-                    "name": "MCP_PORT",
-                    "value": "8082"
-                  },
-                  {
-                    "name": "PYTHONDONTWRITEBYTECODE",
-                    "value": "1"
-                  },
-                  {
-                    "name": "IDENTITY_DEMO_CONFIG",
-                    "value": "/configuration/installation.json"
-                  }
-                ],
-                "image": "${image.jira_runtime}",
-                "imagePullPolicy": "IfNotPresent",
-                "name": "adapter-streamable-http",
-                "ports": [
-                  {
-                    "containerPort": 8082,
-                    "protocol": "TCP"
-                  }
-                ],
-                "resources": {
-                  "limits": {
-                    "cpu": "300m",
-                    "memory": "256Mi"
-                  },
-                  "requests": {
-                    "cpu": "50m",
-                    "memory": "128Mi"
-                  }
-                },
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                },
-                "terminationMessagePath": "/dev/termination-log",
-                "terminationMessagePolicy": "File",
-                "volumeMounts": [
                   {
                     "name": "installation-profile",
                     "mountPath": "/configuration/installation.json",
@@ -3736,236 +3578,6 @@
           "spec": {
             "automountServiceAccountToken": false,
             "containers": [
-              {
-                "command": [
-                  "python",
-                  "/fixtures/start_protected_adapter.py"
-                ],
-                "env": [
-                  {
-                    "name": "ADAPTER_ISSUER",
-                    "value": "https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo"
-                  },
-                  {
-                    "name": "ADAPTER_RESOURCE",
-                    "value": "http://fixture-protected-adapter.${core_namespace}.svc:8083/mcp"
-                  },
-                  {
-                    "name": "MCP_TRANSPORT",
-                    "value": "streamable-http"
-                  },
-                  {
-                    "name": "MCP_PORT",
-                    "value": "8083"
-                  },
-                  {
-                    "name": "JIRA_SERVER",
-                    "value": "http://fixture-jira:8080"
-                  },
-                  {
-                    "name": "JIRA_USER",
-                    "value": "admin"
-                  },
-                  {
-                    "name": "JIRA_TOKEN",
-                    "valueFrom": {
-                      "secretKeyRef": {
-                        "key": "jira-admin",
-                        "name": "fixture-credentials"
-                      }
-                    }
-                  },
-                  {
-                    "name": "PYTHONDONTWRITEBYTECODE",
-                    "value": "1"
-                  },
-                  {
-                    "name": "PYTHONPATH",
-                    "value": "/app:/app/src:/fixtures"
-                  },
-                  {
-                    "name": "IDENTITY_DEMO_CONFIG",
-                    "value": "/configuration/installation.json"
-                  },
-                  {
-                    "name": "IDENTITY_DEMO_ARTIFACTS",
-                    "value": "/configuration/artifacts.json"
-                  }
-                ],
-                "image": "${image.jira_runtime}",
-                "imagePullPolicy": "IfNotPresent",
-                "name": "fixture-protected-adapter",
-                "ports": [
-                  {
-                    "containerPort": 8083,
-                    "protocol": "TCP"
-                  }
-                ],
-                "readinessProbe": {
-                  "failureThreshold": 3,
-                  "initialDelaySeconds": 5,
-                  "periodSeconds": 10,
-                  "successThreshold": 1,
-                  "tcpSocket": {
-                    "port": 8083
-                  },
-                  "timeoutSeconds": 1
-                },
-                "resources": {
-                  "limits": {
-                    "cpu": "300m",
-                    "memory": "256Mi"
-                  },
-                  "requests": {
-                    "cpu": "50m",
-                    "memory": "128Mi"
-                  }
-                },
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                },
-                "terminationMessagePath": "/dev/termination-log",
-                "terminationMessagePolicy": "File",
-                "volumeMounts": [
-                  {
-                    "mountPath": "/fixtures",
-                    "name": "bootstrap",
-                    "readOnly": true
-                  },
-                  {
-                    "name": "installation-profile",
-                    "mountPath": "/configuration/installation.json",
-                    "subPath": "installation.json",
-                    "readOnly": true
-                  },
-                  {
-                    "name": "installation-profile",
-                    "mountPath": "/configuration/artifacts.json",
-                    "subPath": "artifacts.json",
-                    "readOnly": true
-                  }
-                ]
-              },
-              {
-                "command": [
-                  "python",
-                  "/fixtures/start_protected_adapter.py"
-                ],
-                "env": [
-                  {
-                    "name": "ADAPTER_ISSUER",
-                    "value": "https://fixture-keycloak-${core_namespace}.${route_domain}/realms/identity-demo"
-                  },
-                  {
-                    "name": "ADAPTER_RESOURCE",
-                    "value": "http://fixture-protected-adapter.${core_namespace}.svc:8083/mcp"
-                  },
-                  {
-                    "name": "MCP_TRANSPORT",
-                    "value": "sse"
-                  },
-                  {
-                    "name": "MCP_PORT",
-                    "value": "8084"
-                  },
-                  {
-                    "name": "JIRA_SERVER",
-                    "value": "http://fixture-jira:8080"
-                  },
-                  {
-                    "name": "JIRA_USER",
-                    "value": "admin"
-                  },
-                  {
-                    "name": "JIRA_TOKEN",
-                    "valueFrom": {
-                      "secretKeyRef": {
-                        "key": "jira-admin",
-                        "name": "fixture-credentials"
-                      }
-                    }
-                  },
-                  {
-                    "name": "PYTHONDONTWRITEBYTECODE",
-                    "value": "1"
-                  },
-                  {
-                    "name": "PYTHONPATH",
-                    "value": "/app:/app/src:/fixtures"
-                  },
-                  {
-                    "name": "IDENTITY_DEMO_CONFIG",
-                    "value": "/configuration/installation.json"
-                  },
-                  {
-                    "name": "IDENTITY_DEMO_ARTIFACTS",
-                    "value": "/configuration/artifacts.json"
-                  }
-                ],
-                "image": "${image.jira_runtime}",
-                "imagePullPolicy": "IfNotPresent",
-                "name": "adapter-sse",
-                "ports": [
-                  {
-                    "containerPort": 8084,
-                    "protocol": "TCP"
-                  }
-                ],
-                "readinessProbe": {
-                  "failureThreshold": 3,
-                  "initialDelaySeconds": 5,
-                  "periodSeconds": 10,
-                  "successThreshold": 1,
-                  "tcpSocket": {
-                    "port": 8084
-                  },
-                  "timeoutSeconds": 1
-                },
-                "resources": {
-                  "limits": {
-                    "cpu": "300m",
-                    "memory": "256Mi"
-                  },
-                  "requests": {
-                    "cpu": "50m",
-                    "memory": "128Mi"
-                  }
-                },
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                },
-                "terminationMessagePath": "/dev/termination-log",
-                "terminationMessagePolicy": "File",
-                "volumeMounts": [
-                  {
-                    "mountPath": "/fixtures",
-                    "name": "bootstrap",
-                    "readOnly": true
-                  },
-                  {
-                    "name": "installation-profile",
-                    "mountPath": "/configuration/installation.json",
-                    "subPath": "installation.json",
-                    "readOnly": true
-                  },
-                  {
-                    "name": "installation-profile",
-                    "mountPath": "/configuration/artifacts.json",
-                    "subPath": "artifacts.json",
-                    "readOnly": true
-                  }
-                ]
-              },
               {
                 "command": [
                   "python",
@@ -4827,53 +4439,6 @@
                 "gateway.istio.io/tls-terminate-mode": "MUTUAL"
               }
             }
-          }
-        ]
-      }
-    },
-    {
-      "apiVersion": "gateway.networking.k8s.io/v1",
-      "kind": "HTTPRoute",
-      "metadata": {
-        "name": "fixture-jira",
-        "labels": {
-          "app.kubernetes.io/part-of": "identity-demo-preflight",
-          "identity-demo-owner": "${owner}"
-        },
-        "annotations": {},
-        "namespace": "${core_namespace}"
-      },
-      "spec": {
-        "hostnames": [
-          "jira.fixture-mcp.local"
-        ],
-        "parentRefs": [
-          {
-            "group": "gateway.networking.k8s.io",
-            "kind": "Gateway",
-            "name": "fixture-mcp",
-            "sectionName": "mcps"
-          }
-        ],
-        "rules": [
-          {
-            "backendRefs": [
-              {
-                "group": "",
-                "kind": "Service",
-                "name": "fixture-jira",
-                "port": 8082,
-                "weight": 1
-              }
-            ],
-            "matches": [
-              {
-                "path": {
-                  "type": "PathPrefix",
-                  "value": "/mcp"
-                }
-              }
-            ]
           }
         ]
       }

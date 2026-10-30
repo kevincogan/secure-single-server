@@ -35,7 +35,7 @@ CLI/native maintenance also needs the checksum-verified tools in the existing
 ```bash
 make test PYTHON="$DEMO_PYTHON"
 make check PYTHON="$DEMO_PYTHON"
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
   scripts/identity_demo/identity_demo_setup.py --help
 ```
 
@@ -48,13 +48,17 @@ cluster access is required for unit checks.
 
 | Directory | Responsibility |
 |---|---|
-| `scripts/identity_demo/` | Installer, identity, policies, UI, durable run state and trusted operator services |
-| `tests/identity_demo/` | Both operator runtime helpers and automated checks; keep this directory in deployment packages |
+| `runtime/agent_security*.py` | Shared durable authorization, exact approval, execution and reviewed connector contracts |
+| `runtime/identity_demo/` | OpenShell execution, MCP transport, workflow and infrastructure integration |
+| `scripts/identity_demo/` | Installer, identity/session/UI adapters, platform admission and trusted operator services |
+| `tests/identity_demo/` | Automated checks and optional browser/qualification commands; excluded from the runtime image |
+| `examples/document-agent/` | Tiny unrelated content agent and trusted synthetic host proving reuse without Jira or the UI |
 | `workloads/agents/service-request-demo/src/` | Bounded agent loop, Messages client and synthetic remediation input |
 | `infra/identity-demo/` | Application/realm templates and native runtime recipes |
 | `infra/openshell/` | Pinned upstream build inputs and evaluation patches |
 | `docs/examples/` | Public templates; copy to protected private storage before editing |
-| `config/` | Nonsecret source configuration template and exact parameterization targets |
+| `runtime/provider-contract.json` | One reviewed nonsecret endpoint, model and image contract |
+| `config/` | Source-integrity pins, runtime delivery allowlist and dependency lock |
 
 Module names and the legacy `service-request` workflow identifier remain stable;
 the UI calls that workflow **Remediation change request**.
@@ -76,11 +80,10 @@ editing this checkout alone does not change an existing deployment.
 | Cluster permissions, private endpoints and public trust | `cluster_console_resources.py`, `identity_demo_controller_identity.py`, `identity_demo_public_trust.py` |
 | Native changes and build pins | `infra/openshell/patches/README.md`, `infra/openshell/native-build/inputs.lock.json` |
 
-Python modules above are in `scripts/identity_demo/`. Focused regressions are in
-`tests/identity_demo/checks/`; export/setup tests are in `tests/export/`. Helpers
-at the root of `tests/identity_demo/` are also runtime dependencies, not test-only
-code. That inherited layout is deliberate compatibility, pending a separate
-reviewed refactor.
+The shared mechanisms are described in [the reuse guide](docs/security-runtime.md).
+Platform/UI Python modules above are in `scripts/identity_demo/`; native execution
+is in `runtime/identity_demo/`. Focused regressions are in
+`tests/identity_demo/checks/`; export/setup tests are in `tests/export/`.
 
 `make check` checks syntax, links, templates, native patch pins, the complete
 source inventory and common private-data patterns. Its report contains file paths
@@ -89,7 +92,9 @@ secret detector or an independent security assessment. After an intentional
 generic source change, regenerate `export-manifest.json` from the reviewed source;
 never regenerate it just to hide unexplained drift. Configured private working
 copies use `scripts/verify-source.py` without `--inventory`; their configuration
-receipt records the reviewed parameter changes.
+receipt records the one public data-file change. `configure-demo.py` validates the
+fixed source pins before writing that JSON; it never rewrites application/test
+Python or Containerfiles. Runtime endpoint selection remains unavailable to agents.
 
 ## Git and refresh
 

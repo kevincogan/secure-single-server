@@ -84,28 +84,39 @@ class Stages:
 
 
 def inactive_catalog_policy(args: argparse.Namespace, objects: list[dict], result: dict) -> bool:
-    """Recognise only the unchanged base policy awaiting a catalog registration.
+    """Recognise exact unchanged bootstrap policies awaiting catalog routes.
 
     Retain the failed strict verifier receipt. This exception reports a dormant
     policy, never claims functional enforcement or alters the policy itself.
     """
-    if result.get("failures") != ["AuthPolicy/fixture-mcp-auth"]:
+    failures = result.get("failures")
+    pending = {"AuthPolicy/fixture-mcp-auth", "AuthPolicy/fixture-mcp-tools-auth"}
+    if (not isinstance(failures, list) or not failures
+            or any(not isinstance(value, str) for value in failures)
+            or len(failures) != len(set(failures)) or not set(failures) <= pending):
         return False
-    desired = next(o for o in objects if o["kind"] == "AuthPolicy"
-                   and o["metadata"]["name"] == "fixture-mcp-auth")
-    current = setup.get(args, desired)
-    setup.owned(current, args.profile)
-    if current.get("spec") != desired.get("spec"):
-        return False
-    status = current.get("status", {})
-    if not any(c.get("type") == "Accepted" and c.get("status") == "True"
-               for c in status.get("conditions", [])):
-        return False
-    return any(c.get("type") == "Enforced" and c.get("status") == "False" and c.get("message") ==
-               "AuthPolicy is not in the path to any existing routes"
-               and c.get("observedGeneration", status.get("observedGeneration"))
-                   == current["metadata"].get("generation", 1)
-               for c in status.get("conditions", []))
+    for failure in failures:
+        matches = [o for o in objects if o["kind"] == "AuthPolicy"
+                   and o["metadata"]["name"] == failure.split("/", 1)[1]]
+        if len(matches) != 1:
+            return False
+        desired = matches[0]
+        current = setup.get(args, desired)
+        setup.owned(current, args.profile)
+        if current.get("spec") != desired.get("spec"):
+            return False
+        status = current.get("status", {})
+        conditions = status.get("conditions", [])
+        def current_condition(condition):
+            return condition.get("observedGeneration", status.get("observedGeneration")) == current["metadata"].get("generation", 1)
+        if not any(c.get("type") == "Accepted" and c.get("status") == "True"
+                   and current_condition(c) for c in conditions):
+            return False
+        if not any(c.get("type") == "Enforced" and c.get("status") == "False"
+                   and c.get("message") == "AuthPolicy is not in the path to any existing routes"
+                   and current_condition(c) for c in conditions):
+            return False
+    return True
 
 
 def wait_controllers(args: argparse.Namespace, objects: list[dict]) -> None:
@@ -191,10 +202,10 @@ def connected_install(args: argparse.Namespace) -> dict:
     if getattr(args, 'activate_cluster_runtime', False):
         env['IDENTITY_DEMO_REGISTRATION_MODE'] = 'controller'
     env["PYTHONPATH"] = os.pathsep.join(str(setup.ROOT / p) for p in (
-        "scripts/identity_demo", "tests/identity_demo"))
+        "runtime", "runtime/identity_demo", "scripts/identity_demo"))
     if inference_path:
         checked = subprocess.run([sys.executable, "-c",
-            "import sys; from enmaas_flow import private_inference; private_inference(sys.argv[1])",
+            "import sys; from model_execution import private_inference; private_inference(sys.argv[1])",
             inference_path], env=env, cwd=setup.ROOT, capture_output=True, timeout=60)
         setup.write(args.output_dir / "inference-reference-check.json", {
             "passed": checked.returncode == 0, "credential_bytes_read": False,
@@ -264,7 +275,6 @@ def connected_install(args: argparse.Namespace) -> dict:
 def finish_installation(args, env, stages, run, rendered, objects, cli,
                         suggested_presenter, inference_path, *, creation_ledger=None):
     """Complete verified installation stages; never replay application creation."""
-    profile = args.profile
     bundle_path = rendered / "stack.private.json"
     pinned = ["--bundle", str(bundle_path), "--bundle-sha256", setup.sha(bundle_path)]
     wait_controllers(args, objects)

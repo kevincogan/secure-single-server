@@ -71,12 +71,18 @@ def prepare_context(args):
     else:
         unpack(args.oc_archive, lock['oc_archive_sha256'], 'oc', context/'tools/oc')
         unpack(args.cli_archive, cli['sha256'], cli['archive_member'], context/'tools/openshell')
-    for folder in ('scripts', 'tests', 'workloads', 'infra'):
-        if any(p.is_symlink() for p in (ROOT/folder).rglob('*')):
-            raise ValueError('Runtime source must contain regular repository files')
-        shutil.copytree(ROOT/folder, context/folder,
-            ignore=shutil.ignore_patterns('__pycache__', '.pytest_cache', '*.pyc'))
-    shutil.copyfile(ROOT/'tests/identity_demo/requirements-lock.txt', context/'requirements-lock.txt')
+    inventory = json.loads((ROOT/'config/runtime-sources.json').read_text())
+    if inventory.get('schema_version') != 1 or len(set(inventory['files'])) != len(inventory['files']):
+        raise ValueError('Unambiguous runtime source inventory required')
+    for name in inventory['files']:
+        source = ROOT/name
+        if (Path(name).is_absolute() or '..' in Path(name).parts or source.is_symlink()
+                or not source.resolve().is_relative_to(ROOT) or not source.is_file()):
+            raise ValueError('Regular reviewed runtime source required')
+        target = context/name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    shutil.copyfile(ROOT/'config/requirements-runtime.txt', context/'requirements-lock.txt')
     shutil.copyfile(ROOT/'infra/identity-demo/console-runtime.Containerfile', context/'Containerfile')
     hashes = {str(p.relative_to(context)): digest(p) for p in context.rglob('*') if p.is_file()}
     identity = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()

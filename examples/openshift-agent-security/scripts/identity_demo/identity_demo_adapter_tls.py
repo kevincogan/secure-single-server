@@ -91,7 +91,7 @@ def setup(args: argparse.Namespace) -> None:
             "podSelector": {"matchLabels": router["spec"]["selector"]}}],
             "ports": [{"port": 443, "protocol": "TCP"}]}]}
     apply_owned(args, egress)
-    directory = Path(__file__).resolve().parents[2] / "tests/identity_demo"
+    directory = Path(__file__).resolve().parents[2] / "runtime/identity_demo"
     cm = resource("ConfigMap", "fixture-protected-adapter", args.namespace)
     cm["data"] = dict(bootstrap["data"])
     for name in ("adapter_auth.py", "adapter_live_auth.py", "start_protected_adapter.py",

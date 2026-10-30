@@ -12,7 +12,7 @@ contains lower-level commands, security boundaries and release evidence.
 | Direct CLI acceptance | [Operator CLI](#operator-cli-reference), [security probes](#read-only-replay-certificate-renewal-and-containment-acceptance) |
 | Safe maintenance | [Context retirement](#retire-used-contexts-safely), [worker updates](#updating-the-isolated-cluster-workers) |
 | Delivery and verified scope | [Release gates](#open-release-gates), [verification boundary](#cluster-runtime-hardening-status) |
-| Existing workstation workers only | [Legacy local runtime](#legacy-local-runtime-compatibility) |
+| Migrate older workstation workers | [Legacy local runtime](#legacy-local-runtime-compatibility) |
 
 ## Architecture and permission boundaries
 
@@ -85,8 +85,9 @@ and registration grants are cluster-scoped and need platform authorization.
 The coordinator and preparer run on OpenShift with separate scoped ServiceAccounts,
 projected tokens, persistent state and execution leases. Browser runs, automatic
 preparation and the authenticated Jira view work with local workers stopped.
-Local CLI/worker operation remains an explicit compatibility mode. This is a
-connected evaluation with development patches; review the
+Local CLI commands remain available for maintenance. Workstation background
+workers are retired; see [migration guidance](#legacy-local-runtime-compatibility).
+This is a connected evaluation with development patches; review the
 [release gates](#open-release-gates) before customer delivery.
 
 ## Deployment and recovery reference
@@ -201,7 +202,7 @@ contract before this render step.
 
 ```bash
 mkdir -m 700 -p "$DEMO_PACKAGE_OUTPUT"
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   render --installation-config "$DEMO_INSTALLATION_CONFIG" \
   --output-dir "$DEMO_PACKAGE_OUTPUT/render-01"
 ```
@@ -267,7 +268,7 @@ owner's equivalent narrow attachment; do not remove ownership checks.
 
 ```bash
 IDENTITY_DEMO_CONFIG="$DEMO_INSTALLATION_PROFILE" \
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
   scripts/identity_demo/identity_demo_setup.py discovery-access \
   --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
@@ -289,12 +290,12 @@ under an existing private parent. They never print Secret values or API error bo
 ```bash
 export DEMO_PACKAGE_OUTPUT="$DEMO_PRIVATE_STORAGE/package"
 mkdir -m 700 -p "$DEMO_PACKAGE_OUTPUT"
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   preflight --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --output-dir "$DEMO_PACKAGE_OUTPUT/preflight-01"
 
 # Read-only capture of the quiescent accepted owned stack, not a data backup.
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   snapshot --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --credentials-file "$DEMO_FIXTURE_CREDENTIALS" \
   --output-dir "$DEMO_PACKAGE_OUTPUT/snapshot-01"
@@ -302,7 +303,7 @@ export DEMO_STACK_BUNDLE="$DEMO_PACKAGE_OUTPUT/snapshot-01/stack.private.json"
 # Set this to bundle_sha256 from snapshot-01/setup.summary.json after reviewing it.
 export DEMO_STACK_SHA256="<recorded-and-reviewed-sha256>"
 
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   plan --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
   --server-dry-run --output-dir "$DEMO_PACKAGE_OUTPUT/plan-01"
@@ -332,7 +333,7 @@ application. This is a separate privilege-bearing operation, never an automatic
 fallback inside `install`. Use your exact authenticated non-admin username:
 
 ```bash
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   prepare-access --installer-user "$DEMO_INSTALLER_USER" \
   --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
@@ -367,15 +368,15 @@ resources merely to bypass a collision check.
 On the prepared empty owned application target, with shared prerequisites intact:
 
 ```bash
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   permissions --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
   --output-dir "$DEMO_PACKAGE_OUTPUT/permissions-01"
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   install --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
   --output-dir "$DEMO_PACKAGE_OUTPUT/install-01" --apply
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   verify --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
   --output-dir "$DEMO_PACKAGE_OUTPUT/verify-01"
@@ -413,7 +414,7 @@ application creation ledger.
 
 ```bash
 IDENTITY_DEMO_CONFIG="$DEMO_INSTALLATION_PROFILE" \
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
   scripts/identity_demo/identity_demo_setup.py runtime-permissions \
   --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --bundle "$DEMO_STACK_BUNDLE" --bundle-sha256 "$DEMO_STACK_SHA256" \
@@ -623,7 +624,7 @@ namespaces, Secrets, PVCs and Jira. Retire native contexts with the execution he
 before removing their gateway; shared controllers/identity foundation remain untouched.
 
 ```bash
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   cleanup --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --credentials-file "$DEMO_FIXTURE_CREDENTIALS" \
   --ledger "$DEMO_PACKAGE_OUTPUT/install-01/creation-ledger.private.json" \
@@ -727,9 +728,9 @@ requirements in [known limitations](identity-demo-reference.md).
 
 For browser operation, use the OpenShift services and automatic pool in the
 [quickstart](identity-demo-customer-quickstart.md#5-review-the-application-handoff-and-activate).
-The manual context/registration commands below apply to explicit CLI maintenance
-or legacy local mode. They do not replace automatic pool preparation. Fence the
-browser workers before direct execution; never run both against one installation.
+The manual context/registration commands below apply to explicit CLI maintenance.
+They do not replace automatic pool preparation. Fence the OpenShift workers
+before direct execution; never run both against one installation.
 
 ### CLI inputs and ownership
 
@@ -746,7 +747,7 @@ install diagnostic tools for a normal browser workflow.
 | `DEMO_FIXTURE_CREDENTIALS` | Existing private fixture/runtime credential file |
 | `DEMO_OPENSHELL_CLI`, `DEMO_CLI_CONFIG` | v0.1.3 CLI and the prepared private operator profile |
 | `DEMO_PRIVATE_ROOT` | Private directory outside this repository, mode 0700 |
-| `DEMO_SPIRE_AGENT`, `DEMO_PROJECTION_READER` | Reviewed Linux SPIRE CLI and native compute-projection diagnostic; reproduce with [diagnostic-build](../tests/identity_demo/tools/README.md) |
+| `DEMO_SPIRE_AGENT`, `DEMO_PROJECTION_READER` | Reviewed Linux SPIRE CLI and native compute-projection diagnostic; reproduce with [diagnostic-build](../runtime/identity_demo/tools/README.md) |
 | `DEMO_DRIVER_CREDENTIALS`, `DEMO_CATALOG_CREDENTIAL` | Existing private operator-driver keys and fresh catalog-only credential |
 | `DEMO_INFERENCE_CONFIG` | Private approved Messages provider JSON with an existing protected raw-key file reference |
 
@@ -812,7 +813,7 @@ After the application and exact runtime grants are ready, register the two
 workspace records using the supported native API:
 
 ```bash
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
   scripts/identity_demo/identity_demo_execution_setup.py \
   --action prepare-workspaces --ca-file "$DEMO_RUNTIME_CA" \
   --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
@@ -839,7 +840,7 @@ check ownership and name collisions without creating a sandbox.
 
 ```bash
 export DEMO_SUFFIX="n1" # Choose a never-used suffix for every scenario.
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
   scripts/identity_demo/identity_demo_execution_setup.py \
   --action provision --role triage --suffix "$DEMO_SUFFIX" \
   --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
@@ -878,7 +879,7 @@ The project comes
 from this trusted configuration, never from the browser.
 
 ```bash
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
   scripts/identity_demo/identity_demo_execution_setup.py \
   --action register-driver --workflow service-request --project SERVICE \
   --context-file "$DEMO_FRESH_CONTEXT" \
@@ -918,7 +919,7 @@ v0.1.3 `openshell-core/src/secrets.rs` provider mechanism, with no OpenShell cha
 
 ```bash
 export DEMO_FRESH_OUTPUT="$DEMO_PRIVATE_ROOT/walkthrough-$DEMO_SUFFIX"
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
   tests/identity_demo/rehearse_walkthrough.py \
   --workflow service-request --inference-config "$DEMO_INFERENCE_CONFIG" \
   --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
@@ -1024,8 +1025,8 @@ Changing execution mode requires the guarded installer update while idle.
 
 ```bash
 mkdir -m 700 "$DEMO_SECURITY_OUTPUT"
-PYTHONPATH=scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
-  tests/identity_demo/probe_native_exchange.py \
+PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" \
+  runtime/identity_demo/probe_native_exchange.py \
   --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
   --credentials-file "$DEMO_FIXTURE_CREDENTIALS" \
   --cli "$DEMO_OPENSHELL_CLI" --cli-config-dir "$DEMO_CLI_CONFIG" \
@@ -1556,229 +1557,12 @@ temporary build policy after a confirmed terminal Build; failed evidence remains
 
 ## Legacy local runtime compatibility
 
-The required Setup guide runs both workers on OpenShift. This section is only
-for existing macOS/launchd worker installations. It is not needed for a fresh
-cluster runtime, requires an awake workstation and has separate credentials.
-Never run both runtimes against the same execution lane.
-
-### Prepare the workflows once
-
-The connected installer prepares both synthetic projects before console activation.
-A missing project is a setup failure, not a valid empty search result. If an older
-installation lacks OPS or SERVICE, use `provision-project --project OPS` (or
-`SERVICE`) through `demo_exec` below, with a new private output directory: plan
-first, inspect, then apply only while the driver is quiescent. This helper can
-create synthetic seed issues; include them in any authorized issue budget.
-Use `--project-only` when the reviewed recovery calls for an empty synthetic
-project and no seed issues. It preserves other project data and does not change
-permissions. Default installation still includes the supplied synthetic seeds.
-If a dispatch is unknown, reconcile it first; project creation cannot clear an
-uncertain write and the helper must not bypass that stop.
-
-Use Bash for the command blocks below, which use Bash arrays. Inspect the
-generated private `operator-inputs.env` before sourcing it. Keep
-`IDENTITY_DEMO_CONFIG` set to the rendered installation profile and
-`IDENTITY_DEMO_ARTIFACTS` set to the matching artifact lock on every command.
-Pass `--inference-config` to the connected installer so the generated environment
-retains the validated inference-file path; otherwise add its private path before
-installing the user services. Shell exports alone are not inherited by launchd.
-
-Seed the four workflow/role slots once before starting the services. Automatic
-preparation later maintains two ready contexts per slot. Native workspaces
-and SERVICE/OPS already exist after the connected installer; do not repeat those
-completed stages. These commands use the generated private environment. Choose
-four never-used suffixes, at most three alphanumeric characters; the example
-suffixes must not be reused after a failed or consumed provision.
-
-```bash
-export PYTHONPATH=scripts/identity_demo:tests/identity_demo
-set -e
-export DEMO_BATCH_DIR="$DEMO_PRIVATE_ROOT/console-initial-01"
-mkdir -m 700 "$DEMO_BATCH_DIR"
-# Helpers pass file paths, not secret values. Every invocation has a new output directory.
-demo_exec() {
-  "$DEMO_PYTHON" scripts/identity_demo/identity_demo_execution_setup.py \
-    --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
-    --credentials-file "$DEMO_FIXTURE_CREDENTIALS" \
-    --cli "$DEMO_OPENSHELL_CLI" --cli-config-dir "$DEMO_CLI_CONFIG" "$@"
-}
-demo_context() {
-  demo_exec --action provision --role "$1" --suffix "$2" \
-    --output-dir "$DEMO_BATCH_DIR/context-$2-$DEMO_BATCH_PHASE" ${DEMO_APPLY[@]+"${DEMO_APPLY[@]}"}
-}
-demo_register() {
-  demo_exec --action register-driver --workflow "$1" --project "$2" \
-    --console-enabled --presenter-subject "$DEMO_PRESENTER_SUBJECT" \
-    --output-dir "$DEMO_BATCH_DIR/register-$1-$DEMO_BATCH_PHASE" \
-    "${DEMO_CONTEXT_FLAGS[@]}" ${DEMO_APPLY[@]+"${DEMO_APPLY[@]}"}
-}
-DEMO_BATCH_PHASE=plan
-DEMO_APPLY=()
-demo_context triage z1
-demo_context reader zr
-demo_context triage zs
-demo_context triage zi
-```
-
-Stop on any failure. Inspect the private plans for exact target, owner, role and
-unused names. Then create only those contexts:
-
-```bash
-DEMO_BATCH_PHASE=apply
-DEMO_APPLY=(--apply)
-demo_context triage z1
-demo_context reader zr
-demo_context triage zs
-demo_context triage zi
-```
-
-Expected: four successful provisions with distinct `context.private.json` files.
-On an uncertain create, stop and inspect; do not choose a new suffix to hide the
-failed attempt. The technical reference describes exact-context recovery.
-
-Register the fixed workflow mappings. Run the next block first with `plan`,
-inspect results, then repeat it with `apply` and `DEMO_APPLY=(--apply)`:
-
-```bash
-DEMO_BATCH_PHASE=plan
-DEMO_APPLY=()
-DEMO_CONTEXT_FLAGS=(--context-file "$DEMO_BATCH_DIR/context-z1-apply/context.private.json" \
-  --context-file "$DEMO_BATCH_DIR/context-zr-apply/context.private.json")
-demo_register cve TEST
-DEMO_CONTEXT_FLAGS=(--context-file "$DEMO_BATCH_DIR/context-zs-apply/context.private.json")
-demo_register service-request SERVICE
-DEMO_CONTEXT_FLAGS=(--context-file "$DEMO_BATCH_DIR/context-zi-apply/context.private.json")
-demo_register incident-triage OPS
-```
-
-`DEMO_PRESENTER_SUBJECT` is the fresh Analyst's exact subject from the generated
-private operator environment, not a username. It explicitly permits Settings
-preparation; Viewer membership never grants this action. The old
-`service-request` identifier is the Remediation change request workflow. Registration
-must complete while idle, before presentation; it rolls the web driver and
-requires a new browser login. Never share credentials from that environment.
-
-Registration and UI code updates roll the driver while idle and require fresh
-browser login. Register all initial mappings before presentation. Do not execute
-a legacy browser rehearsal and the coordinator against the same installation
-at the same time.
-
-#### Install persistent gateway configuration
-
-Inputs: the configured source copy, generated private environment, current catalog
-credential and an idle installation. Use the existing helper defined above:
-
-```bash
-demo_exec --action gateway-install \
-  --catalog-credential-file "$DEMO_CATALOG_CREDENTIAL" \
-  --output-dir "$DEMO_PRIVATE_ROOT/gateway-plan-01"
-# Review the exact owned resources and policy changes in the private plan.
-demo_exec --action gateway-install \
-  --catalog-credential-file "$DEMO_CATALOG_CREDENTIAL" \
-  --output-dir "$DEMO_PRIVATE_ROOT/gateway-install-01" --apply
-```
-
-Expected: admission/readiness checks pass and
-`gateway-install-01/persistent-gateway.receipt.private.json` is created. The
-existing gateway now keeps stable configuration; user/workload/run/project,
-certificate binding, expiry/cancellation and exact approval remain live checks.
-A partial or uncertain installation stops here: retain its receipts, do not
-repeat creation or bypass a collision. Review before resuming or rolling back.
-
-Add these **path/settings values** to the private operator environment before
-staging the services. Keep the environment mode 0600; do not store it in Git:
-
-```bash
-export DEMO_GATEWAY_MODE=persistent
-export DEMO_GATEWAY_RECEIPT="$DEMO_PRIVATE_ROOT/gateway-install-01/persistent-gateway.receipt.private.json"
-export DEMO_POOL_MODE=automatic
-export DEMO_PREPARER_CLI_CONFIG="$DEMO_PRIVATE_ROOT/cli-config-preparer"
-export DEMO_PREPARER_MANAGEMENT_PORT=18444
-```
-
-The coordinator keeps its own profile and loopback port 18443. The preparer
-initializes a separate verified-TLS profile on 18444, using `DEMO_RUNTIME_CA`.
-Keep both directories private and distinct. Never disable TLS to resolve a
-profile, trust or port mismatch.
-
-### Start the trusted services
-
-Save the reviewed paths-only environment outside Git, mode 0600; private root
-mode 0700. Set `DEMO_OPERATOR_ENV_FILE` to its absolute path and source it.
-Credentials stay in the referenced private files. From the private configured example directory:
-
-```bash
-export DEMO_OPERATOR_ENV_FILE=/absolute/private/demo/operator-inputs.env
-source "$DEMO_OPERATOR_ENV_FILE"
-"$DEMO_PYTHON" scripts/identity_demo/identity_demo_console_launchd.py \
-  --action plan --environment-file "$DEMO_OPERATOR_ENV_FILE" \
-  --private-root "$DEMO_PRIVATE_ROOT"
-"$DEMO_PYTHON" scripts/identity_demo/identity_demo_console_launchd.py \
-  --action install --environment-file "$DEMO_OPERATOR_ENV_FILE" \
-  --private-root "$DEMO_PRIVATE_ROOT"
-"$DEMO_PYTHON" scripts/identity_demo/identity_demo_console_launchd.py \
-  --service preparer --action plan --environment-file "$DEMO_OPERATOR_ENV_FILE" \
-  --private-root "$DEMO_PRIVATE_ROOT"
-"$DEMO_PYTHON" scripts/identity_demo/identity_demo_console_launchd.py \
-  --service preparer --action install --environment-file "$DEMO_OPERATOR_ENV_FILE" \
-  --private-root "$DEMO_PRIVATE_ROOT"
-```
-
-Plans precede each service installation. These are user services, with new source
-snapshots under protected private storage. They do not install a new cluster
-operator. The source labels are `org.example.agent-security-console` and its
-`-preparer` service. Do not also run duplicate foreground workers. Source changes
-need explicit idle service restaging; changing this checkout does not update a
-previous immutable snapshot. To activate changed source while idle, first verify
-both existing service definitions refer to this installation's private environment
-and root. Retain their rollback paths, uninstall only those exact owned services,
-then repeat plan/install from the updated configured source. Stop/start alone
-continues to use the previous immutable bundle; never overwrite a different agent.
-
-Check service status with the same flags and `--action status`, adding
-`--service preparer` for that service. `--action stop`, `start` and `uninstall`
-control that exact local user service. Stop only while idle and preserve recovery
-receipts. A sleeping host or expired operator credential can make the UI offline.
-`loaded` confirms only service registration, not a healthy worker. Require the
-coordinator and preparer to be online, then enable the verified automatic pool
-below. Filling a slot does not require waiting for the entire pool. If a
-loaded service stays offline, inspect its private `console-worker.launchd.*.log`
-or `console-preparer.launchd.*.log` before restarting; preserve the failure logs.
-A private operator-login file is optional. Without one, renew the selected
-kubeconfig interactively with your approved `oc login` procedure before it
-expires; never add passwords to this repository or a command history.
-
-#### Enable the automatic warm pool
-
-Run after the two services are healthy and the preparer profile exists. This
-explicit preflight verifies gateway configuration, profile separation, known
-native contexts and capacity before changing scheduling mode:
-
-```bash
-"$DEMO_PYTHON" scripts/identity_demo/identity_demo_presentation.py \
-  --action automatic-enable --kubeconfig "$DEMO_KUBECONFIG" \
-  --expected-server "$DEMO_SERVER" --credentials-file "$DEMO_FIXTURE_CREDENTIALS" \
-  --driver-credentials-file "$DEMO_DRIVER_CREDENTIALS" \
-  --cli "$DEMO_OPENSHELL_CLI" --cli-config-dir "$DEMO_PREPARER_CLI_CONFIG" \
-  --coordinator-cli-config-dir "$DEMO_CLI_CONFIG" \
-  --management-port "$DEMO_PREPARER_MANAGEMENT_PORT" \
-  --gateway-receipt "$DEMO_GATEWAY_RECEIPT" \
-  --output-dir "$DEMO_PRIVATE_ROOT/automatic-enable-01"
-```
-
-Expected: `automatic_pool_enabled: true`. Settings reports a target of **eight
-ready contexts**, two each for CVE Triage, CVE Reader, Incident and Remediation.
-The total managed cap is **12**, including preparation, allocated, consumed,
-retiring and quarantined contexts. Capacity shortages pause preparation; they do
-not discard evidence or exceed the cap. A failed preflight changes no scheduling
-mode. Inspect the exact failed prerequisite rather than repeating installation.
-
-When migrating an existing installation, retire only independently verified closed
-identities first. Supply their original private context files using repeated
-`--retired-context-file` arguments. The helper checks exact sandbox, Pod and
-registration absence; the driver checks closed runs and records the receipt.
-Never declare a live or uncertain identity retired just to free capacity.
-
+Local background workers and the early standalone setup/diagnostic CLIs are
+retired from the current delivery path. Use the OpenShift installation path.
+Before migrating an older local installation, use its retained release to stop
+both owned services and preserve the original process/fencing receipts. The
+current idle/lease checks must then confirm no competing worker remains.
+Historical databases, consumed identities and quarantine records must not be reset.
 
 ## Onboard another use case
 
@@ -1940,7 +1724,7 @@ attestation. Inspect these with `oc get service kubernetes -n default -o json`,
 and `oc get nodes -o wide`. Account for API/load-balancer or worker changes. Broad ranges, `0.0.0.0/0` and guessed addresses are refused.
 
 ```bash
-export PYTHONPATH=scripts/identity_demo:tests/identity_demo
+export PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo
 export DEMO_SECURITY_PROFILE="$DEMO_PRIVATE_ROOT/security-profile.json"
 export DEMO_SECURITY_NETWORK="$DEMO_PRIVATE_ROOT/security-network.json"
 export DEMO_SECURITY_PLAN="$DEMO_PRIVATE_ROOT/security-plan-01"

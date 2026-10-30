@@ -13,11 +13,11 @@ COPY requirements-lock.txt /app/requirements-lock.txt
 RUN python3.12 -m pip install --no-cache-dir --no-deps -r /app/requirements-lock.txt PyYAML==6.0.3
 COPY tools/ /usr/local/bin/
 COPY scripts/ /app/scripts/
-COPY tests/ /app/tests/
+COPY runtime/ /app/runtime/
 COPY workloads/ /app/workloads/
 COPY infra/ /app/infra/
 RUN chmod -R a+rX /app && chmod 0555 /usr/local/bin/oc /usr/local/bin/openshell
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 HOME=/state/private \
-    PYTHONPATH=/app/scripts/identity_demo:/app/tests/identity_demo
+    PYTHONPATH=/app/runtime:/app/runtime/identity_demo:/app/scripts/identity_demo
 USER 1001
 ENTRYPOINT ["python3.12", "/app/scripts/identity_demo/identity_demo_cluster_bootstrap.py"]

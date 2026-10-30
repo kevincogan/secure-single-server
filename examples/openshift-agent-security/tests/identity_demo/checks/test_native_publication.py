@@ -21,6 +21,44 @@ def save(path: Path, value: dict) -> Path:
     return path
 
 
+@pytest.mark.parametrize('extra', [None, 'tests/identity_demo/unreviewed.py'])
+def test_console_publication_accepts_the_actual_closed_runtime_context(tmp_path, monkeypatch, extra):
+    """Exercise source preparation and publication together without building or uploading."""
+    import console_runtime_build as build
+
+    output = tmp_path / 'runtime-build'
+    output.mkdir(mode=0o700)
+    args = argparse.Namespace(output_dir=output, apply=False, oc_archive='synthetic', cli_archive='synthetic')
+    def unpack(archive, expected, member, target):
+        target.write_bytes(b'synthetic-public-tool')
+    monkeypatch.setattr(build, 'unpack', unpack)
+    lock, _, plan, context = build.prepare_context(args)
+    assert (context / 'runtime/agent_security.py').is_file()
+    assert not (context / 'tests').exists()
+    if extra:
+        added = context / extra
+        added.parent.mkdir(parents=True)
+        added.write_text('# not an approved runtime source\n')
+        plan['context_sha256'][extra] = publish.digest(added)
+    receipt = save(output / 'runtime-build.receipt.json', {**plan, 'built': True})
+    args.runtime_build_receipt = str(receipt)
+    args.runtime_build_sha256 = publish.digest(receipt)
+    args.installation_profile = str(save(tmp_path / 'profile.json', LEGACY.to_dict()))
+    calls = []
+    def publish_only(options, record, profile, contexts):
+        calls.append(contexts)
+        assert record['inputs'] == lock and profile == LEGACY
+        return {'validated': True, 'cluster_changed': False}
+    monkeypatch.setattr(publish, 'publish_contexts', publish_only)
+    if extra:
+        with pytest.raises(ValueError, match='console build'):
+            publish.console_publication(args)
+        assert not calls
+    else:
+        assert publish.console_publication(args)['validated']
+        assert len(calls) == 1
+
+
 @pytest.fixture
 def prepared(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple:
     """Construct a completed local build receipt and an entirely fake API."""

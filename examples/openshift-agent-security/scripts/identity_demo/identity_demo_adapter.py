@@ -130,7 +130,7 @@ def setup(args: argparse.Namespace) -> None:
     configure_clients(base, credentials)
     _, jwks = fixture_request(base, "/realms/identity-demo/protocol/openid-connect/certs")
     bootstrap = resource("ConfigMap", "fixture-protected-adapter", args.namespace)
-    directory = Path(__file__).resolve().parents[2] / "tests/identity_demo"
+    directory = Path(__file__).resolve().parents[2] / "runtime/identity_demo"
     bootstrap["data"] = {name: (directory / name).read_text() for name in (
         "adapter_auth.py", "adapter_live_auth.py", "start_protected_adapter.py", "probe_protected_adapter.py")}
     bootstrap["data"]["jwks.json"] = json.dumps(jwks)

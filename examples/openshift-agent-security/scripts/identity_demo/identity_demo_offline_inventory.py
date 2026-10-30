@@ -31,10 +31,10 @@ BUILD_INPUTS = (
     "infra/openshell/native-build/Builder.Containerfile",
     "infra/openshell/native-build/build-native.sh",
     "infra/openshell/native-build/README.md",
-    "tests/identity_demo/tools/inputs.lock.json",
-    "tests/identity_demo/tools/read_native_projection.go",
-    "tests/identity_demo/tools/read_native_projection_test.go",
-    "tests/identity_demo/tools/README.md",
+    "runtime/identity_demo/tools/inputs.lock.json",
+    "runtime/identity_demo/tools/read_native_projection.go",
+    "runtime/identity_demo/tools/read_native_projection_test.go",
+    "runtime/identity_demo/tools/README.md",
 )
 
 

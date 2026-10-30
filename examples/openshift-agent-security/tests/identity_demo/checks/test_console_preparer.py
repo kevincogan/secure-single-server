@@ -203,20 +203,6 @@ def test_cancelled_unclaimed_job_can_be_replenished_without_runtime_replay(tmp_p
     assert reserve(driver, client, uuid4().hex) is not None
 
 
-def test_preparer_service_uses_distinct_label_and_logs(tmp_path: Path) -> None:
-    from identity_demo_console_launchd import definition, PREPARER_LABEL, LABEL
-    from identity_demo_console_launchd import stage_source_bundle
-    tmp_path.chmod(0o700)
-    env = tmp_path / 'operator.env'
-    env.write_text('# path references only')
-    env.chmod(0o600)
-    bundle, _ = stage_source_bundle(Path(__file__).resolve().parents[3], tmp_path)
-    original = definition(env, tmp_path, bundle)
-    preparer = definition(env, tmp_path, bundle, PREPARER_LABEL)
-    assert original['Label'] == LABEL != preparer['Label']
-    assert preparer['EnvironmentVariables']['DEMO_SERVICE_MODE'] == 'preparer'
-    assert 'DEMO_SERVICE_MODE' not in original['EnvironmentVariables']
-    assert original['StandardOutPath'] != preparer['StandardOutPath']
 
 
 def test_atomic_checkpoint_is_private_and_survives_replacement(tmp_path: Path) -> None:

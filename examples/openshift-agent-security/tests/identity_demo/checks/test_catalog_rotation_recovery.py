@@ -11,6 +11,45 @@ import identity_demo_adapter_catalog as catalog
 import identity_demo_console_worker as worker
 
 
+def test_catalog_update_packages_runtime_sources(tmp_path, monkeypatch):
+    """Code maintenance must work after operational sources leave the test tree."""
+    from pathlib import Path
+
+    deployment = {'metadata': {'uid': 'owned-deployment', 'resourceVersion': '1'},
+        'spec': {'template': {'metadata': {'annotations': {'identity-demo-catalog-code': 'old'}},
+            'spec': {'containers': [{'name': 'adapter-https', 'env': [
+                {'name': 'ADAPTER_DISCOVERY_DIGESTS_FILE', 'value': '/catalog-trust/digests.json'}]}],
+                'volumes': [{'name': 'catalog-code', 'configMap': {'name': 'old-code'}}]}}}}
+    old = {'data': {}}
+    created = []
+    def owned(args, kind, name):
+        return deployment if kind == 'deployment' else old
+    def fresh(args, value):
+        created.append(value)
+        return {**value, 'metadata': {**value['metadata'], 'uid': 'fresh-code'}}
+    def kube(args, *words, **options):
+        if words[0] == 'config':
+            return {'clusters': [{'cluster': {'server': catalog.SERVER}}]}
+        assert words[:2] == ('patch', 'deployment')
+        return {'spec': {}}
+    monkeypatch.setattr(catalog, 'owned', owned)
+    monkeypatch.setattr(catalog, 'fresh', fresh)
+    monkeypatch.setattr(catalog, 'kube', kube)
+    access = tmp_path / 'kubeconfig'
+    access.write_text('synthetic')
+    access.chmod(0o600)
+    args = Namespace(expected_server=catalog.SERVER, kubeconfig=str(access),
+                     receipt_file=str(tmp_path / 'receipt.json'))
+    assert catalog.update_code(args)['code_changed']
+    assert len(created) == 1
+    root = Path(__file__).resolve().parents[3] / 'runtime/identity_demo'
+    assert set(created[0]['data']) == {
+        'start_protected_adapter.py', 'adapter_auth.py', 'adapter_live_auth.py', 'adapter_discovery.py'}
+    for name, code in created[0]['data'].items():
+        assert code == (root / name).read_text()
+        compile(code, name, 'exec')
+
+
 def test_full_overlap_refuses_before_any_file_or_mutation(tmp_path, monkeypatch):
     now = 10000
     keys = {'first': now + 100, 'second': now + 700}

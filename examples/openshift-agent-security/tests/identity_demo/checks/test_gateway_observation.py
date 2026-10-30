@@ -99,6 +99,10 @@ def snapshot(ca: str = "public-fixture-ca") -> dict:
                     ],
                 }
             },
+            {"route_config": {"name": "https.8443.bound", "virtual_hosts": [{
+                "domains": [route.READ_HOST],
+                "typed_per_filter_config": {route.FILTER + "-step4": {}},
+            }]}},
         ]
     }
 

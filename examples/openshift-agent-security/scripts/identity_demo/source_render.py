@@ -186,10 +186,9 @@ def _leaf(ca_key: object, ca: x509.Certificate, names: list[str], *, client: boo
 def initial_state(profile: DeploymentProfile, trust: dict, certificate_config: dict | None = None,
                   application_ca: str | None = None) -> dict:
     """Generate independent keys/credentials; never seed from the old installation."""
-    templates = list(TEMPLATES.glob("*-realm.json"))
     tokens = set()
-    for source in templates:
-        tokens.update(TOKENS.findall(source.read_text()))
+    for name in ("initial", "management", "exchange"):
+        tokens.update(TOKENS.findall(json.dumps(realm_template(name))))
     values = {name: str(uuid4()) if name.startswith("id.") else secrets.token_urlsafe(32)
               for name in tokens if name.startswith(("id.", "credential.", "client_secret."))}
     for name in ("keycloak_admin", "jira_admin"):
@@ -284,6 +283,27 @@ def validate_state(state: dict, profile: DeploymentProfile, trust: dict,
             raise ValueError("Usable application TLS state required; explicit rotation required")
 
 
+def realm_template(name):
+    """Expand fixed reviewed common data; keep the two issuer contracts distinct."""
+    value = read_json(TEMPLATES / (name + '-realm.json'))
+    if '$common' not in value:
+        return value
+    if value.pop('$common') != 'realm-common.json':
+        raise ValueError('Fixed realm common template required')
+    common = read_json(TEMPLATES / 'realm-common.json')
+    if set(common) != {'fields', 'entries'} or set(common['fields']).intersection(value):
+        raise ValueError('Unambiguous realm fields required')
+    def expand(item):
+        if isinstance(item, dict):
+            if set(item) == {'$realm_ref'}:
+                return json.loads(json.dumps(common['entries'][item['$realm_ref']]))
+            return {k: expand(v) for k, v in item.items()}
+        if isinstance(item, list):
+            return [expand(v) for v in item]
+        return item
+    return {**common['fields'], **expand(value)}
+
+
 def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, dict]:
     """Produce a complete private application bundle from checked-in templates."""
     profile, artifacts, trust, cidrs = load_inputs(config_file)
@@ -315,8 +335,9 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
             if set(value) == {"$source"}:
                 name = value["$source"]
                 source = ROOT / name
-                if (not source.resolve().is_relative_to(ROOT) or source.suffix != ".py"
-                        or not name.startswith(("scripts/identity_demo/", "tests/identity_demo/"))):
+                if (not source.resolve().is_relative_to(ROOT)
+                        or (source.suffix != ".py" and name != 'runtime/provider-contract.json')
+                        or not name.startswith(("scripts/identity_demo/", "runtime/"))):
                     raise ValueError("Repository Python source required")
                 data = source.read_bytes()
                 pins[name] = hashlib.sha256(data).hexdigest()
@@ -352,7 +373,7 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
         return substitute(value) if isinstance(value, str) else value
     for name, secret_name in (("initial", "fixture-credentials"), ("management", "fixture-keycloak-recovery"),
                               ("exchange", "fixture-keycloak-upstream-realm")):
-        state["secret_data"][secret_name + "/realm.json"] = encoded(json.dumps(walk(read_json(TEMPLATES / (name + "-realm.json")))))
+        state["secret_data"][secret_name + "/realm.json"] = encoded(json.dumps(walk(realm_template(name))))
     source = read_json(TEMPLATES / "application.json")
     selected = [o for o in source['objects'] if not (contract['mode'] == 'managed'
         and o['kind'] == 'Secret' and o['metadata']['name'] in SECRETS)]

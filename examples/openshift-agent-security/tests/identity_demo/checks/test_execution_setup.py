@@ -227,6 +227,7 @@ def test_register_driver_preserves_profile_and_support_modules(monkeypatch: pyte
     current = {'metadata': {'labels': dict(LABELS)}, 'data': {
         'config.json': json.dumps({'contexts': [], 'project': 'TEST'}),
         'installation-profile.json': 'synthetic-profile', 'support.py': '# synthetic support',
+        'provider-contract.json': (setup.ROOT/'runtime/provider-contract.json').read_text(),
         'identity_demo_console_store.py': (setup.ROOT/'scripts/identity_demo/identity_demo_console_store.py').read_text()}}
     deployment = {'metadata': {'labels': dict(LABELS)}, 'spec': {'template': {'spec': {
         'volumes': [{'name': 'code', 'configMap': {'name': 'fixture-old'}}]}}}}
@@ -406,7 +407,7 @@ def rejection_review_harness(tmp_path, monkeypatch):
         assert 'exec' in words and 'deployment/fixture-identity-driver' in words
         state.exec_calls+=1
         env={**os.environ,'DRIVER_DATABASE':str(store.path),'IDENTITY_DEMO_CONFIG':str(profile),
-             'PYTHONPATH':str(Path(setup.__file__).parent)+os.pathsep+str(setup.ROOT/'tests/identity_demo')}
+             'PYTHONPATH':os.pathsep.join(str(setup.ROOT/p) for p in ('runtime','runtime/identity_demo','scripts/identity_demo','tests/identity_demo'))}
         return real_run([sys.executable,'-c',words[-1]],env=env,**kwargs)
     monkeypatch.setattr(setup.subprocess,'run',execute)
     return setup,args,state,store,run,proposal
@@ -505,7 +506,8 @@ def test_console_update_cannot_replace_a_different_configured_model_before_admis
     import identity_demo_execution_setup as setup
     monkeypatch.setattr(setup,'guard',lambda a:None)
     monkeypatch.setattr(setup,'inspect_state',lambda a:{'rollback_quiescent':True})
-    current=setup.console_model_contract((setup.ROOT/'scripts/identity_demo/identity_demo_console_store.py').read_text())
+    current=setup.console_model_contract((setup.ROOT/'scripts/identity_demo/identity_demo_console_store.py').read_text(),
+        (setup.ROOT/'runtime/provider-contract.json').read_text())
     different='synthetic-other-model' if current!='synthetic-other-model' else 'synthetic-second-model'
     configured="def safe_evidence(value):\n for key,item in value.items():\n  if key == 'model' and item == "+repr(different)+": continue\n"
     data={'config.json':json.dumps({'contexts':[],'project':'TEST'}),'identity_demo_console_store.py':configured}

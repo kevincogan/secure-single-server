@@ -14,6 +14,7 @@ from uuid import uuid4
 from identity_demo_run_store import Denied, RunStore, scoped_read_jql
 import identity_demo_warm_pool as warm
 import identity_demo_pool_profiles as profiles
+from provider_contract import MODEL
 
 STAGES = {"preparing_identity", "identity_verified", "assessment_running", "awaiting_approval",
           "protected_execution", "outcome_verified", "completed", "execution_failed", "inference_failed", "cancelled",
@@ -74,7 +75,7 @@ def safe_evidence(value: object) -> dict:
             continue
         if key in ("backend_before", "backend_after") and type(item) is int and 0 <= item < 1_000_000:
             continue
-        if key == "model" and item == "approved-chat-model":
+        if key == "model" and item == MODEL:
             continue
         if key == "verified_issue_key" and isinstance(item, str) and re.fullmatch(r"[A-Z][A-Z0-9]{1,15}-[1-9][0-9]*", item):
             continue

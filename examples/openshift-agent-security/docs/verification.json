@@ -1,13 +1,54 @@
 {
   "schema_version": 3,
-  "date": "2026-10-25",
-  "scope": "Connected reusable foundation: connector proof, shared profile pooling, OpenShift builds and history-preserving presentation migration passed. Fresh setup used reviewed checkpoint recovery; an unassisted final-image walkthrough and external release approvals remain outstanding.",
+  "date": "2026-10-30",
+  "scope": "Reusable security-core/runtime refactor: offline checks and isolated OpenShift candidate acceptance passed. Installation required reviewed checkpoint recovery. The live demo was not updated; an unassisted clean installation and external release approvals remain outstanding.",
   "technical_scope_passed": true,
   "customer_ready": false,
   "evidence_policy": {
     "current_summary": true,
     "raw_receipts_and_prior_checkpoint_records": "Retained privately outside the customer package.",
-    "scope_note": "Earlier live evidence and the new candidate qualification are separate. Current technical completion requires candidate acceptance, history-preserving migration and final package checks. Skipped integration checks are not passes."
+    "scope_note": "Earlier sections retain their dated historical evidence. refactor_validation records the October 30 offline and isolated-candidate checks; it does not requalify every earlier migration, rotation or recovery scenario. Skipped or excluded integration checks are not passes."
+  },
+  "refactor_validation": {
+    "date": "2026-10-30",
+    "scope": "Reusable security core, separated runtime and current OpenShift candidate; raw receipts retained privately outside source delivery.",
+    "offline_tests": {
+      "passed": 2244,
+      "integration_checks_excluded": 38,
+      "execution": "Submission recheck: 2,233 passed in the restricted run; all 11 synthetic loopback HTTP/TLS tests then passed with localhost socket access. Integration checks were excluded."
+    },
+    "source_checks": [
+      "Syntax, documentation links, shell examples, templates and native patch pins",
+      "Delivery inventory, public-data scan and git diff --check"
+    ],
+    "candidate_acceptance": {
+      "passed": true,
+      "runs": 5,
+      "positive_workflows": [
+        "cve",
+        "incident-triage",
+        "service-request"
+      ],
+      "permission_denials": 2,
+      "exact_synthetic_jira_effects": 3,
+      "genuine_inference_workflows": 2,
+      "model_calls": 4,
+      "approval_tampering_and_cross_user_access_denied": true,
+      "logout_revoked_session": true,
+      "single_use_workloads_and_run_cleanup_verified": 5,
+      "historical_positive_results_verified": 3,
+      "replenished_ready_contexts": 8,
+      "reviewed_installation_recovery_used": true,
+      "unassisted_clean_install_proven": false
+    },
+    "source_boundary": "Candidate acceptance used the same executable and configuration sources. Subsequent changes only tidy documentation and refresh its inventory; those changes are checked offline, without another candidate deployment.",
+    "candidate_resources_removed": true,
+    "live_demo_updated": false,
+    "not_reverified": [
+      "All 38 integration checks",
+      "Every earlier migration, recovery and certificate-rotation scenario",
+      "Independent security, licensing, distribution and support approvals"
+    ]
   },
   "source_review": {
     "date": "2026-10-25",

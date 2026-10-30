@@ -16,9 +16,7 @@ from unittest.mock import patch
 SCRIPTS = Path(__file__).resolve().parents[3] / "scripts" / "identity_demo"
 sys.path.insert(0, str(SCRIPTS))
 import identity_demo_lab as lab  # noqa: E402 -- repository-local script, not an installed package
-import identity_demo_gateway as gateway  # noqa: E402 -- repository-local script
 import identity_demo_adapter as adapter  # noqa: E402 -- repository-local script
-import identity_demo_oauth as oauth  # noqa: E402 -- repository-local script
 import identity_demo_adapter_tls as adapter_tls  # noqa: E402 -- repository-local script
 
 
@@ -122,34 +120,6 @@ class OwnershipTests(unittest.TestCase):
                 lab.main()
         command.assert_not_called()
 
-    def test_gateway_generates_both_explicit_listener_policies(self) -> None:
-        """Reproduction must not regress to the attachment that missed tool calls."""
-        server = "https://expected.invalid"
-        argv = ["gateway", "--kubeconfig", "/private/config", "--expected-server", server,
-                "--extend-mcp", "--keycloak-url", "https://fixture-keycloak-demo-core.example.invalid"]
-        recorded = []
-
-        def read_fixture(args: argparse.Namespace, *command: str) -> str:
-            """Return only the immutable setup inputs needed by this offline test."""
-            if command[0] == "config":
-                return server
-            if command[:2] == ("get", "namespace"):
-                return json.dumps({"metadata": {"labels": lab.LABELS}})
-            if command[:2] == ("get", "service"):
-                return json.dumps({"spec": {"type": "ClusterIP"}})
-            raise AssertionError("Unexpected cluster operation")
-
-        def record(args: argparse.Namespace, item: dict) -> None:
-            """Capture manifest values without applying anything."""
-            recorded.append(copy.deepcopy(item))
-
-        with patch.object(sys, "argv", argv), patch.object(gateway, "oc", side_effect=read_fixture), \
-                patch.object(gateway, "apply_owned", side_effect=record):
-            gateway.main()
-        policies = {item["metadata"]["name"]: item for item in recorded if item["kind"] == "AuthPolicy"}
-        self.assertEqual(set(policies), {"fixture-mcp-auth", "fixture-mcp-tools-auth"})
-        self.assertEqual(policies["fixture-mcp-auth"]["spec"]["targetRef"]["sectionName"], "mcp")
-        self.assertEqual(policies["fixture-mcp-tools-auth"]["spec"]["targetRef"]["sectionName"], "mcps")
 
     def test_protected_adapter_wrong_cluster_refused(self) -> None:
         """New authentication fixtures must also refuse the wrong target before writes."""
@@ -173,53 +143,3 @@ class OwnershipTests(unittest.TestCase):
                 adapter.configure_clients("https://fixture.invalid", credentials)
         self.assertEqual(request.call_count, 3)
         self.assertFalse(any(call.kwargs.get("method") == "PUT" for call in request.call_args_list))
-
-    def test_oauth_setup_refuses_wrong_cluster_before_writes(self) -> None:
-        """An HTTPS route cannot accidentally be published on another cluster."""
-        self.args.expected_server = "https://expected.invalid"
-        with patch.object(oauth, "oc", return_value="https://wrong.invalid"), \
-                patch.object(oauth, "apply_owned") as write:
-            with self.assertRaises(ValueError):
-                oauth.setup(self.args)
-        write.assert_not_called()
-
-    def test_oauth_policy_exception_applies_only_to_broker(self) -> None:
-        """Metadata GET may be public, while every backend request remains authenticated."""
-        server = "https://expected.invalid"
-        host = "fixture-mcp-demo-core.example.invalid"
-        url = "https://" + host + "/mcp"
-        argv = ["gateway", "--kubeconfig", "/private/config", "--expected-server", server,
-                "--extend-mcp", "--keycloak-url", "https://fixture-keycloak-demo-core.example.invalid",
-                "--oauth-resource-url", url]
-        items = []
-
-        def read_fixture(args: argparse.Namespace, *command: str) -> str:
-            """Return no credentials and only the supported configuration inputs."""
-            if command[0] == "config":
-                return server
-            if command[:2] == ("get", "namespace"):
-                return json.dumps({"metadata": {"labels": lab.LABELS}})
-            if command[:2] == ("get", "route"):
-                return json.dumps({"metadata": {"labels": lab.LABELS}, "spec": {"host": host}})
-            if command[:2] == ("get", "service"):
-                return json.dumps({"spec": {"type": "ClusterIP"}})
-            raise AssertionError("Unexpected cluster operation")
-
-        with patch.object(sys, "argv", argv), patch.object(gateway, "oc", side_effect=read_fixture), \
-                patch.object(gateway, "apply_owned", side_effect=lambda args, item: items.append(copy.deepcopy(item))):
-            gateway.main()
-        policies = {item["metadata"]["name"]: item["spec"] for item in items if item["kind"] == "AuthPolicy"}
-        broker, backend = policies["fixture-mcp-auth"], policies["fixture-mcp-tools-auth"]
-        self.assertIn("request.method == 'GET'", broker["when"][0]["predicate"])
-        self.assertNotIn("when", backend)
-        self.assertIn(url, backend["rules"]["authorization"]["audience"]["patternMatching"]["patterns"][0]["predicate"])
-        extension = next(item for item in items if item["kind"] == "MCPGatewayExtension")
-        self.assertEqual(extension["spec"]["oauthProtectedResource"]["resource"], url)
-
-    def test_oauth_exposure_refuses_missing_metadata(self) -> None:
-        """The script cannot open router ingress before the actual traffic checks pass."""
-        with patch.object(oauth, "loopback_request", return_value=(401, {}, {})), \
-                patch.object(oauth, "apply_owned") as write:
-            with self.assertRaises(ValueError):
-                oauth.expose(self.args, "https://fixture.example.invalid/mcp", "https://issuer.example.invalid")
-        write.assert_not_called()

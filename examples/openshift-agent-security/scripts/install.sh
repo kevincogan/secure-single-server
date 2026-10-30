@@ -65,7 +65,7 @@ if [[ $action == build ]]; then
   while read -r digest path; do
     [[ $digest =~ ^[a-f0-9]{64}$ && $path =~ ^[A-Za-z0-9_.:/-]+$ && $path != /* && $path != *..* && $path != *.private.* ]] || { echo 'Unsafe inventory entry' >&2; exit 1; }
     case $path in
-      .gitignore|AGENTS.md|LICENSE|README.md|GETTING-STARTED.md|Makefile|pytest.ini|config/*|docs/*|infra/*|scripts/*|tests/*|workloads/*) ;;
+      .gitignore|AGENTS.md|LICENSE|README.md|GETTING-STARTED.md|Makefile|pytest.ini|config/*|docs/*|examples/*|infra/*|runtime/*|scripts/*|tests/*|workloads/*) ;;
       *) echo 'Unapproved source root' >&2; exit 1;;
     esac
     [[ -f $path && ! -L $path ]] || { echo 'Regular inventoried source required' >&2; exit 1; }
@@ -75,7 +75,7 @@ if [[ $action == build ]]; then
     printf '%s\n' "$path" >> "$out/source-files.txt"
   done < "$out/source.sha256"
   [[ $(sort "$out/source-files.txt" | uniq -d | wc -l | tr -d ' ') == 0 ]] || { echo 'Duplicate source path' >&2; exit 1; }
-  [[ -z $(find config docs infra scripts tests workloads -type l -print) ]] || { echo 'Source symlink refused' >&2; exit 1; }
+  [[ -z $(find config docs examples infra runtime scripts tests workloads -type l -print) ]] || { echo 'Source symlink refused' >&2; exit 1; }
   "${hash[@]}" -c "$out/source.sha256" > "$out/source-check.private.log"
   # A second, complete Python scan runs in the credential-free image build.
   # This pre-upload check emits paths only and catches common private literals.

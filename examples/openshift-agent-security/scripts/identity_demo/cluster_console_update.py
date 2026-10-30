@@ -211,7 +211,7 @@ def prepare_adapter(args,profile,previous):
         record, = [v for v in records if v['kind']==obj['kind'] and v['name']==obj['metadata']['name']]
         if setup.fingerprint(obj)!=record['fingerprint']:
             raise ValueError('Protected adapter/code differs from its exact receipt')
-    source=setup.ROOT/'tests/identity_demo/adapter_discovery.py'
+    source=setup.ROOT/'runtime/identity_demo/adapter_discovery.py'
     if source.is_symlink():raise ValueError('Regular fixed catalog module required')
     action_source=setup.ROOT/'scripts/identity_demo/identity_demo_jira_action_adapter.py'
     if action_source.is_symlink():raise ValueError('Regular fixed action module required')

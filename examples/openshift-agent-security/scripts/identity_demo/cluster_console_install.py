@@ -97,7 +97,6 @@ def run(args):
         for index, obj in enumerate(proposed):
             namespaces(args, profile)
             meta = obj['metadata']
-            scope = ['-n', meta['namespace']] if meta.get('namespace') else []
             current=prerequisite_observation(args,profile,obj)
             if current:
                 if not setup.administrator_prepared(args,obj,current):
@@ -152,8 +151,6 @@ def updated_web_code(args, profile, name):
 
 def configure(args, profile):
     """Wire only receipt-proven, idle application objects; retain exact rollback."""
-    import hashlib
-    import json
     import secrets
     from cluster_console_configuration import configure as render
     from cluster_console_resources import private_network
@@ -385,7 +382,7 @@ def workloads(args, profile):
         if role == 'preparer':
             files['capacity-budget.json'] = json.dumps(budget).encode()
         else:
-            from enmaas_flow import private_inference
+            from model_execution import private_inference
             chat = private_inference(args.inference_config)
             inference = read_json(setup.private_file(args.inference_config))
             key = setup.private_file(chat['credential_file'])

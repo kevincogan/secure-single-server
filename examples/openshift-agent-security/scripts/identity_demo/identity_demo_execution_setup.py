@@ -21,7 +21,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tests" / "identity_demo"))
+sys.path.insert(0, str(ROOT / "runtime" / "identity_demo"))
 
 from execution_context import ExecutionContext, resolve_context, context_identity  # noqa: E402
 import probe_native_exchange as native  # noqa: E402
@@ -31,6 +31,7 @@ from identity_demo_spire_registration import CVE_IMAGE, prepare  # noqa: E402
 from identity_demo_runtime_cli import private_path  # noqa: E402
 from probe_native_identity import probe  # noqa: E402
 from deployment_profile import active_profile  # noqa: E402
+from provider_contract import DIAGNOSTIC_IMAGE, MODEL, load as load_provider, sources as provider_sources
 
 
 SANDBOX_CPU = "50m"
@@ -117,10 +118,8 @@ def provision(args: argparse.Namespace) -> dict:
     context = context_template(args.role, args.suffix)
     contract = getattr(args,'pool_profile',None)
     workload_image = contract['workload_image'] if contract else CVE_IMAGE
-    policy_path = ROOT / 'tests/identity_demo/cve-runtime-policy.yaml'
+    policy_path = ROOT / 'runtime/identity_demo/cve-runtime-policy.yaml'
     if contract:
-        import yaml
-        from identity_demo_pool_profiles import fingerprint
         require(contract['role']==args.role and contract['namespace']==context.namespace,
                 'Compatible approved preparation profile required')
         policy_path = args.output_dir/'profile-policy.yaml'
@@ -250,7 +249,7 @@ def diagnostic_container(uid: int) -> dict:
     """Stage tools into the shared run volume without mounting tokens or SVIDs."""
     require(type(uid) is int and uid > 0, "Non-root native UID required")
     return {"name": "step56-diagnostic-stage",
-        "image": "registry.example.test/demo/jira-runtime@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "image": DIAGNOSTIC_IMAGE,
         "imagePullPolicy": "IfNotPresent",
         "command": ["python", "-c", "import time; time.sleep(180)"],
         "securityContext": {"runAsUser": uid, "runAsNonRoot": True,
@@ -466,7 +465,7 @@ def prepare_console(args: argparse.Namespace) -> dict:
             "realm_recreated": False}
 
 
-def console_model_contract(source: str) -> str:
+def console_model_contract(source: str, contract: str | None = None) -> str:
     """Read the fixed evidence-model contract without executing installed code."""
     import ast
     tree = ast.parse(source)
@@ -481,9 +480,16 @@ def console_model_contract(source: str) -> str:
             for part in node.test.values:
                 if (isinstance(part, ast.Compare) and len(part.ops) == 1 and isinstance(part.ops[0], ast.Eq)
                         and isinstance(part.left, ast.Name) and len(part.comparators) == 1
-                        and isinstance(part.comparators[0], ast.Constant)
-                        and isinstance(part.comparators[0].value, str)):
-                    values[part.left.id] = part.comparators[0].value
+                        ):
+                    right = part.comparators[0]
+                    if isinstance(right, ast.Constant) and isinstance(right.value, str):
+                        values[part.left.id] = right.value
+                    elif (part.left.id == 'item' and isinstance(right, ast.Name) and right.id == 'MODEL'
+                            and any(isinstance(n, ast.ImportFrom) and n.module == 'provider_contract'
+                                and any(a.name == 'MODEL' and a.asname in (None, 'MODEL') for a in n.names)
+                                for n in tree.body)):
+                        require(contract is not None, 'Reviewed provider data required')
+                        values['item'] = load_provider(contract)['chat_model']
             if values.get('key') == 'model' and 'item' in values:
                 models.append(values['item'])
     require(len(models) == 1 and bool(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}', models[0])),
@@ -555,10 +561,15 @@ def register_driver(args: argparse.Namespace) -> dict:
     updates = {name: (ROOT / "scripts" / "identity_demo" / name).read_text()
                for name in ("identity_demo_driver.py", "identity_demo_run_store.py", "deployment_profile.py",
                             "identity_demo_console.py", "identity_demo_console_store.py", "identity_demo_console_visuals.py", "identity_demo_warm_pool.py", 'identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py')}
+    public_sources = provider_sources()
     require('identity_demo_console_store.py' in data
-            and console_model_contract(data['identity_demo_console_store.py'])
-                == console_model_contract(updates['identity_demo_console_store.py']),
+            and console_model_contract(data['identity_demo_console_store.py'], data.get('provider-contract.json'))
+                == console_model_contract(updates['identity_demo_console_store.py'], public_sources['provider-contract.json'])
+            and ('provider-contract.json' not in data
+                or load_provider(data['provider-contract.json']) == load_provider(public_sources['provider-contract.json'])),
             'Provider-configured source matching the installed console is required; do not deploy pristine templates')
+    updates.update({p.name:p.read_text() for p in (ROOT/"runtime").glob("agent_security*.py")})
+    updates.update(public_sources)
     data.update(updates)
     if getattr(args, "console_enabled", False):
         config["coordinator_enabled"] = True
@@ -622,6 +633,7 @@ def update_adapter(args: argparse.Namespace) -> dict:
     modules = ("identity_demo_jira_action_adapter.py", "identity_demo_run_store.py", "deployment_profile.py", "identity_demo_warm_pool.py", 'identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py')
     require(all(name in data for name in modules if name not in ('identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py', 'identity_demo_warm_pool.py')), "Existing guarded adapter modules required")
     data.update({name: (ROOT / "scripts" / "identity_demo" / name).read_text() for name in modules})
+    data.update({p.name:p.read_text() for p in (ROOT/"runtime").glob("agent_security*.py")})
     if data == current["data"]:
         return {"applied": False, "code_changed": False}
     name = "fixture-adapter-action-code-" + hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:10]
@@ -807,8 +819,8 @@ def review_dispatch_rejection(args: argparse.Namespace) -> dict:
                 and not deployment['metadata'].get('deletionTimestamp'), 'Reviewed resource identity changed')
         if name == 'fixture-jira':
             containers = deployment['spec']['template']['spec']['containers']
-            require({c['name'] for c in containers} == {'fixture-jira','adapter-sse','adapter-streamable-http'}
-                    and len(containers) == 3 and all(c['image'] == value['jira_image'] for c in containers)
+            require({c['name'] for c in containers} in ({'fixture-jira'}, {'fixture-jira','adapter-sse','adapter-streamable-http'})
+                    and len(containers) in (1,3) and all(c['image'] == value['jira_image'] for c in containers)
                     and '@sha256:' in value['jira_image'], 'Exact reviewed fixture digest required')
     method = textwrap.dedent(inspect.getsource(RunStore.review_dispatch_rejection))
     program = """import os,json,re,sqlite3,sys

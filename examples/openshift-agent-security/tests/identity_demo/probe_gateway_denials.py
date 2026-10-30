@@ -48,7 +48,7 @@ def main() -> None:
         raise ValueError("Owned gateway configuration required")
     os.environ.update(IDENTITY_DEMO_KEYCLOAK_URL=credentials["keycloak_url"],
                       IDENTITY_DEMO_GATEWAY_HOST=gateway_host)
-    import checks.test_components as components
+    import identity_demo_fixture_http as components
     from checks.test_gateway import initialize, rpc
     from checks.test_gateway_oauth import gateway_request
 

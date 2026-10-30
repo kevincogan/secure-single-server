@@ -13,7 +13,7 @@ import tarfile
 from native_build import capture, command, digest
 from source_render import read_json
 
-TOOLS = Path(__file__).resolve().parents[2] / "tests/identity_demo/tools"
+TOOLS = Path(__file__).resolve().parents[2] / "runtime/identity_demo/tools"
 
 
 def diagnostic_build(args: argparse.Namespace) -> dict:

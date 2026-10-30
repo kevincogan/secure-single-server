@@ -289,9 +289,11 @@ def test_rendered_driver_includes_every_local_import(config):
     bundle, _, _ = renderer.render(config)
     maps = [o for o in bundle["objects"] if o["kind"] == "ConfigMap"]
     code = next(o for o in maps if "identity_demo_driver.py" in o.get("data", {}))
-    local = {p.stem for p in (renderer.ROOT / "scripts/identity_demo").glob("*.py")}
+    local = {p.stem for folder in ("scripts/identity_demo", "runtime")
+             for p in (renderer.ROOT / folder).glob("*.py")}
     data = code["data"]
     assert "identity_demo_console_visuals.py" in data
+    assert data["provider-contract.json"] == (renderer.ROOT / "runtime/provider-contract.json").read_text()
     for name, text in data.items():
         if not name.endswith(".py"):
             continue
@@ -372,3 +374,45 @@ def test_unknown_native_management_scope_is_rejected(config):
     config.write_text(json.dumps(value))
     with pytest.raises(ValueError,match='native management scope'):
         renderer.render(config)
+
+
+@pytest.mark.parametrize("name,listener", [
+    ("fixture-mcp-auth", "mcp"), ("fixture-mcp-tools-auth", "mcps"),
+])
+def test_retained_catalog_listeners_have_explicit_identity_policies(config, name, listener):
+    """Moving setup must retain authentication on each catalog/tool listener."""
+    bundle, _, _ = renderer.render(config)
+    policy, = [o for o in bundle["objects"]
+               if o["kind"] == "AuthPolicy" and o["metadata"]["name"] == name]
+    assert policy["metadata"]["namespace"] == "fresh-core"
+    assert policy["metadata"]["labels"]["identity-demo-owner"] == "test-owner"
+    spec = policy["spec"]
+    assert spec["targetRef"] == {
+        "group": "gateway.networking.k8s.io", "kind": "Gateway",
+        "name": "fixture-mcp", "sectionName": listener,
+    }
+    issuer = "https://fixture-keycloak-fresh-core.apps.test.example.org/realms/identity-demo"
+    assert spec["rules"]["authentication"]["keycloak"]["jwt"]["issuerUrl"] == issuer
+    checks = spec["rules"]["authorization"]
+    assert checks["issuer"]["patternMatching"]["patterns"] == [
+        {"predicate": 'has(auth.identity.iss) && auth.identity.iss == "' + issuer + '"'}]
+    resource = "https://fixture-mcp-fresh-core.apps.test.example.org/mcp"
+    assert checks["audience"]["patternMatching"]["patterns"] == [{"predicate":
+        'has(auth.identity.aud) && (auth.identity.aud == "' + resource +
+        '" || (type(auth.identity.aud) == list && "' + resource + '" in auth.identity.aud))'}]
+
+
+def test_public_metadata_exception_cannot_open_tools_or_bound_bootstrap(config):
+    """Only catalog metadata GET bypasses auth; the bound path starts closed."""
+    bundle, _, _ = renderer.render(config)
+    policies = {o["metadata"]["name"]: o["spec"] for o in bundle["objects"]
+                if o["kind"] == "AuthPolicy"}
+    assert policies["fixture-mcp-auth"]["when"] == [{"predicate":
+        "!(request.method == 'GET' && request.path in "
+        "['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])"}]
+    assert "when" not in policies["fixture-mcp-tools-auth"]
+    assert "when" not in policies["fixture-mcp-bound"]
+    assert policies["fixture-mcp-bound"]["rules"]["authorization"] == {
+        "closed-until-native-validation": {
+            "metrics": False, "patternMatching": {"patterns": [{"predicate": "false"}]},
+            "priority": 0}}
