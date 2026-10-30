@@ -1,0 +1,108 @@
+name: PriceTag demo deployment
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pricetag-demo.yml'
+      - 'scripts/pricetag/**'
+      - 'scripts/common/**'
+      - 'scripts/remote-gateway/**'
+      - 'configs/pricetag/**'
+      - 'tests/pricetag/**'
+      - 'tests/common/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pricetag-demo.yml'
+      - 'scripts/pricetag/**'
+      - 'scripts/common/**'
+      - 'scripts/remote-gateway/**'
+      - 'configs/pricetag/**'
+      - 'tests/pricetag/**'
+      - 'tests/common/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pricetag-demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo:
+    name: Mock gateway API and browser demo
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman apparmor-utils python3-yaml openssl curl
+          python3 tests/pricetag/container-demo-test.py
+          node tests/pricetag/mock-guard.test.cjs
+          npm ci --prefix tests/pricetag/browser --ignore-scripts
+          sudo tests/pricetag/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Configure confined CI container profile
+        run: |
+          sudo apparmor_parser --replace tests/pricetag/ci.apparmor
+          sudo install -d -m 0755 /etc/containers/containers.conf.d
+          printf '[containers]\napparmor_profile="pricetag-demo-ci"\n' | sudo tee /etc/containers/containers.conf.d/99-pricetag-demo.conf >/dev/null
+      - name: Qualify isolated PostgreSQL runtime
+        run: sudo python3 tests/pricetag/database-smoke.py
+      - name: Build pinned application sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Independent of private registries or provider credentials. Use the
+          # same reviewed source pins as the image publication PR.
+          maas=6ac4c80ebc95f590e5f24593ac15bb80c7f9fa1d
+          metering=666770c4e31e035c1de236490bbff9dfffe7e047
+          for component in maas metering; do
+            directory="$RUNNER_TEMP/$component"
+            if [[ "$component" == maas ]]; then
+              repository=https://github.com/Ladas/models-as-a-service.git
+              revision="$maas"
+            else
+              repository=https://github.com/Ladas/pricetag-metering.git
+              revision="$metering"
+            fi
+            git init "$directory"
+            git -C "$directory" remote add origin "$repository"
+            git -C "$directory" fetch --depth=1 origin "$revision"
+            git -C "$directory" checkout --detach FETCH_HEAD
+            test "$(git -C "$directory" rev-parse HEAD)" = "$revision"
+          done
+          node --test "$RUNNER_TEMP/metering/tests/ui/"*.test.cjs
+          sudo python3 tests/pricetag/metering-unit.py --source "$RUNNER_TEMP/metering"
+          sudo scripts/pricetag/build-maas --source "$RUNNER_TEMP/maas" --expected-commit "$maas" --tag localhost/maas:demo-ci
+          sudo python3 scripts/pricetag/build-metering --source "$RUNNER_TEMP/metering" --revision "$metering" --tag localhost/metering:demo-ci
+          sudo podman pull quay.io/opendatahub/praxis-experimental@sha256:502f120fed7b8e516ce1d78396045c8f72673672351432b9dc2e61baf5c13ac8
+      - name: Deploy and test the demo with mock inference
+        run: |
+          sudo python3 tests/pricetag/container-demo.py \
+            --maas-image localhost/maas:demo-ci \
+            --metering-image localhost/metering:demo-ci \
+            --praxis-image quay.io/opendatahub/praxis-experimental@sha256:502f120fed7b8e516ce1d78396045c8f72673672351432b9dc2e61baf5c13ac8 \
+            --node-modules "$PWD/tests/pricetag/browser/node_modules" \
+            --output "$RUNNER_TEMP/pricetag-demo"
+      - name: Collect sanitized results
+        if: always()
+        run: |
+          mkdir -p evidence/pricetag-demo
+          for name in results failure; do
+            if sudo test -f "$RUNNER_TEMP/pricetag-demo/$name.json"; then
+              sudo cat "$RUNNER_TEMP/pricetag-demo/$name.json" | tee "evidence/pricetag-demo/$name.json" >/dev/null
+            fi
+          done
+      - name: Upload assertion results only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pricetag-demo-results
+          path: evidence/pricetag-demo/*.json
+          if-no-files-found: warn
+          retention-days: 7

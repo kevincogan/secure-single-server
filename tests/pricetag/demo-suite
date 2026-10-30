@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Run mock deployment API/CLI/UI acceptance on RHEL, keeping keys on the host."""
+import argparse
+import importlib.machinery
+import importlib.util
+import ipaddress
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.parse
+import uuid
+
+ROOT=Path(__file__).resolve().parents[2]
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output',required=True,type=Path)
+    parser.add_argument('--node-modules',required=True,type=Path,help='directory containing the pinned Playwright installation')
+    parser.add_argument('--loopback-public-ip',action='store_true',help='temporarily route the configured public IPv4 to this mock host for self-tests; requires iproute')
+    args=parser.parse_args()
+    if os.geteuid()!=0: parser.error('run with sudo on mock RHEL')
+    loader=importlib.machinery.SourceFileLoader('benchmark',str(ROOT/'scripts/pricetag/benchmark'))
+    spec=importlib.util.spec_from_loader(loader.name,loader);bench=importlib.util.module_from_spec(spec);loader.exec_module(bench)
+    bench.require_mock(Path('/etc/praxis-pricetag'))
+    os.umask(0o077);args.output.mkdir(mode=0o700)
+    origin=next(x.split('=',1)[1] for x in Path('/etc/praxis-pricetag/metering.env').read_text().splitlines() if x.startswith('MANAGEMENT_PUBLIC_ORIGIN='))
+    route_added=False;results=[]
+    def run(name,command,env=None):
+        started=time.monotonic()
+        with (args.output/(name+'.log')).open('w') as log:
+            completed=subprocess.run(command,env=env,stdout=log,stderr=subprocess.STDOUT,cwd='/tmp',timeout=600)
+        results.append({'test':name,'passed':completed.returncode==0,'seconds':time.monotonic()-started})
+        (args.output/'results.json').write_text(json.dumps(results,indent=2)+'\n')
+        print(('PASS ' if completed.returncode==0 else 'FAIL ')+name,flush=True)
+        if completed.returncode: raise RuntimeError(name+' failed; inspect private log')
+    fixture=args.output/'fixture'
+    fixture_prefix='demo-suite-'+uuid.uuid4().hex[:8]
+    try:
+        if args.loopback_public_ip:
+            address=str(ipaddress.IPv4Address(urllib.parse.urlsplit(origin).hostname))
+            subprocess.run(['ip','route','add','local',address+'/32','dev','lo'],check=True)
+            route_added=True
+        with tempfile.TemporaryDirectory(prefix='pricetag-browser-',dir='/root') as private:
+            directory=Path(private)
+            for name,source in [('admin.key','/root/pricetag-admin/admin.key'),('server.pem','/root/pricetag-admin/tls/server.pem'),('ca.pem','/etc/praxis-pricetag/ca.pem')]:
+                shutil.copyfile(source,directory/name);(directory/name).chmod(0o600)
+            env={**os.environ,'GATEWAY_URL':origin,'KEY_DIRECTORY':private,'NODE_PATH':str(args.node_modules),'NODE_EXTRA_CA_CERTS':str(directory/'ca.pem'),'MOCK_DEPLOYMENT_CONFIRMED':'yes'}
+            run('browser-runtime',['node','-e',"require('playwright').chromium.launch().then(async b=>{await b.close();console.log('Browser ready')}).catch(e=>{console.error(e.message);process.exit(1)})"],env)
+            run('key-demotion',[sys.executable,str(ROOT/'tests/pricetag/rhel-key-demotion.py')])
+            run('public-boundary',[sys.executable,str(ROOT/'tests/pricetag/rhel-public-boundary.py')])
+            run('documented-cli-api',[sys.executable,str(ROOT/'tests/pricetag/remote-demo.py')],env)
+            run('pricing-api',[sys.executable,str(ROOT/'tests/pricetag/rhel-pricing.py'),'--output',str(args.output/'pricing-api')])
+            for scenario in ['management','user-relationships','key-lifecycle','offboarding','pricing','discounts','session-boundary']:
+                run('browser-'+scenario,['node',str(ROOT/f'tests/pricetag/browser-{scenario}.cjs')],env)
+            run('fixture',[sys.executable,str(ROOT/'tests/pricetag/rhel-demo-fixture.py'),'--prefix',fixture_prefix,'--output',str(fixture)])
+            shutil.copyfile(directory/'server.pem',fixture/'server.pem')
+            run('browser-teams',['node',str(ROOT/'tests/pricetag/browser-teams.cjs')],{**env,'KEY_DIRECTORY':str(fixture),'ADMIN_KEY_DIRECTORY':private})
+            run('quota-matrix',[sys.executable,str(ROOT/'tests/pricetag/rhel-quota-matrix.py'),'--output',str(args.output/'quota')])
+    finally:
+        try:
+            if (fixture/'manifest.json').exists():
+                run('fixture-cleanup',[sys.executable,str(ROOT/'tests/pricetag/rhel-demo-fixture.py'),'--prefix',fixture_prefix,'--output',str(fixture),'--cleanup'])
+        finally:
+            if route_added: subprocess.run(['ip','route','del','local',address+'/32','dev','lo'],check=True)
+
+
+if __name__=='__main__':main()

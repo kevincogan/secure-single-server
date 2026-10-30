@@ -1,0 +1,38 @@
+#include <tunables/global>
+
+# CI-only adaptation of containers/common v0.57's default profile (Apache-2.0).
+# https://github.com/containers/common/blob/v0.57.0/pkg/apparmor/apparmor_linux_template.go
+# Preserve confinement while allowing signals within crun's NNP-stacked label.
+# https://github.com/podman-container-tools/container-libs/issues/805
+profile pricetag-demo-ci flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+  network,
+  capability,
+  file,
+  umount,
+
+  signal (receive) peer=unconfined,
+  signal (send,receive) peer=pricetag-demo-ci,
+  # Stacked label ordering differs across AppArmor/runtime versions.
+  signal (send,receive) peer="pricetag-demo-ci//&crun",
+  signal (send,receive) peer="crun//&pricetag-demo-ci",
+  # Permit host runtime cleanup, as in current containers/common.
+  signal (receive) peer={/usr/bin/,/usr/sbin/,}crun*,
+  signal (receive) peer={/usr/bin/,/usr/sbin/,}podman,
+
+  deny @{PROC}/* w,
+  deny @{PROC}/{[^1-9],[^1-9][^0-9],[^1-9s][^0-9y][^0-9s],[^1-9][^0-9][^0-9]*}/** w,
+  deny @{PROC}/sys/[^k]** w,
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+  deny mount,
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+  ptrace (trace,read) peer=pricetag-demo-ci,
+}
