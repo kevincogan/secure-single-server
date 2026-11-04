@@ -17,13 +17,13 @@ the steps below create the people and activity to inspect.
 Sign in at `https://<gateway-host>:8443/login` with the administrator key.
 Open **Administration → Users** (`/admin`):
 
-1. In **Create or update a login**, create an ordinary user and a second ordinary user to be their
+1. In **Create or update a user**, create an ordinary user and a second ordinary user to be their
    manager. Keep their login names stable: usage belongs to that identity.
 2. In the existing user table, choose the manager in the user’s **Manager**
    dropdown and retain the `user` role. Changes save immediately. A manager does not need administrator privileges.
-3. In **Administration → Safety Net → Per-user monthly overrides**, choose the user and set their monthly USD limit.
+3. In **Administration → User quota → Per-user monthly quota overrides**, choose the user and set their monthly USD limit.
    **Use global default** removes an override; it does not reset spending.
-4. Return to **Users → Issue onboarding key**, select each user and choose a name and finite
+4. Return to **User keys → Issue onboarding key**, select each user and choose a name and finite
    lifetime. This creates an additional key, not a rotation. Use **Copy key** or
    **Download .key**; the secret is never displayed. Keep the downloaded file private
    (`chmod 600 /path/to/pricetag.key`) and pass its path to the client helper. Do not include keys in screenshots or recordings.
@@ -58,11 +58,12 @@ prove model quality or a fixed cost reduction.
 
 ## 3. Inspect a user's view through impersonation
 
-As superadmin, open **Administration → Users**:
+As superadmin, open **Administration → User keys**:
 
 1. Select the user under **Issue onboarding key**; you do not need to issue a key.
 2. Choose **View selected user’s usage** or **View selected user’s team**.
-   Confirm with **Continue**.
+   Confirm in the **Change dashboard view** dialog with **Continue**.
+   **Cancel** or Escape keeps the current view; direct URLs use a styled confirmation page.
 3. Show the **Viewing as** banner. Personal Usage must contain only the selected
    identity; the team view must contain only that identity's authorized subtree.
 4. Choose **Back to admin view** in the banner and confirm. Aggregate Usage and
@@ -75,7 +76,7 @@ in a separate browser profile instead.
 
 ## 4. Apply controls and continue on an allowed model
 
-1. In **Administration → Safety Net → Per-user monthly overrides**, lower the test user's
+1. In **Administration → User quota → Per-user monthly quota overrides**, lower the test user's
    allowance below their recorded spend. Use an ordinary user: superadmin
    accounts are exempt from this spending gate.
 2. Send another paid-model request and observe denial after policy caches refresh
@@ -85,7 +86,7 @@ in a separate browser profile instead.
    aliases; the saved value is the **billed upstream ID**.
 4. Select the corresponding alias explicitly in OpenCode and retry. Confirm the
    exception works and a different paid model remains blocked.
-5. Expand **Existing user overrides** to search/page through overrides.
+5. Use the **Existing user overrides** table to search/page through overrides.
    **Remove override** restores the global allowance without resetting spending.
    Restore the intended allowance and exception list after the demonstration.
 
@@ -102,9 +103,9 @@ per-user model allowlist.
 
 - **Pricing:** open the rate-card view and enable unused models when you want
   the full price catalog, rather than just models with recorded usage.
-- **Administration → Pricing Discounts:** save a scoped discount policy and
+- **Administration → Discounts:** save a scoped discount policy and
   verify its effective rates. Saving the policy refreshes prices.
-- **Administration → Pricing Discounts → Model pricing:** the demo image also provides the
+- **Administration → Model pricing:** the demo image also provides the
   optional custom-rate API/UI. Set input, output, cache-read and cache-write
   rates explicitly in USD per million tokens. Search **Current model rates**,
   choose **Edit rates**, review all four values and save. Use the billed model ID.
@@ -120,19 +121,20 @@ See [pricing operations](pricing.md) for refresh, catalog and repricing examples
 
 ## 6. Replace keys and offboard
 
-1. Sign in as the user and open **My keys** (`/management`). Create another key
+1. Sign in as the user and open **My keys** (`/management`), then the **Create key** tab. Create another key
    with a distinct name and allowed finite lifetime. Deliberate additional keys
    are supported; repeated submissions while creation is pending are ignored.
 2. **Copy key** or **Download .key**, then **Dismiss key**. The secret is not
    displayed and cannot be retrieved later. Update OpenCode's key-file path,
    restart it and verify inference. Both keys work until one expires or is revoked.
-3. **Revoke** the old key. Active keys appear first; expandable history lists
-   revoked/expired records with status, expiry dates and remaining lifetime.
-   This is revocation, not permanent record deletion.
-4. As superadmin, use **Administration → Users → Revoke a user's keys** to
-   **Check active keys** or **Revoke all keys** for a selected identity. New keys
+3. In **Your keys**, search by name or key ID and **Revoke** the old key.
+   Use **Status** to show Active, Revoked, Expired or All keys. The table shows
+   expiry and remaining lifetime, with five rows per page by default.
+   Revocation preserves the record for audit; it does not permanently delete it.
+4. As superadmin, open **Administration → Users**, select a user, then
+   **Check active keys** or confirm **Revoke all keys**. New keys
    can still be issued afterward; this action does not disable the account.
-5. To offboard, save the login as **Inactive** under **Create or update a login**.
+5. To offboard, save the login as **Inactive** under **Create or update a user**.
    Verify that its existing browser session cannot read usage and its inference
    access is denied. Revoke its keys as well when permanent offboarding is intended.
 
@@ -140,7 +142,7 @@ Key revocation does not itself end an existing dashboard session. Suspension
 blocks access; reactivation can make unrevoked, unexpired keys usable again.
 See [users and keys](users.md) for CLI equivalents and overlap rotation.
 
-<details>
+<details markdown="1">
 <summary>Automated verification of these boundaries</summary>
 
 The [mock demo suite](../../testing/pricetag-management-demo.md) exercises the

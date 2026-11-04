@@ -15,12 +15,10 @@ The installer supports these two fixed profiles. Choose them during installation
 the helper cannot add arbitrary profile names. Older `pricetag/` deployments use
 the legacy `pricetag` command.
 
-## Reduced demo image
-
 Provider and model routing is configured through the host CLI below. User,
 budget, key and pricing management is available in the browser.
 
-## Refresh models on a CLI-managed deployment
+## Update the external provider’s models
 
 The numbered steps below update an installed external provider. For a fresh
 installation, use the [installer](README.md#3-install) or
@@ -38,7 +36,15 @@ ssh -t "${SSH_OPTS[@]}" "$RHEL_HOST" \
 Run the following steps **on RHEL**. New workstation shell? Restore the
 [connection variables](README.md#1-set-the-connection) first.
 
-## 1. List available model IDs
+## 1. Inspect configured and available models
+
+List the saved profiles, model aliases and limits without revealing credentials:
+
+```console
+sudo python3 scripts/pricetag/providers list
+```
+
+Discover model IDs from the external service (enter its credentials again):
 
 ```console
 sudo python3 scripts/pricetag/providers external --api both --list-models
@@ -48,7 +54,7 @@ Enter the endpoint(s) and key at the hidden prompt. The helper prints advertised
 IDs grouped by API and the preset-file path. It saves nothing and does not
 provide limits, prices or generated JSON. Listing does not verify inference access.
 
-<details>
+<details markdown="1">
 <summary>Search, pagination and direct OpenAI</summary>
 
 ```console
@@ -108,7 +114,7 @@ public catalog prices may differ from your upstream contract. Some built-in
 hosted-model entries are intentionally $0: a present price row does not mean
 usage will consume a USD budget. Decide whether free access is intended before
 enabling those models.
-[PriceTag price loading](https://github.com/redhat-et/pricetag-metering/blob/a33b90ad1aea66479dbff99444ca819498589982/internal/pricing/pricing.go).
+[PriceTag price loading](https://github.com/redhat-et/pricetag-metering/blob/6d9c1c6e1fc6f8b38f15cc17783dc4758237aa1f/internal/pricing/pricing.go).
 
 Zero-price models do not add USD spend. They still count toward the configured
 10-billion-token monthly per-user safety quota. The public listener also has a
@@ -124,8 +130,8 @@ blocks free models.
 | Generated alias-to-price-source mapping | `/etc/praxis-pricetag/price-sources.json` |
 
 `configs/pricetag/price-seeds.json` is not consumed by this installation path;
-editing it does not change active prices. Usage is priced by the exact upstream model ID recorded by PriceTag. Existing
-rates are preserved. Missing rates use the configured PriceTag fallback until
+editing it does not change active prices. Usage is priced by the exact upstream model ID recorded by PriceTag. Existing custom
+rates are preserved; imported rates follow PriceTag refresh and discount policy. Missing rates use the configured PriceTag fallback until
 an administrator adds explicit rates; publishing an alias does not add a price.
 
 The gateway `/v1/models` lists configured models. The usage dashboard lists
@@ -134,7 +140,7 @@ both an upstream ID and its gateway alias; these are separate rate records,
 not duplicate charges.
 
 Use the [pricing UI and APIs](pricing.md) to inspect rates and manage source-catalog
-discounts. Add missing rates through **Administration → Pricing Discounts → Model pricing**. Price the
+discounts. Add missing rates through **Administration → Model pricing**. Price the
 upstream ID recorded in usage; catalog refresh does not synchronize copied aliases.
 
 ## 4. Apply the external models to Praxis
@@ -157,23 +163,23 @@ setup if only one API is supported. The command:
 Models removed from selection stop being routed; their historical usage stays.
 Do not edit generated gateway files or rerun `prepare.py` for this operation.
 
-<details>
+<details markdown="1">
 <summary>How model aliases and routing work</summary>
 
 For a preset `gpt-6-luna`, the external profile exposes `external/gpt-6-luna`.
 Praxis routes that alias to the external OpenAI endpoint and rewrites the request's
 `model` to `gpt-6-luna`. The catalog exposes the alias and configured limits;
-PriceTag accounts for usage under the alias.
+PriceTag records and prices usage under the rewritten upstream model ID.
 
-This separates `openai/gpt-6-luna` from `external/gpt-6-luna` even when both
-upstreams use the same model ID. The underlying gateway renderer supports
+The aliases select different connections, but the shared upstream model ID has
+one PriceTag price record; aliases alone cannot assign separate supplier rates. The underlying gateway renderer supports
 separate `id` (alias) and `model` (upstream ID) fields, but this helper generates
 `PROFILE/MODEL_ID` automatically. Arbitrary names such as `fast-coder` require
 additional configuration support; the three-field preset format cannot set them.
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Models omitted from discovery and direct OpenAI limits</summary>
 
 A provider may serve a model without advertising it. For a verified preset:
@@ -210,7 +216,7 @@ sudo python3 scripts/pricetag/providers external --api both --replace
 
 Omitting `--refresh-models` preserves model selection, budgets and usage.
 
-<details>
+<details markdown="1">
 <summary>Endpoint and discovery options</summary>
 
 HTTPS and `/v1` normalization are automatic. Enter API origins, not request paths.
@@ -229,7 +235,7 @@ it does not verify credentials or model access.
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Unattended credentials</summary>
 
 For automation, provision one-line credentials in root-owned regular files,
@@ -252,4 +258,5 @@ deleted; remove them through your secret-delivery process after verification.
 
 </details>
 
-For candidate automation over SSH, use the [private management API client](management-api.md).
+Provider configuration uses the host helper above. The [management API client](management-api.md)
+handles identities, budgets, keys and prices, not provider credentials or routing.

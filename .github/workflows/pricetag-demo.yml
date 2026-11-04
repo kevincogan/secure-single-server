@@ -58,9 +58,9 @@ jobs:
         run: |
           set -euo pipefail
           # Independent of private registries or provider credentials. Use the
-          # same reviewed source pins as the image publication PR.
+          # reviewed source candidate, independently of published image digests.
           maas=6ac4c80ebc95f590e5f24593ac15bb80c7f9fa1d
-          metering=666770c4e31e035c1de236490bbff9dfffe7e047
+          metering=ce9c6c51b8dff178637003945b517255c54fc853
           for component in maas metering; do
             directory="$RUNNER_TEMP/$component"
             if [[ "$component" == maas ]]; then
@@ -77,6 +77,10 @@ jobs:
             test "$(git -C "$directory" rev-parse HEAD)" = "$revision"
           done
           node --test "$RUNNER_TEMP/metering/tests/ui/"*.test.cjs
+          sudo env NODE_PATH="$GITHUB_WORKSPACE/tests/pricetag/browser/node_modules" \
+            node "$RUNNER_TEMP/metering/tests/ui/table-browser.cjs"
+          sudo env NODE_PATH="$GITHUB_WORKSPACE/tests/pricetag/browser/node_modules" \
+            node "$RUNNER_TEMP/metering/tests/ui/session-dialog-browser.cjs"
           sudo python3 tests/pricetag/metering-unit.py --source "$RUNNER_TEMP/metering"
           sudo scripts/pricetag/build-maas --source "$RUNNER_TEMP/maas" --expected-commit "$maas" --tag localhost/maas:demo-ci
           sudo python3 scripts/pricetag/build-metering --source "$RUNNER_TEMP/metering" --revision "$metering" --tag localhost/metering:demo-ci

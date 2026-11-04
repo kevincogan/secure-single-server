@@ -26,7 +26,7 @@ Pull the same digest-pinned images as the installer:
 ```console
 PRAXIS_REF=quay.io/opendatahub/praxis-experimental@sha256:502f120fed7b8e516ce1d78396045c8f72673672351432b9dc2e61baf5c13ac8
 MAAS_REF=quay.io/redhat-et/secure-single-server-maas-standalone@sha256:0bec6ef57fa5b10a7bef8f4df8d98f932c9d7fc96798f7bfc0cd77b504790fa8
-METERING_REF=quay.io/redhat-et/secure-single-server-pricetag-metering@sha256:02494463ca905e8342c39f707310e4aa2c8a14670625da5c9fdd750e7622220a
+METERING_REF=quay.io/redhat-et/secure-single-server-pricetag-metering@sha256:dabb2f35f54c30c2c387b3bf298b66f3b84a4110ddf3a78a204c7d59c5de2f1a
 (
   for image in "$PRAXIS_REF" "$MAAS_REF" "$METERING_REF"; do
     sudo podman pull "$image" || exit 1
@@ -130,7 +130,7 @@ Preparation refuses existing directories. Startup installs persistent systemd
 Quadlets for PostgreSQL, MaaS, PriceTag and Praxis. Do not rerun preparation over
 an existing deployment; upgrades require separate qualification.
 
-<details>
+<details markdown="1">
 <summary>Private network and trusted services</summary>
 
 MaaS trusts host loopback and the three `/32` service addresses assigned to MaaS,

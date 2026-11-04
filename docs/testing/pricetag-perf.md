@@ -80,7 +80,7 @@ The command refuses non-fixture models and real-provider credential mounts.
 It does not delete usage history, tune quotas, rotate production keys, or prove
 long-term retention safety.
 
-<details>
+<details markdown="1">
 <summary>Using OpenCode against the mock host</summary>
 
 The fixture emits a fixed `add(2,3)` call whenever tools are advertised. OpenCode
@@ -162,13 +162,12 @@ are not substitutes for RHEL measurements.
 sudo python3 tests/pricetag/rhel-pricing.py --output /root/pricetag-admin/pricing-check
 ```
 
-Use a new output directory. This mock-only test checks admin/ordinary/anonymous
-access, attempts to save the unchanged discount policy, refreshes source prices, and creates
-a historical-repricing preview. The known upstream discount-save constraint
-error is recorded as `known_bug`, not a successful save. Other failures stop the
-test. It does not apply historical corrections. Catalog
-refresh requires outbound access and may update source prices; gateway alias
-snapshots remain unchanged.
+Use a new output directory. This mock-only test verifies administrator, ordinary
+user and anonymous access; saves the unchanged discount policy; and refreshes
+source prices. It previews and confirms repricing for one uniquely named
+synthetic event, including an idempotent repeat. A discount-save failure now
+fails the test; it is not accepted as a known bug. Catalog refresh requires
+outbound access and can update imported rates; managed overrides remain intact.
 
 ## Missing-price fallback check
 
@@ -178,9 +177,10 @@ On the mock-only host:
 sudo python3 tests/pricetag/rhel-price-fallback.py
 ```
 
-This checks that an unpriced model does not block bootstrap, emits a warning,
-and gets an alias price when source rates exist. It uses session-local PostgreSQL
-tables; deployment prices, users and usage stay unchanged.
+This checks through service APIs that missing prices permit setup with a warning
+and that copying a source rate prices the billed upstream ID, not an unused
+alias. It creates unique, unrouted synthetic price records and retains them for
+audit; existing model rates, users and usage are unchanged.
 See [fallback rates](../quickstarts/remote-gateway-pricetag/pricing.md#missing-price-fallback).
 
 ## USD quota probe

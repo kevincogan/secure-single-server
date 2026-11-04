@@ -4,10 +4,9 @@ Admin is always created; Alice/Bob are optional. Ordinary users inherit $5/month
 unless configured otherwise. Keys expire within 90 days. Use ordinary-user keys
 for inference: admin is quota-exempt.
 
-With the management candidate installed, **Administration** provides user/manager controls and onboarding keys;
-**Safety Net** includes per-user USD overrides. **My keys** manages personal keys. The commands below use the same
-service APIs; they do not write business tables directly. Published images without
-those APIs are not compatible with this branch's helpers.
+**Administration → Users** manages identities and manager relationships;
+**User quota** manages per-user USD overrides; **User keys** issues onboarding keys.
+**My keys** manages personal keys. The commands below use the same service APIs.
 
 ## Open the management session
 
@@ -59,11 +58,16 @@ sudo cat /root/pricetag-admin/carol.key
 
 ## Manage keys in the dashboard
 
-**Administration → Users** creates an identity without a key. **Issue onboarding key**
-adds a key; it does not replace existing keys. Choose **Copy key** or **Download .key**,
+**Administration → Users** creates an identity without a key. Search by login or
+name, filter all/active/inactive users, and use **Edit** to update the selected login.
+The table defaults to five users per page. Select a row to inspect active keys
+and confirm **Revoke all keys**.
+
+**Administration → User keys → Issue onboarding key** adds a key; it does not replace existing keys. Choose **Copy key** or **Download .key**,
 then **Dismiss key**. The secret is never displayed or saved in browser storage.
 
-Users manage their own keys under **My keys**. Active keys appear first, with expiry
+Users open **My keys** from the top navigation. The **My keys** tab lists keys;
+**Create key** issues a new key with private copy/download controls. Active keys appear first, with expiry
 and remaining lifetime. **Revoke** stops a key; revoked/expired records remain in
 expandable history. Permanent deletion is not supported. The deployed MaaS cleanup
 API targets expired ephemeral keys, not ordinary revoked key records.
@@ -82,7 +86,7 @@ chmod 600 /path/to/pricetag.key
 
 ## Inspect a user's view
 
-As superadmin, select the user in **Administration → Users → Issue onboarding key**
+As superadmin, select the user in **Administration → User keys → Issue onboarding key**
 and choose **View selected user’s usage** or **View selected user’s team**.
 Confirm **Continue**; no key needs to be issued or copied. The **Viewing as** banner
 identifies the target. Use **Back to admin view** and confirm to restore your view.
@@ -108,7 +112,7 @@ To revoke a specific key, copy its ID from `list`:
 sudo python3 scripts/pricetag/maas-key revoke --subject carol --key-id OLD_KEY_ID
 ```
 
-<details>
+<details markdown="1">
 <summary>Copy a rotated key and switch OpenCode</summary>
 
 Run in the **workstation installation shell**, after exiting SSH:
@@ -128,7 +132,7 @@ of the key file it already references and restart OpenCode.
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Rotate with an overlap while clients switch</summary>
 
 ```console
@@ -140,7 +144,7 @@ Switch the client, verify inference, then revoke the old key by ID.
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Find saved keys or recover access</summary>
 
 ```console
@@ -155,7 +159,7 @@ reported old IDs after checking their status.
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Dashboard versus CLI: supported operations</summary>
 
 | Task | Available interface |
@@ -163,9 +167,9 @@ reported old IDs after checking their status.
 | View aggregate and user spending | Administrator dashboard |
 | View local users and change administrator roles or manager relationships | Administrator **Users** |
 | Set the default monthly allowance and post-limit model exceptions | Administrator **Safety Net** (`/api/v1/admin/safety-net`) |
-| Create users or change an individual allowance | Administration → Users / Safety Net → Per-user monthly overrides; SSH `scripts/pricetag/user` uses the same PriceTag APIs |
-| Issue onboarding keys | Administration → Users → Issue onboarding key |
-| Create/list/revoke your own keys | My keys (`/management`); SSH `scripts/pricetag/maas-key` remains available |
+| Create users or change an individual allowance | Administration → Users / User quota → Per-user monthly quota overrides; SSH `scripts/pricetag/user` uses the same PriceTag APIs |
+| Issue onboarding keys | Administration → User keys → Issue onboarding key |
+| Create/search/revoke your own keys | My keys (`/management`): search by name or ID, filter Active/Revoked/Expired/All, and select 5/20/50 rows per page; SSH `scripts/pricetag/maas-key` remains available |
 | Configure providers, credentials and advertised models | SSH [provider helper](providers.md) |
 | View personal/team spending | Usage is personal for users/managers; My team follows manager relationships |
 | Inspect a user’s scoped view without their key | Superadmin View / Team links; read-only impersonation with confirmed return |
@@ -176,7 +180,7 @@ post-limit exception list, so no model bypasses the USD limit.
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Administration boundaries and upstream API gaps</summary>
 
 - The matching PriceTag demo image is required.
@@ -206,4 +210,4 @@ post-limit exception list, so no model bypasses the USD limit.
   fresh-install guide. Use the [mock benchmark](../../testing/pricetag-perf.md)
   to measure resource and storage growth.
 
-For candidate automation over SSH, use the [private management API client](management-api.md).
+For automation over SSH, use the [private management API client](management-api.md).

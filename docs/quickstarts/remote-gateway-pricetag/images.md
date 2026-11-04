@@ -36,7 +36,7 @@ The published images target `linux/amd64`. They are pinned in
 `scripts/pricetag/install.py`; no moving `latest` tag is used. Override them only
 to test another publication.
 
-<details>
+<details markdown="1">
 <summary>Override published MaaS and PriceTag images</summary>
 
 ```console
@@ -54,15 +54,17 @@ options](providers.md). Never put provider keys in command-line arguments.
 
 </details>
 
-<details>
-<summary>Build from the default source revisions</summary>
+<details markdown="1">
+<summary>Build from the latest demo branches</summary>
 
 Source mode defaults to these fork branches:
 
 - [MaaS: feat/standalone-runtime-minimal](https://github.com/Ladas/models-as-a-service/tree/feat/standalone-runtime-minimal).
 - [PriceTag: feat/standalone-demo-reuse-upstream-ui](https://github.com/Ladas/pricetag-metering/tree/feat/standalone-demo-reuse-upstream-ui).
 
-The optional PriceTag follow-up is not selected. Each branch is resolved to a
+The published image already includes the **My keys** tabs, administration-table
+changes and impersonation confirmation dialog. Use source mode for changes
+beyond that release. The optional PriceTag follow-up is not selected. Each branch is resolved to a
 full commit before building, recorded in the image label and checked on import.
 
 ```console
@@ -73,7 +75,7 @@ sudo scripts/pricetag/install --hostname "$GATEWAY_HOST" --image-mode source
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Build another branch or commit</summary>
 
 For branches, add `--maas-branch BRANCH` and/or `--metering-branch BRANCH`
@@ -95,7 +97,7 @@ PriceTag schema/API changes need compatibility testing.
 
 </details>
 
-<details>
+<details markdown="1">
 <summary>Image verification and upgrade limits</summary>
 
 Revision options also set expected source labels for published images. A mismatch

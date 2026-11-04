@@ -17,14 +17,33 @@ let stage='setup';
  async function done(page,action){await page.locator('#status').evaluate(el=>el.textContent='');await action();await page.waitForFunction(()=>document.querySelector('#status').textContent==='Done');}
  try{
   const key=fs.readFileSync(keyPath,'utf8').trim();const {page}=await login(key);await page.goto(base+'/admin');await page.locator('#admin').waitFor({state:'visible'});
-  async function who(){return await page.evaluate(async()=>await(await fetch('/api/v1/whoami')).json());}
+  // Confirmation pages intentionally forbid fetch through their CSP. Inspect
+  // the same browser session via its cookie-sharing request context instead.
+  async function who(){const response=await page.context().request.get(base+'/api/v1/whoami');assert.equal(response.status(),200);return await response.json();}
+  async function confirmDashboard(){
+   // Returning to admin reloads /dashboard at the SAME URL. waitForURL alone
+   // can resolve before the form has submitted or the session cookie changes.
+   await Promise.all([page.waitForEvent('domcontentloaded'),page.getByRole('button',{name:'Continue',exact:true}).click()]);
+   assert.equal(new URL(page.url()).pathname,'/dashboard');
+  }
   const original=await who();assert.equal(original.user,'admin');
-  stage='view-as GET requires confirmation';await page.locator('#onboard [name=subject]').selectOption('alice');await page.getByRole('link',{name:'View selected user’s usage',exact:true}).click();await page.getByRole('heading',{name:'Change dashboard view'}).waitFor();assert.equal((await who()).user,'admin');
+  stage='view-as modal does not change identity';await page.locator('#vtab-user-keys').click();await page.locator('#onboard [name=subject]').selectOption('alice');
+  const viewLink=page.getByRole('link',{name:'View selected user’s usage',exact:true});await viewLink.click();
+  const dialog=page.getByRole('dialog',{name:'Change dashboard view'});await dialog.waitFor();assert.equal(new URL(page.url()).pathname,'/admin');assert.equal((await who()).user,'admin');
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal((await who()).user,'admin');
+  await viewLink.click();await page.keyboard.press('Escape');assert.equal((await who()).user,'admin');await viewLink.click();
   stage='cross-origin session writes denied';
   for(const route of ['/admin/impersonate?as=alice','/logout']){const response=await page.context().request.post(base+route,{headers:{Origin:'https://attacker.invalid'},maxRedirects:0});console.log('Cross-origin '+route.split('?')[0]+' HTTP '+response.status());assert.equal(response.status(),403);}
-  stage='confirm scoped view';await Promise.all([page.waitForURL(u=>u.pathname==='/dashboard'),page.getByRole('button',{name:'Continue',exact:true}).click()]);assert.equal((await who()).user,'alice');assert.equal((await who()).impersonating,true);
+  stage='confirm scoped view';await confirmDashboard();assert.equal((await who()).user,'alice');assert.equal((await who()).impersonating,true);
+  await page.locator('#impersonation-banner').waitFor({state:'visible'});await page.locator('#standalone-budget').waitFor({state:'visible'});
+  assert.ok(await page.evaluate(()=>document.querySelector('#impersonation-banner').getBoundingClientRect().bottom <= document.querySelector('#standalone-budget').getBoundingClientRect().top),'impersonation must precede budget');
   const keyResponse=await page.context().request.post(base+'/me/keys',{headers:{Origin:base},data:{name:'forbidden-impersonated-key',expiresIn:'1h'},maxRedirects:0});assert.equal(keyResponse.status(),403);
-  stage='return to administrator';await page.goto(base+'/admin/impersonate');await Promise.all([page.waitForURL(u=>u.pathname==='/dashboard'),page.getByRole('button',{name:'Continue',exact:true}).click()]);assert.equal((await who()).user,'admin');
+  stage='return to administrator';await page.locator('#impersonation-banner').getByRole('link',{name:'Back to admin view',exact:true}).click();await dialog.waitFor();assert.equal((await who()).user,'alice');await confirmDashboard();assert.equal((await who()).user,'admin');assert.equal((await who()).impersonating,false);
+  stage='direct URL retains GET confirmation fallback';const fallback=await page.goto(base+'/admin/impersonate?as=admin');
+  assert.equal(fallback.status(),200);assert.match(fallback.headers()['content-security-policy'],/default-src 'none'/);
+  assert.equal(await page.evaluate(async()=>{try{await fetch('/api/v1/whoami');return false;}catch{return true;}}),true,'confirmation CSP must deny script-initiated API access');
+  await page.getByRole('heading',{name:'Change dashboard view'}).waitFor();assert.equal((await who()).impersonating,false);
+  await page.getByRole('link',{name:'Cancel',exact:true}).click();
   stage='nonexistent impersonation target rejected';
   const missing=await page.context().request.post(base+'/admin/impersonate?as=missing-test-identity',{headers:{Origin:base},maxRedirects:0});assert.equal(missing.status(),403);assert.equal((await who()).user,'admin');
   stage='logout confirmation';await page.goto(base+'/logout');await page.getByRole('heading',{name:'Sign out'}).waitFor();assert.equal((await who()).user,'admin');await Promise.all([page.waitForURL(u=>u.pathname==='/login'),page.getByRole('button',{name:'Continue',exact:true}).click()]);

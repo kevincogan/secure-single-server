@@ -7,8 +7,9 @@ OpenCode with a user key and a monthly USD budget.
 SSH/8443 from your IP; Git, Python 3 and OpenCode on your workstation.
 The tested VM has 8 vCPUs, 32 GiB RAM and 150 GiB disk. No GPU is needed.
 
-> The installer uses digest-pinned published MaaS and PriceTag demo images.
-> [Source builds](images.md) remain available for testing another branch or commit.
+> The default published images include the administration, user-key, quota and
+> pricing controls described below. To test newer source, choose **Build latest
+> demo branches** or add `--image-mode source`; see [image options](images.md).
 > The optional provider editor is not included.
 
 ## 1. Set the connection
@@ -23,7 +24,7 @@ REPO="$PWD"
 SSH_OPTS=(-o IdentitiesOnly=yes -o ForwardAgent=no -i "$SSH_KEY")
 ```
 
-<details>
+<details markdown="1">
 <summary>Need a test VM? Create one with the AWS helper</summary>
 
 Follow the [AWS test-VM example](../../testing/aws-pricetag.md), then continue
@@ -59,13 +60,16 @@ ssh -t "${SSH_OPTS[@]}" "$RHEL_HOST" \
 ```
 
 Choose providers, enter their keys at hidden prompts, then confirm with `install`.
+Keep **Use tested published images** to install the **My keys** tabs, updated
+administration tables and impersonation confirmation dialog. Choose
+**Build latest demo branches** only to test newer source; see [image options](images.md).
 
 - **Providers:** OpenAI, an external OpenAI-compatible/Messages service, or both.
 - **Users:** admin is required; Alice/Bob are optional. Choose **Admin only** to
   [create your own user](users.md#create-a-user) afterward.
 - **Defaults:** real providers, published images, $5/month per ordinary user.
 
-<details>
+<details markdown="1">
 <summary>Installer options and logs</summary>
 
 | Option | Purpose |
@@ -79,7 +83,8 @@ External setup accepts one or both APIs; one key must cover the selected APIs.
 Credentials and model presets are checked before installation. Prices are loaded
 at service startup. Missing prices use [PriceTag fallback rates](pricing.md#missing-price-fallback)
 and do not block installation. Review rates before using real providers.
-For a DNS certificate, set `GATEWAY_HOST` to that name before running the installer.
+For a DNS name in the generated private certificate, set `GATEWAY_HOST` to
+that name first. This does not obtain a publicly trusted certificate.
 Existing deployments are refused.
 
 The installer prints progress and a private log path under `/var/log/`, plus a
@@ -103,7 +108,7 @@ ssh "${SSH_OPTS[@]}" "$RHEL_HOST" \
 Open the URL, accept the deployment certificate and paste the admin key.
 Clear the clipboard after login with `pbcopy < /dev/null`. Clipboard managers may retain copied keys.
 Open **Administration** at `/admin`: **Users** handles onboarding and managers;
-**Safety Net** handles budgets. **My keys** at `/management` handles personal keys.
+**Safety Net** sets defaults; **User quota** sets individual overrides. **My keys** at `/management` handles personal keys.
 Follow the [UI demo walkthrough](demo.md) for the
 onboarding, personal/team views, read-only impersonation, budgets, pricing and
 key replacement/offboarding.
@@ -112,7 +117,7 @@ key replacement/offboarding.
 
 In the **workstation installation shell**, choose your user on the first line.
 For installer/CLI-created users, this copies the CA/key and prints a launch command
-for any project shell. Browser-issued keys are shown once: save yours privately to
+for any project shell. Browser-issued keys can be downloaded after issuance: save yours privately to
 `$CLIENT_DIR/$INFERENCE_USER.key` instead of the key-copy SSH command below.
 
 ```console
@@ -150,16 +155,47 @@ the helper passes gateway settings for that process without writing a config fil
 OpenCode merges these with existing settings. Sessions for one user share their budget.
 
 Send: **“Reply with just: gateway works.”** In the admin dashboard, select Alice
-(or your chosen user) and confirm the request, model alias and recorded spend.
+(or your chosen user) and confirm the request, recorded upstream model ID and spend.
 Accounting may take a few seconds; free models record zero USD. The default
-allowance is per user. With the management candidate, view and change overrides
-in **Administration → Safety Net**; the [user helper](users.md) uses the same service API.
-The pinned published demo image includes these controls. Older images may not.
+allowance is per user. View and change overrides
+in **Administration → User quota**; the [user helper](users.md) uses the same service API.
 For budget-denial testing, use the separate [mock quota probe](../../testing/pricetag-perf.md#usd-quota-probe).
 
-[Save a native config or switch to the standard OpenCode config directory](clients.md).
+[Manual configuration and saved launcher](clients.md) ·
+[OpenCode Desktop setup](clients.md#opencode-desktop).
 
-<details>
+<details markdown="1">
+<summary>What the harness helper does</summary>
+
+For OpenCode, `scripts/pricetag/harness`:
+
+1. Checks that your key is a private regular file and validates gateway HTTPS using
+   the supplied CA (or system trust when `--ca-file` is omitted).
+2. Fetches the public `/v1/models` catalog without sending your key. Reads each
+   model's API dialect, upstream ID and context/output limits from gateway metadata.
+3. Builds `praxis-openai` and `praxis-anthropic` providers for all valid advertised
+   models. Both connect to your gateway; provider credentials stay on RHEL.
+   GPT reasoning models use the Responses SDK; other OpenAI-compatible models use
+   Chat Completions; Messages models use the Anthropic SDK. Compatibility options
+   are selected from upstream model metadata.
+4. Reads your user key and passes the configuration through the child process's
+   `OPENCODE_CONFIG_CONTENT`, plus CA environment settings. It starts `opencode`
+   in the current project directory; `--model` selects the initial model only.
+
+It writes no OpenCode configuration file and does not change the gateway.
+OpenCode still merges existing settings and stores its own normal session data.
+The key is present in the process environment; do not share environment dumps.
+Catalog visibility does not grant inference access: the gateway validates your
+key and applies authorization and budget checks on requests.
+
+`--print-config` previews the generated launch settings with the key redacted.
+Codex and Claude Code use their own launch arguments/environment; Codex with
+vLLM also writes a local model-catalog cache. The no-config-file description above
+is specifically for OpenCode.
+
+</details>
+
+<details markdown="1">
 <summary>Switch users</summary>
 
 Copy the other user's key with step 5, then launch with its path:
@@ -174,7 +210,7 @@ python3 "$REPO/scripts/pricetag/harness" opencode --url "$GATEWAY_URL" \
 
 ## Operations
 
-With the **management candidate**, use Administration for users, team
+Use Administration for users, team
 relationships, budgets, onboarding keys and prices; use My keys for personal keys. Provider/model configuration stays in the host CLI
 for the reduced demo image. Personal
 and manager dashboards show scoped usage. For automation, use

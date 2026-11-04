@@ -120,7 +120,9 @@ class InstallTest(unittest.TestCase):
         source = self.image_args('--image-mode', 'source')
         self.assertEqual(source.maas_branch, installer.MAAS_BRANCH)
         self.assertEqual(source.metering_branch, installer.METERING_BRANCH)
-        self.assertEqual(source.metering_revision, installer.METERING_COMMIT)
+        self.assertEqual(args.metering_revision, installer.METERING_COMMIT)
+        self.assertEqual(source.metering_revision, installer.SOURCE_METERING_COMMIT)
+        self.assertEqual(module('build-metering').REVISION, installer.SOURCE_METERING_COMMIT)
         for flags in (['--image-mode', 'source', '--maas-branch', '../bad'],
                       ['--image-mode', 'source', '--maas-branch', 'feature', '--maas-revision', 'a' * 40]):
             with self.assertRaises(SystemExit):
@@ -144,6 +146,11 @@ class InstallTest(unittest.TestCase):
                 installer.acquire_images(args, 'amd64')
             self.assertEqual(checkout.call_args_list[0].args[2], 'refs/heads/feature/test')
             self.assertEqual(args.maas_revision, resolved)
+            self.assertEqual(checkout.call_args_list[1].args[2],
+                             'refs/heads/feat/standalone-demo-reuse-upstream-ui')
+            self.assertEqual(args.metering_revision, resolved)
+            self.assertTrue(any('--revision' in c.args[0] and resolved in c.args[0]
+                                for c in run.call_args_list))
             self.assertTrue(any('--expected-commit' in c.args[0] and resolved in c.args[0]
                                 for c in run.call_args_list))
 

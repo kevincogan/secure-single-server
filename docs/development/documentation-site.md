@@ -65,6 +65,14 @@ To add a visual demo to another scenario, use the project skill in
 [`.claude/skills/visual-demo/`](../../.claude/skills/visual-demo/SKILL.md). It
 holds the page template, the branding values, and the render and check steps.
 
+## Collapsible examples
+
+Use `<details markdown="1">` with a `<summary>` and a blank line before the
+Markdown body. The `md_in_html` extension needs this attribute to render links,
+fenced code and tables inside the block. Plain `<details>` can leave Markdown
+visible as text on the site even when it works on GitHub. Keep required steps
+visible; collapse optional examples and explanations.
+
 ## Red Hat branding
 
 The theme uses Red Hat red (`#ee0000`, with `#a60000` and `#f56e6e` as the dark

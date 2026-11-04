@@ -91,8 +91,10 @@ nav:
           - Manual installation: docs/quickstarts/remote-gateway-pricetag/manual.md
           - Providers and models: docs/quickstarts/remote-gateway-pricetag/providers.md
           - Users, keys and budgets: docs/quickstarts/remote-gateway-pricetag/users.md
-          - Saved client configuration: docs/quickstarts/remote-gateway-pricetag/clients.md
-          - Price operations and recovery: docs/quickstarts/remote-gateway-pricetag/pricing.md
+          - OpenCode CLI and desktop: docs/quickstarts/remote-gateway-pricetag/clients.md
+          - Model prices and discounts: docs/quickstarts/remote-gateway-pricetag/pricing.md
+          - UI demo walkthrough: docs/quickstarts/remote-gateway-pricetag/demo.md
+          - Management CLI and API: docs/quickstarts/remote-gateway-pricetag/management-api.md
           - Image options: docs/quickstarts/remote-gateway-pricetag/images.md
           - Architecture and pilot limits: docs/testing/pricetag.md
           - AWS deployment runbook: docs/testing/aws-pricetag.md

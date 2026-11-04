@@ -1,9 +1,32 @@
 # Management CLI and API
 
-For the management candidate, use **Administration** for admin operations and **My keys** for personal key operations.
+Use **Administration** for admin operations and **My keys** for personal key operations.
 For automation, `scripts/pricetag/manage` calls the private loopback API with the
 host's protected service credential. It does not print credentials or response
 bodies, and it refuses to overwrite response files.
+
+## Prepare workstation administrator access
+
+After [local connection setup](README.md#5-prepare-the-local-connection), run in
+that workstation shell. This copies an administrator key into a private file;
+keep it separate from the ordinary-user key used for inference.
+
+```console
+umask 077
+ssh "${SSH_OPTS[@]}" "$RHEL_HOST" 'sudo cat /root/pricetag-admin/admin.key' > "$CLIENT_DIR/admin.key"
+chmod 600 "$CLIENT_DIR/admin.key"
+cd "$REPO"
+```
+
+For a browser-issued administrator key, use its downloaded private file instead.
+Do not commit keys or management response files to the repository. Use a private
+working directory for the examples below:
+
+```console
+mkdir -p "$CLIENT_DIR/management"
+chmod 700 "$CLIENT_DIR/management"
+cd "$CLIENT_DIR/management"
+```
 
 ## Remote HTTPS client
 
@@ -12,7 +35,7 @@ access. The helper creates an **in-memory session**, applies normal server-side
 role checks, and writes the response to a new private file:
 
 ```sh
-python3 scripts/pricetag/api GET /api/v1/management/users \
+python3 "$REPO/scripts/pricetag/api" GET /api/v1/management/users \
   --url "$GATEWAY_URL" --key-file "$CLIENT_DIR/admin.key" \
   --ca-file "$CLIENT_DIR/ca.pem" --output users.json
 ```
@@ -22,13 +45,13 @@ operations cannot manage another user's keys, including when called by an admin.
 Supported methods: GET, POST, PUT, PATCH and DELETE. The helper also accepts `/api/v1/pricing?used=0` to list the complete catalog.
 Other query strings are rejected; use a direct authenticated API client for filtered reporting.
 
-<details>
+<details markdown="1">
 <summary>Change a user's budget over HTTPS</summary>
 
 ```sh
 umask 077
 printf '%s\n' '{"subject":"carol","monthly_usd":5}' > budget-input.json
-python3 scripts/pricetag/api PUT /api/v1/management/budgets \
+python3 "$REPO/scripts/pricetag/api" PUT /api/v1/management/budgets \
   --url "$GATEWAY_URL" --key-file "$CLIENT_DIR/admin.key" \
   --ca-file "$CLIENT_DIR/ca.pem" --input budget-input.json \
   --output budget-result.json
@@ -77,8 +100,7 @@ sudo python3 scripts/pricetag/manage PUT budgets \
   --output /root/gateway-management/budget-result.json
 ```
 
-The same resource names are available for `users`, `prices`, `policy`, `keys` and `key-revocations`. They use the candidate
-PriceTag management API schemas. The server validates allowed methods and fields;
+The same resource names are available for `users`, `prices`, `policy`, `keys` and `key-revocations`. They use the deployed PriceTag management API schemas. The server validates allowed methods and fields;
 this client does not bypass authorization or manipulate database tables.
 
 

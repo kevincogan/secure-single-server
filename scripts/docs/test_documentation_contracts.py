@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 import yaml
+import markdown
 
 
 ROOT = Path(__file__).parents[2]
@@ -39,6 +40,26 @@ def scenario_pages(entries):
 
 
 class DocumentationContractsTests(unittest.TestCase):
+    def test_pricetag_collapsed_sections_render_markdown(self):
+        base = ROOT / "docs/quickstarts/remote-gateway-pricetag"
+        for path in base.glob("*.md"):
+            source = path.read_text(encoding="utf-8")
+            for block in re.findall(r"<details[^>]*>.*?</details>", source, re.DOTALL):
+                with self.subTest(page=path.name, summary=block.split("</summary>")[0]):
+                    rendered = markdown.markdown(
+                        block, extensions=["md_in_html", "tables", "pymdownx.superfences"]
+                    )
+                    if re.search(r"\[[^\]]+\]\([^)]+\)", block):
+                        self.assertIn('<a href="', rendered)
+                    if "```" in block:
+                        self.assertIn("<pre", rendered)
+                        self.assertNotIn("```", rendered)
+                    if "| ---" in block:
+                        self.assertIn("<table>", rendered)
+        source = (base / "README.md").read_text(encoding="utf-8")
+        rendered = markdown.markdown(source, extensions=["md_in_html", "pymdownx.superfences"])
+        self.assertIn('href="../../testing/aws-pricetag.md"', rendered)
+
     def test_every_scenario_nav_page_is_linked_from_the_scenarios_index(self):
         config = yaml.load(
             (ROOT / "mkdocs.yml").read_text(encoding="utf-8"),

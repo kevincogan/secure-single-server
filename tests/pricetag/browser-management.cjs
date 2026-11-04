@@ -36,22 +36,42 @@ async function done(page, action) {
     await page.locator('#api_key').fill(key);
     await Promise.all([page.waitForURL(url => url.pathname !== '/login'), page.getByRole('button', { name: 'Sign In', exact: true }).click()]);
     await page.goto(base + '/management');
-    await page.waitForFunction(() => document.querySelector('#identity')?.textContent.startsWith('Signed in as '));
+    await page.locator('#keyManagement').waitFor({state:'visible'});
+    await page.locator('#keys[aria-busy=false]').waitFor();
     return { page, context };
   }
   try {
     const { page: admin, context: adminContext } = await login(readKey('admin'));
+    await admin.getByRole('link', {name:'My team',exact:true}).waitFor();
     await admin.goto(base + '/admin');
     await admin.locator('#admin').waitFor({ state: 'visible' });
+    await admin.getByRole('link', {name:'My team',exact:true}).waitFor();
     await admin.locator('#user [name=subject]').fill('demo-ui-onboard');
     await admin.locator('#user [name=name]').fill('Demo UI Onboarding');
-    await done(admin, () => admin.locator('#user button').click());
-    await admin.locator('#vtab-safety-net').click();
+    await done(admin, () => admin.getByRole('button',{name:'Save user',exact:true}).click());
+    assert.equal(await admin.locator('#partner-users-page-size').inputValue(), '5');
+    await admin.locator('#partner-users-search').fill('demo-ui-onboard');
+    const managedRow=admin.locator('#partner-users-list tbody tr').filter({hasText:'demo-ui-onboard'});
+    await managedRow.waitFor();
+    await managedRow.locator('.partner-role').focus();await admin.keyboard.press('Enter');await admin.keyboard.press('Escape');
+    assert.equal(await admin.locator('#partner-detail-ov.show').count(),0);
+    await managedRow.locator('.partner-manager').click();await admin.keyboard.press('Escape');
+    assert.equal(await admin.locator('#partner-detail-ov.show').count(),0);
+    await managedRow.getByRole('button',{name:'Edit',exact:true}).click();
+    assert.equal(await admin.locator('#user [name=subject]').inputValue(),'demo-ui-onboard');
+    assert.equal(await admin.locator('#user [name=subject]').getAttribute('readonly'),'');
+    await admin.locator('#newUser').click();
+    assert.equal(await admin.locator('#user [name=subject]').getAttribute('readonly'),null);
+    const userCard=await admin.locator('#tab-people > .card').boundingBox();
+    await admin.locator('#vtab-user-quota').click();
+    const quotaCard=await admin.locator('#tab-user-quota > .card').boundingBox();
+    assert.equal(quotaCard.x,userCard.x);assert.equal(quotaCard.width,userCard.width);
     await admin.locator('#budget [name=subject]').selectOption('demo-ui-onboard');
     await admin.locator('#budget [name=monthly_usd]').fill('5');
     await done(admin, () => admin.getByRole('button', { name: 'Set override', exact: true }).click());
-    // Verify the expandable per-user overrides list and inheritance.
-    await admin.locator('#budgetDetails summary').click();
+    // The overrides table is always visible beneath the editor.
+    assert.equal(await admin.locator('#budgetDetails').isVisible(),true);
+    assert.equal(await admin.locator('#status').isVisible(),false);
     await admin.locator('#budgetSearch [name=search]').fill('demo-ui-onboard');
     await done(admin,()=>admin.locator('#budgetSearch button').click());
     const overrideRow=admin.locator('#budgets tr').filter({hasText:'demo-ui-onboard'});
@@ -61,8 +81,7 @@ async function done(page, action) {
     assert.match(await admin.locator('#budgetCurrent').textContent(),/Inherits global default/);
     await admin.locator('#budget [name=monthly_usd]').fill('5');
     await done(admin,()=>admin.getByRole('button',{name:'Set override',exact:true}).click());
-    await admin.locator('#vtab-people').click();
-    await admin.locator('#onboard [name=subject]').selectOption('demo-ui-onboard');
+    await admin.locator('#vtab-user-keys').click();await admin.locator('#onboard [name=subject]').selectOption('demo-ui-onboard');
     await admin.locator('#onboard [name=expiresIn]').fill('2d');
     await done(admin, () => admin.getByRole('button', { name: 'Issue key', exact: true }).click());
     const issued = await downloadKey(admin, '#onboardKey');
@@ -70,25 +89,29 @@ async function done(page, action) {
     await admin.locator('#onboardKey').getByRole('button', { name: 'Dismiss key', exact: true }).click();
     assert.equal(await admin.locator('#onboardKey').isVisible(), false);
     const { page: user, context: userContext } = await login(issued.key);user.on('dialog', dialog=>dialog.accept());
+    assert.equal(await user.getByRole('link', {name:'My team',exact:true}).count(),0);
     assert.equal(await user.locator('#admin').isVisible(), false);
     const statuses = await user.evaluate(async () => {
       const result = [];
-      for (const route of ['/api/v1/management/users', '/api/v1/management/prices', '/api/v1/admin/partner-users']) {
+      for (const route of ['/api/v1/management/users', '/api/v1/management/prices', '/api/v1/admin/partner-users', '/api/v1/admin/partner-users/00000000-0000-0000-0000-000000000001/keys']) {
         result.push((await fetch(route, { headers: { 'X-Forwarded-User': 'admin', 'X-MaaS-Username': 'admin' } })).status);
       }
       return result;
     });
-    assert.deepEqual(statuses, [403, 403, 403]);
-    await done(user, () => user.getByRole('button', { name: 'List my keys', exact: true }).click());
+    assert.deepEqual(statuses, [403, 403, 403, 403]);
+    await done(user, () => user.getByRole('button', { name: 'Refresh', exact: true }).click());
     assert.ok(await user.locator('#keys button').count(), 'issued key absent from personal list');
+    await user.getByRole('tab', {name:'Create key',exact:true}).click();
     await user.locator('#key [name=name]').fill('demo-personal-key');
     await user.locator('#key [name=expiresIn]').fill('1d');
     await done(user, () => user.getByRole('button', { name: 'Create key', exact: true }).click());
     const personal = await downloadKey(user, '#newKey');
+    await user.getByRole('tab', {name:'My keys',exact:true}).click();
     assert.ok(personal.key, 'personal key missing');
-    await done(user, () => user.getByRole('button', { name: 'List my keys', exact: true }).click());
-    const row = user.locator('#keys p').filter({ hasText: personal.id });
+    await done(user, () => user.getByRole('button', { name: 'Refresh', exact: true }).click());
+    const row = user.locator('#keys tr[data-key-id="' + personal.id + '"]');
     await done(user, () => row.getByRole('button', { name: 'Revoke', exact: true }).click());
+    await user.locator('#keyState').selectOption('revoked');
     assert.equal(await row.locator('.key-status').textContent(), 'revoked');
     await userContext.close();
     await adminContext.close();

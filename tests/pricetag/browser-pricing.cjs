@@ -15,7 +15,7 @@ let stage='setup';
  const browser=await chromium.launch({args:['--ignore-certificate-errors-spki-list='+pin]});
  async function login(key){const context=await browser.newContext();const page=await context.newPage();await page.goto(base+'/login');await page.locator('#api_key').fill(key);await Promise.all([page.waitForURL(u=>u.pathname!=='/login'),page.getByRole('button',{name:'Sign In',exact:true}).click()]);return {context,page};}
  async function done(page,action){await page.locator('#status').evaluate(el=>el.textContent='');await action();await page.waitForFunction(()=>document.querySelector('#status').textContent==='Done');}
- async function price(page,model,input,output){await page.locator('#vtab-pricing-discounts').click();const form=page.locator('#price');await form.locator('[name=model]').fill(model);await form.locator('[name=provider]').fill('mock');await form.locator('[name=source_model]').fill('');for(const [name,value]of Object.entries({input_cost_per_mtok:input,output_cost_per_mtok:output,cache_write_cost_per_mtok:0,cache_read_cost_per_mtok:0}))await form.locator('[name='+name+']').fill(String(value));await done(page,()=>form.getByRole('button',{name:'Save rates',exact:true}).click());}
+ async function price(page,model,input,output){await page.locator('#vtab-model-pricing').click();const form=page.locator('#price');await form.locator('[name=model]').fill(model);await form.locator('[name=provider]').fill('mock');await form.locator('[name=source_model]').fill('');for(const [name,value]of Object.entries({input_cost_per_mtok:input,output_cost_per_mtok:output,cache_write_cost_per_mtok:0,cache_read_cost_per_mtok:0}))await form.locator('[name='+name+']').fill(String(value));await done(page,()=>form.getByRole('button',{name:'Save rates',exact:true}).click());}
  async function spend(page,expected){await page.waitForFunction(async expected=>{const r=await fetch('/api/v1/whoami');const v=await r.json();return Math.abs(v.quota.spent_usd-expected)<1e-8;},expected,{timeout:30000,polling:500});}
  let policyPage, originalPolicy;
  async function policy(value){
@@ -29,8 +29,8 @@ let stage='setup';
  try{
   const {page:admin}=await login(fs.readFileSync(keyPath,'utf8').trim());await admin.goto(base+'/admin');await admin.locator('#admin').waitFor({state:'visible'});
   const subject='demo-price-'+Date.now();stage='onboard price-test user';
-  await admin.locator('#user [name=subject]').fill(subject);await admin.locator('#user [name=name]').fill('Demo price verification');await done(admin,()=>admin.locator('#user button').click());
-  await admin.locator('#onboard [name=subject]').selectOption(subject);await admin.locator('#onboard [name=expiresIn]').fill('1d');await done(admin,()=>admin.getByRole('button',{name:'Issue key',exact:true}).click());
+  await admin.locator('#user [name=subject]').fill(subject);await admin.locator('#user [name=name]').fill('Demo price verification');await done(admin,()=>admin.getByRole('button',{name:'Save user',exact:true}).click());
+  await admin.locator('#vtab-user-keys').click();await admin.locator('#onboard [name=subject]').selectOption(subject);await admin.locator('#onboard [name=expiresIn]').fill('1d');await done(admin,()=>admin.getByRole('button',{name:'Issue key',exact:true}).click());
   const issued=await downloadKey(admin, '#onboardKey');await admin.locator('#onboardKey').getByRole('button',{name:'Dismiss key',exact:true}).click();
   const {page:user}=await login(issued.key);user.on('dialog', dialog=>dialog.accept());
   stage='set initial rate through UI';await price(admin,'fixture-cheap',1000,2000);
@@ -48,7 +48,7 @@ let stage='setup';
   assert.deepEqual(models.map(m=>m.model),['fixture-cheap']);
   console.log('PASS: usage is attributed to the upstream model; no alias price update was needed');
   stage='set individual budget through UI';
-  await admin.locator('#vtab-safety-net').click();await admin.locator('#budget [name=subject]').selectOption(subject);await admin.locator('#budget [name=monthly_usd]').fill('0.01');await done(admin,()=>admin.getByRole('button',{name:'Set override',exact:true}).click());
+  await admin.locator('#vtab-user-quota').click();await admin.locator('#budget [name=subject]').selectOption(subject);await admin.locator('#budget [name=monthly_usd]').fill('0.01');await done(admin,()=>admin.getByRole('button',{name:'Set override',exact:true}).click());
   policyPage=await admin.context().newPage();await policyPage.goto(base+'/admin');
   originalPolicy=await policyPage.evaluate(async()=>await(await fetch('/api/v1/admin/safety-net')).json());
   async function inferenceStatuses(){return await user.evaluate(async key=>{

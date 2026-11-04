@@ -31,15 +31,15 @@ sets an optional USD override, and then provisions the key.
 
 Praxis validates OpenAI requests with the `Authorization: Bearer` header and
 Anthropic Messages requests with `x-api-key`. Identity comes from MaaS validation,
-not caller-supplied `x-tenant-*` headers. The PriceTag catalog is served from the
+not caller-supplied `x-tenant-*` headers. The public gateway catalog is served from the
 configured model list and includes each model's API, context and output limits.
 Provider setup and replacement use `scripts/pricetag/providers`; presets and
 reviewed PriceTag source prices live in `configs/pricetag/`.
 
 The gateway uses PriceTag's USD balance policy as its spending limit and retains
 the 10-billion monthly token safety gate. It does not configure Praxis'
-`token_rate_limit` filter. Unknown prices must be seeded before a model is
-enabled. Admission fails closed when the balance service is unavailable. The
+`token_rate_limit` filter. Missing prices use [fallback estimates](../quickstarts/remote-gateway-pricetag/pricing.md#missing-price-fallback);
+review or set rates before enabling real traffic. Admission fails closed when the balance service is unavailable. The
 metering service caches quota decisions for 15 seconds, so a request burst can
 continue on a previously allowed balance after spend crosses the limit. The
 mock quota probe measured this overage; treat the USD limit as an enforced
@@ -68,10 +68,10 @@ admin boundary before broader use.
 The browser logs in with a MaaS key. PriceTag exchanges it for its existing
 Secure/HttpOnly session cookie. Inference-key expiry and browser-session expiry
 are independent. Revoking a MaaS key prevents later validation, while an
-already established browser cookie may remain valid until it expires. The admin
-dashboard is supported by the current metering profile. Ordinary-user personal
-dashboards are pending upstream and currently show “coming soon”; do not grant
-admin roles to bypass that limitation.
+already established browser cookie may remain valid until it expires. The pinned demo image supports administrator, personal and manager dashboards.
+Personal views are identity-scoped; manager views are limited to the reporting
+subtree. Suspending an identity blocks its sessions and inference. See
+[users and keys](../quickstarts/remote-gateway-pricetag/users.md#limits) for offboarding limits.
 
 ## Deploy and test
 
@@ -89,12 +89,14 @@ ledger and backups; define and test a retention policy before long-lived use.
 
 ## Current implementation dependencies
 
-- The MaaS image must be built from the reviewed cluster-free runtime branch;
-  the standard Kubernetes image still requires a cluster.
+- The pinned MaaS image contains the reviewed cluster-free runtime changes;
+  the standard Kubernetes image is not a substitute. Published images and source
+  builds are described in [image options](../quickstarts/remote-gateway-pricetag/images.md).
 - Praxis must contain ET `api_key_auth` and the reviewed external-metering
   integration. The combined experimental image must be pinned by digest.
-- Personal dashboards await upstream support. Complete key/session offboarding
-  and encrypted off-host backup/restore need separate implementation and testing.
+- The PriceTag image includes fork changes for scoped dashboards and management.
+  Automatic session invalidation on key revocation and encrypted off-host
+  backup/restore remain separate work.
 
 These are release gates. Do not treat a successful container start as proof
 that the complete single-server service is ready for users.

@@ -24,7 +24,7 @@ private.
 
 1. Sign in at `https://<gateway-host>:8443/login` using the administrator key at
    `/root/pricetag-admin/admin.key`. Transfer/display keys only in a private terminal.
-2. Open **Administration → Pricing Discounts → Model pricing**. Configure illustrative rates for
+2. Open **Administration → Model pricing**. Configure illustrative rates for
    upstream IDs `fixture` and `fixture-cheap`; label them synthetic. For example,
    USD/MTok input/output rates of 1,000/2,000 and 100/200 make the mock differences
    visible. Set both cache rates explicitly. These are demo rates, not vendor prices.
@@ -74,6 +74,10 @@ sudo python3 tests/pricetag/rhel-demo-fixture.py --cleanup \
   --output /root/pricetag-admin/demo-team-fixture
 ```
 
-Full automated browser deployment coverage is being prepared in a separate CI
-PR. This reduced image has passed the benchmark API/browser/quota suite; keep
-hosted CI qualification separate from the RHEL installation check.
+## Run the complete API and browser suite
+
+The [demo CI workflow](../../.github/workflows/pricetag-demo.yml) runs the
+mock deployment suite, including browser authorization and lifecycle tests.
+Follow [the suite instructions](pricetag-demo-ci.md#run-on-the-benchmark-rhel-deployment)
+for browser prerequisites and the complete run command. RHEL benchmark validation remains separate from hosted CI; a passing
+mock suite does not qualify real-provider behavior.
