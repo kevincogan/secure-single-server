@@ -24,8 +24,7 @@ def test_checked_in_lock_matches_all_patches() -> None:
     """No patch edit or package selection can silently change the build contract."""
     value = json.loads((build.RECIPES / "inputs.lock.json").read_text())
     assert [p["file"] for p in value["patches"]] == [
-        "v0.1.3-sandbox-subject-comparison.patch", "v0.1.3-pilot-sender-transport.patch",
-        "v0.1.3-sender-installation-domain.patch", "v0.1.3-sender-x509-feature.patch",
+        "v0.1.3-sandbox-subject-comparison.patch",
         "v0.1.3-bounded-oauth-response.patch"]
     for entry in value["patches"]:
         assert build.digest(build.PATCHES / entry["file"]) == entry["sha256"]

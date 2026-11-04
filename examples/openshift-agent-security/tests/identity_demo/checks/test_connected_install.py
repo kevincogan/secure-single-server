@@ -79,7 +79,8 @@ def test_ordered_setup_reuses_existing_helpers(harness: SimpleNamespace,
     assert result["production_approved"] is False
     assert stages.index("06-admission") < stages.index("07-install")
     assert stages.index("08-runtime-plan") < stages.index("08-runtime-apply")
-    assert stages.index("10-verify") < stages.index("11-trust") < stages.index("12-workspaces")
+    assert stages.index("10-verify") < stages.index("12-workspaces")
+    assert "11-trust" not in stages  # Legacy TLS has no binding-trust setup.
     assert stages.index("13-project") < stages.index("13-incident-project") < stages.index("14-catalog")
     for stage, project in (("13-project", "SERVICE"), ("13-incident-project", "OPS")):
         words = harness.state.commands[stage]
@@ -120,7 +121,7 @@ def test_plan_has_no_apply_stages(harness: SimpleNamespace) -> None:
 
 
 @pytest.mark.parametrize("stage", ["01-preflight", "06-admission", "07-install",
-                                    "08-runtime-apply", "11-trust", "13-incident-project", "14-catalog"])
+                                    "08-runtime-apply", "13-incident-project", "14-catalog"])
 def test_failure_never_retries_or_tears_down(harness: SimpleNamespace, stage: str) -> None:
     """Interrupted/unknown mutations retain existing explicit recovery semantics."""
     harness.state.fail = stage
@@ -404,12 +405,10 @@ def test_joined_cluster_services_forward_credentials_wait_and_keep_gateway_parse
     result=connected.activate_cluster_services(args, {'IDENTITY_DEMO_ARTIFACTS':'private-artifacts'},
         Stages(),rendered,Path('openshell'),'private-inference',{'application_installation_completed':True})
     names=[e[0] for e in events]
-    assert names.index('23-console-configuration') < names.index('wait-configured') < names.index('23a-public-trust-reconcile')
-    assert names.index('23a-public-trust-reconcile') < names.index('wait-issuer') < names.index('24-trust-observation')
-    assert names.index('27-cluster-workers') < names.index('wait-workers') < names.index('28-public-trust-refresh')
-    waits = [i for i, name in enumerate(names) if name == 'wait-workers']
-    assert len(waits) == 2
-    assert names.index('28-public-trust-refresh') < waits[1] < names.index('29-automatic-preparation')
+    assert names.index('23-console-configuration') < names.index('wait-configured') < names.index('25-persistent-gateway')
+    assert names.index('27-cluster-workers') < names.index('wait-workers') < names.index('29-automatic-preparation')
+    assert names.count('wait-workers') == 1
+    assert not any('public-trust' in n or n == '24-trust-observation' for n in names)
     for name,script,words in events:
         if name in ('wait-configured','wait-workers','wait-issuer'):continue
         assert '--credentials-file' in words

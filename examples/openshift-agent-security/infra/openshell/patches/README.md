@@ -1,34 +1,31 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Native evaluation patches
 
-Apply the patches in the order pinned by
-[the native build lock](../native-build/inputs.lock.json), using the
-[guarded native build procedure](../native-build/README.md).
-Upstream source/dependency pins are retained. Patch hashes identify the source
-in this package; runtime acceptance and maintenance ownership are separate gates.
+Apply the two patches in the order pinned by [inputs.lock.json](../native-build/inputs.lock.json).
+The source commit and upstream Cargo.lock are unchanged. Use the [guarded build procedure](../native-build/README.md).
 
-1. `v0.1.3-sandbox-subject-comparison.patch`: compare signed JWT-SVID subject with
-   the authenticated sandbox before intermediate credential release.
-2. `v0.1.3-pilot-sender-transport.patch`: share the same immutable X.509 SVID for
-   the final exchange and MCP TLS connection; reject binding mismatch/expiry.
-3. `v0.1.3-sender-installation-domain.patch`: require the configured compile-time
-   trust domain rather than the sender patch's example domain.
-4. `v0.1.3-sender-x509-feature.patch`: enable the required X.509 Workload API
-   feature with its recorded dependency lock.
-5. `v0.1.3-bounded-oauth-response.patch`: bound token responses to 128 KiB and
-   report only allowlisted OAuth categories; never reflect issuer descriptions.
+1. `v0.1.3-sandbox-subject-comparison.patch` compares the signed JWT-SVID subject
+   with the authenticated sandbox before releasing intermediate credentials.
+   A later gateway denial cannot repair a credential released to another workload.
+2. `v0.1.3-bounded-oauth-response.patch` bounds token responses to 128 KiB and
+   emits allowlisted OAuth categories without reflecting issuer descriptions.
 
-The build recipe selects optimized auditable release binaries. The response
-bounds passed 16 offline native OAuth tests, and target-specific release images
-were built and exercised within the recorded evaluation. Each new installation
-still needs its own matching images. Designated platform/native security review,
-a named maintenance owner and release approval remain distribution gates.
-The build records exact MCP host, token endpoint, issuer/MCP audiences, trust
-domain and public CA bundle. A target contract change requires a new build.
-The gateway must independently enforce signature, audience, certificate peer,
-SPIFFE identity, user/workload/run binding and exact approval.
+The sender transport, installation-domain and X.509 feature patches are retired
+in this candidate. No request certificate, thumbprint comparison or additional
+X.509 dependency is used for delegated MCP requests. Native management mTLS,
+ordinary HTTPS and SPIRE attestation remain independently required.
 
-Install the supervisor binary at `/openshell-supervisor` and gateway at
-`/usr/local/bin/openshell-gateway`. Verify packaged and running executables.
-These development patches do not establish vendor support or production
-approval; review [release limits](../../../docs/identity-demo-reference.md).
+Final grants are bearer tokens with a maximum 30-second lifetime. The protected
+host checks their signature, issuer, audience and lifetime, then exact current
+user/workload/run/project authority and approval. A copied token can be replayed
+within those limits; acceptance must measure credential custody and bypasses.
+This candidate is not approved for adoption until deployed checks and explicit
+residual-risk review pass. Offline tests alone do not select its token model.
+
+The generic native identity-exchange contract allows unchanged verified binaries
+to be repackaged with approved public TLS roots. Images and their trust hashes
+remain pinned; endpoint and permission configuration remain installation-specific.
+Install the supervisor at `/openshell-supervisor` and gateway at
+`/usr/local/bin/openshell-gateway`. Verify packaged and running binaries.
+Platform-owner review, maintenance ownership and distribution approval remain
+separate gates; development patches do not imply vendor support.

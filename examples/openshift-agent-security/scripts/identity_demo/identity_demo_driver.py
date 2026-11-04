@@ -9,7 +9,6 @@ No backend mutation is implemented here; an adapter must separately claim it.
 
 from __future__ import annotations
 
-import base64
 import asyncio
 from dataclasses import dataclass
 import hashlib
@@ -19,23 +18,11 @@ import os
 from pathlib import Path
 import re
 import secrets
-import ssl
 import sqlite3
-import stat
 import time
 from uuid import UUID
-from typing import Any, Callable
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlencode, urlparse
-from urllib.request import (
-    HTTPRedirectHandler,
-    HTTPSHandler,
-    ProxyHandler,
-    Request as URLRequest,
-    build_opener,
-)
-
-import jwt
+from typing import Callable
+from urllib.parse import urlparse
 from starlette.applications import Starlette
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -44,6 +31,9 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Re
 from starlette.routing import Route
 
 from agent_security_service import RunService, VerifiedActor
+from agent_security import prepare_storage
+from identity_demo_oidc import (OIDCSession, Verifier, FixedIssuerKeys, NoIssuerRedirect,
+    exchange_code, end_issuer_session, safe_https, valid_delegation)
 
 import identity_demo_console as console
 from identity_demo_console_store import ConsoleStore
@@ -93,183 +83,11 @@ class Config:
     jira_view_ca: str | None = None
 
 
-class Verifier:
-    """Use the maintained JWT library and only the configured issuer's keys."""
-
-    def __init__(
-        self, issuer: str, service: str | None = None, ca: str | None = None
-    ) -> None:
-        self.issuer = issuer
-        self.keys = FixedIssuerKeys(
-            (service or issuer) + "/protocol/openid-connect/certs",
-            ssl_context=ssl.create_default_context(cafile=ca),
-            timeout=5,
-        )
-
-    def __call__(self, token: str, audience: str) -> dict:
-        """Validate signature, issuer, recipient, expiry and required claims."""
-        if not isinstance(token, str) or not 1 <= len(token) <= 16_384:
-            raise Denied("invalid_token")
-        try:
-            key = self.keys.get_signing_key_from_jwt(token).key
-            return jwt.decode(
-                token,
-                key,
-                algorithms=["RS256"],
-                issuer=self.issuer,
-                audience=audience,
-                options={"require": ["exp", "iat", "iss", "sub", "aud"]},
-            )
-        except jwt.PyJWTError as error:
-            raise Denied("invalid_token") from error
-
-
-class NoIssuerRedirect(HTTPRedirectHandler):
-    """Never follow redirects while sending a login code or retrieving keys."""
-
-    def redirect_request(
-        self,
-        req: URLRequest,
-        fp: Any,
-        code: int,
-        msg: str,
-        headers: Any,
-        newurl: str,
-    ) -> None:
-        """Deny a redirect without exposing its location or request credentials."""
-        raise Denied("issuer_redirect")
-
-
-class FixedIssuerKeys(jwt.PyJWKClient):
-    """Keep PyJWT key refresh/cache behavior with bounded, redirect-free HTTPS."""
-
-    def fetch_data(self) -> dict:
-        """Read only the configured issuer; clear failed cache refreshes safely."""
-        value = None
-        try:
-            client = build_opener(
-                ProxyHandler({}),
-                HTTPSHandler(context=self.ssl_context),
-                NoIssuerRedirect(),
-            )
-            with client.open(URLRequest(self.uri), timeout=self.timeout) as response:
-                body = response.read(65_537)
-            if len(body) > 65_536:
-                raise Denied("issuer_response_size")
-            candidate = strict_json(body)
-            if not isinstance(candidate, dict) or not isinstance(candidate.get("keys"), list):
-                raise Denied("invalid_issuer_keys")
-            value = candidate
-            return value
-        except (HTTPError, URLError, TimeoutError, OSError, ValueError) as error:
-            raise Denied("issuer_unavailable") from error
-        finally:
-            if self.jwk_set_cache is not None:
-                self.jwk_set_cache.put(value)
-
-
-def exchange_code(endpoint: str, fields: bytes, ca: str | None) -> dict:
-    """Bound a fixed HTTPS token request with normal CA/name verification."""
-    client = build_opener(
-        ProxyHandler({}),
-        HTTPSHandler(context=ssl.create_default_context(cafile=ca)),
-        NoIssuerRedirect(),
-    )
-    try:
-        with client.open(
-            URLRequest(endpoint + "/protocol/openid-connect/token", data=fields),
-            timeout=8,
-        ) as response:
-            body = response.read(65_537)
-            if len(body) > 65_536:
-                raise Denied("issuer_response_size")
-            return strict_json(body)
-    except HTTPError as error:
-        raise Denied("login_exchange") from error
-    except (URLError, TimeoutError, OSError) as error:
-        raise Denied("issuer_unavailable") from error
-
-
-
-def end_issuer_session(endpoint: str, client_id: str, refresh_token: str, ca: str | None) -> bool:
-    """End this IdP session once; local sign-out never depends on the network."""
-    client = build_opener(ProxyHandler({}),
-        HTTPSHandler(context=ssl.create_default_context(cafile=ca)), NoIssuerRedirect())
-    try:
-        fields = urlencode({"client_id": client_id, "refresh_token": refresh_token}).encode()
-        with client.open(URLRequest(endpoint + "/protocol/openid-connect/logout", data=fields),
-                         timeout=8) as response:
-            response.read(1)
-            return response.status in (200, 204)
-    except (Denied, HTTPError, URLError, TimeoutError, OSError):
-        return False
-
-
-def safe_https(value: str) -> bool:
-    """Require a fixed clean HTTPS endpoint; never accept user-selected URLs."""
-    parsed = urlparse(value)
-    return (
-        parsed.scheme == "https"
-        and bool(parsed.hostname)
-        and not (parsed.username or parsed.password or parsed.query or parsed.fragment)
-    )
-
-
 def secret_matches(actual: str, expected: str) -> bool:
     """Compare credential bytes safely, including malformed non-ASCII input."""
     return secrets.compare_digest(actual.encode(), expected.encode())
 
 
-def prepare_storage(database: Path) -> None:
-    """Restore private modes after a PVC mount without replacing durable state."""
-    os.umask(0o077)
-    parent = database.parent
-    parent.mkdir(mode=0o700, exist_ok=True)
-    info = parent.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
-        raise ValueError("Owned private state directory required")
-    parent.chmod(0o700)
-    # SQLite uses these fixed sibling files, never user-selected paths.
-    for path in (
-        database,
-        Path(str(database) + "-journal"),
-        Path(str(database) + "-wal"),
-        Path(str(database) + "-shm"),
-    ):
-        try:
-            info = path.lstat()
-        except FileNotFoundError:
-            continue
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
-            raise ValueError("Owned regular state file required")
-        path.chmod(0o600)
-
-
-def peer_matches(claims: dict, headers: dict) -> bool:
-    """Check the sanitized TLS peer forwarded by the trusted bound gateway."""
-    peer = headers.get("x-forwarded-client-cert", "")
-    if not isinstance(peer, str) or len(peer) > 4096 or "\n" in peer or "\r" in peer:
-        return False
-    fields = {}
-    for part in peer.split(";"):
-        name, separator, value = part.partition("=")
-        if (
-            not separator
-            or name in fields
-            or name not in ("By", "Hash", "URI", "Subject", "Cert")
-        ):
-            return False
-        if name not in ("Subject", "Cert") and ("," in value or '"' in value):
-            return False
-        fields[name] = value
-    try:
-        thumb = claims["cnf"]["x5t#S256"]
-        if not isinstance(thumb, str) or len(thumb) != 43:
-            return False
-        digest = base64.b64decode(thumb + "=", altchars=b"-_", validate=True).hex()
-        return fields.get("Hash") == digest and fields.get("URI") == claims["azp"]
-    except (KeyError, ValueError, TypeError):
-        return False
 
 
 class Driver:
@@ -313,11 +131,7 @@ class Driver:
             )
         if type(config.stateless_login) is not bool:
             raise ValueError("Explicit stateless login flag required")
-        self.config, self.verify = (
-            config,
-            verifier
-            or Verifier(config.issuer, config.issuer_service, config.issuer_ca),
-        )
+        self.config = config
         if type(config.private_operator_api) is not bool:
             raise ValueError('Boolean private API configuration required')
         if config.private_operator_api:
@@ -340,10 +154,18 @@ class Driver:
         self.actions = RunService(self.store)
         self.console = ConsoleStore(self.store)
         self.store.recover_dispatched()
-        self.sessions: dict[str, dict] = {}
-        self.pending: dict[str, dict] = {}
-        from identity_demo_login_state import LoginState
-        self.login_state = LoginState()
+        self.authentication = OIDCSession(config, self.store, verifier)
+        # Concrete session mechanism, shared with the unrelated document host.
+        self.session = self.authentication.session
+        self.form = self.authentication.form
+        self.body = self.authentication.body
+        self.role = self.authentication.role
+        self.session_deadline = self.authentication.session_deadline
+        self.end_browser_session = self.authentication.end_browser_session
+        self.login = self.authentication.login
+        self.callback = self.authentication.callback
+        self.logout = self.authentication.logout
+        self.browser_session_cookie = self.authentication.browser_session_cookie
         self.tickets: dict[str, dict] = {}
         if len({c["workload"] for c in config.contexts}) != len(
             config.contexts
@@ -442,21 +264,46 @@ class Driver:
         configured=next((c for c in self.config.contexts if c['workload']==workload),None)
         return configured or self.console.context_for_workload(workload)
 
+    @property
+    def sessions(self):
+        return self.authentication.sessions
+
+    @sessions.setter
+    def sessions(self, value):
+        self.authentication.sessions = value
+
+    @property
+    def pending(self):
+        return self.authentication.pending
+
+    @property
+    def verify(self):
+        return self.authentication.verify
+
+    @verify.setter
+    def verify(self, value):
+        self.authentication.verify = value
+
+    async def json_fields(self, request, expected, *, limit, reason):
+        """Validate one bounded JSON shape after the caller's role check."""
+        data = strict_json(await self.body(request, limit))
+        if data.keys() != expected:
+            raise Denied(reason)
+        return data
+
     async def prepare_next(self, request: Request) -> Response:
         """Reserve fresh preparation without stopping or replacing the coordinator."""
         self.console_operator(request, 'preparer')
-        data = strict_json(await self.body(request, 1024))
-        if set(data) != {'owner'}:
-            raise Denied('console_fields')
+        data = await self.json_fields(request, {'owner'},
+            limit=1024, reason='console_fields')
         return JSONResponse({'preparation': self.console.prepare_next(data['owner'], self.config.contexts, self.config.project)},
                             headers={'Cache-Control': 'no-store'})
 
     async def prepare_finish(self, request: Request) -> Response:
         """Accept only a trusted provisioner's exact fresh native identity receipt."""
         self.console_operator(request, 'preparer')
-        data = strict_json(await self.body(request, 8192))
-        if set(data) != {'owner', 'id', 'context', 'receipt_sha256'}:
-            raise Denied('console_fields')
+        data = await self.json_fields(request, {'owner', 'id', 'context', 'receipt_sha256'},
+            limit=8192, reason='console_fields')
         context = data['context']
         with self.store.transaction() as db:
             reservation = db.execute('SELECT target FROM console_preparations WHERE id=? AND owner=?',
@@ -511,17 +358,6 @@ class Driver:
         """Expose readiness without run, session or credential information."""
         return JSONResponse({"ready": True, "execution_contexts_configured": bool(self.execution_contexts(active_only=True))})
 
-    def end_browser_session(self, identifier: str, session: dict) -> None:
-        """Remove local authority and revoke its runs without replaying dispatched writes."""
-        if self.sessions.get(identifier) is session:
-            self.sessions.pop(identifier)
-        for run in session.get("runs", ()):
-            self.store.revoke("run_id", run)
-
-    @staticmethod
-    def session_deadline(session: dict) -> int:
-        """Keep the bounded sliding browser lifetime distinct from run authority."""
-        return int(session.get("session_expires", session["claims"]["exp"]))
 
     def display_claims(self, session: dict) -> dict:
         """Use local lifetime only for presentation, never token verification or delegation."""
@@ -529,86 +365,6 @@ class Driver:
                 "session_refresh": "session_expires" in session,
                 "display_role": self.role(session["claims"])}
 
-    async def session(self, request: Request, *, minimum: int = 0, renew: bool = True, touch: bool = True, force: bool = False) -> dict:
-        """Renew only trusted backend credentials; never extend a registered run."""
-        identifier = request.cookies.get(COOKIE, "")
-        session = self.sessions.get(identifier)
-        now = time.time()
-        if session is None:
-            raise Denied("login_required")
-        if (self.session_deadline(session) <= now
-                or session.get("last_activity", now) + SESSION_IDLE_SECONDS <= now):
-            self.end_browser_session(identifier, session)
-            raise Denied("login_required")
-        if "session_expires" not in session:
-            return session  # Existing non-refreshable headless/fixture session.
-        lock = session.setdefault("refresh_lock", asyncio.Lock())
-        async with lock:
-            now = time.time()
-            if self.sessions.get(identifier) is not session:
-                raise Denied("login_required")
-            if (self.session_deadline(session) <= now
-                    or session.get("last_activity", now) + SESSION_IDLE_SECONDS <= now):
-                self.end_browser_session(identifier, session)
-                raise Denied("login_required")
-            if renew and (force or session["claims"]["exp"] <= now + max(minimum, REFRESH_MARGIN_SECONDS)
-                          or session.get("refresh_expires", 0) <= now + REFRESH_MARGIN_SECONDS):
-                try:
-                    if session.get("refresh_expires", 0) <= now:
-                        raise Denied("login_required")
-                    fields = urlencode({"grant_type": "refresh_token", "client_id": self.config.client,
-                                        "refresh_token": session["refresh_token"]}).encode()
-                    tokens = await run_in_threadpool(exchange_code,
-                        self.config.issuer_service or self.config.issuer, fields, self.config.issuer_ca)
-                    claims = await run_in_threadpool(self.verify, tokens["access_token"], self.config.client)
-                    old = session["claims"]
-                    if (claims["iss"] != old["iss"] or claims["sub"] != old["sub"]
-                            or claims.get("azp") != self.config.client
-                            or self.role(claims) != self.role(old)
-                            or (old.get("sid") and claims.get("sid") != old["sid"])
-                            or claims["exp"] <= time.time() + REFRESH_MARGIN_SECONDS):
-                        raise Denied("login_binding")
-                    if "id_token" in tokens:
-                        identity = await run_in_threadpool(self.verify, tokens["id_token"], self.config.client)
-                        if identity["sub"] != claims["sub"] or (old.get("sid") and identity.get("sid") != old["sid"]):
-                            raise Denied("login_binding")
-                    refresh = tokens.get("refresh_token", session["refresh_token"])
-                    lifetime = tokens.get("refresh_expires_in")
-                    if (not isinstance(refresh, str) or not 1 <= len(refresh) <= 16384
-                            or type(lifetime) is not int or lifetime <= 0):
-                        raise Denied("login_binding")
-                    if (self.sessions.get(identifier) is not session
-                            or self.session_deadline(session) <= time.time()
-                            or session.get("last_activity", time.time()) + SESSION_IDLE_SECONDS <= time.time()):
-                        raise Denied("login_required")
-                    # A response lost after rotation must never be blindly replayed.
-                    session.update(claims=claims, token=tokens["access_token"],
-                        refresh_token=refresh, refresh_expires=min(session["absolute_expires"], int(time.time()) + lifetime))
-                except asyncio.CancelledError:
-                    self.end_browser_session(identifier, session)
-                    raise
-                except Exception:
-                    self.end_browser_session(identifier, session)
-                    raise Denied("session_renewal_required") from None
-            # Passive polling may renew tokens but cannot keep an idle browser alive forever.
-            if touch and not request.url.path.endswith("/live"):
-                session["last_activity"] = time.time()
-            session["session_expires"] = min(session["absolute_expires"], session["refresh_expires"],
-                int(session["last_activity"] + SESSION_IDLE_SECONDS))
-            request.state.browser_session = (identifier, session)
-        return session
-
-    async def browser_session_cookie(self, request: Request, call_next: Callable) -> Response:
-        """Renew only an authenticated opaque cookie, bounded by server-side expiry."""
-        response = await call_next(request)
-        binding = getattr(request.state, "browser_session", None)
-        if binding is not None:
-            identifier, session = binding
-            remaining = int(self.session_deadline(session) - time.time())
-            if self.sessions.get(identifier) is session and remaining > 0:
-                response.set_cookie(COOKIE, identifier, path="/", secure=True,
-                    httponly=True, samesite="lax", max_age=remaining)
-        return response
 
     @staticmethod
     def internal(request: Request, secret: str) -> None:
@@ -617,35 +373,6 @@ class Driver:
         if not secret_matches(received, "Bearer " + secret):
             raise Denied("internal_authentication")
 
-    async def body(self, request: Request, limit: int = 131_072) -> bytes:
-        """Bound the actual incoming stream even without Content-Length."""
-        result = bytearray()
-        async for chunk in request.stream():
-            result.extend(chunk)
-            if len(result) > limit:
-                raise Denied("request_size")
-        return bytes(result)
-
-    async def form(self, request: Request, *, renew: bool = True) -> tuple[dict, dict]:
-        """Check exact Origin, session CSRF and duplicate-free bounded form fields."""
-        session = await self.session(request, renew=False, touch=False)
-        if request.headers.get("origin") != self.config.origin:
-            raise Denied("csrf_origin")
-        try:
-            fields = parse_qs(
-                (await self.body(request, 8192)).decode(),
-                strict_parsing=True,
-                max_num_fields=12,
-            )
-        except (ValueError, UnicodeError) as error:
-            raise Denied("invalid_form") from error
-        if any(len(v) != 1 for v in fields.values()):
-            raise Denied("duplicate_field")
-        values = {k: v[0] for k, v in fields.items()}
-        if not secret_matches(values.pop("csrf", ""), session["csrf"]):
-            raise Denied("csrf_token")
-        session = await self.session(request, renew=renew)
-        return session, values
 
     def page(self, content: str, *, user: str = "", active: str = "Workflows",
              presentation: bool = False, refresh: bool = False, csrf: str = "", status_code: int = 200, live_url: str = "", live_kind: str = "run", session_deadline: int = 0) -> HTMLResponse:
@@ -801,186 +528,6 @@ class Driver:
                                     requested_by=session['claims']['sub'])
         return RedirectResponse('/settings', status_code=303)
 
-    async def logout(self, request: Request) -> Response:
-        """Revoke local run authority and end this IdP session without exposing credentials."""
-        session, fields = await self.form(request, renew=False)
-        if fields:
-            raise Denied("logout_fields")
-        identifier = request.cookies.get(COOKIE, "")
-        async with session.setdefault("refresh_lock", asyncio.Lock()):
-            self.end_browser_session(identifier, session)
-            if session.get("refresh_token"):
-                await run_in_threadpool(end_issuer_session,
-                    self.config.issuer_service or self.config.issuer, self.config.client,
-                    session["refresh_token"], self.config.issuer_ca)
-        response = RedirectResponse("/", status_code=303)
-        response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="lax")
-        response.headers["Cache-Control"] = "no-store"
-        return response
-
-    async def login(self, request: Request) -> Response:
-        """Start real Authorization Code + PKCE with single-use state and nonce."""
-        now = time.time()
-        self.pending = {k: v for k, v in self.pending.items() if v["expires"] > now}
-        self.sessions = {
-            k: v for k, v in self.sessions.items()
-            if self.session_deadline(v) > now and v.get("last_activity", now) + SESSION_IDLE_SECONDS > now
-        }
-        if (not self.config.stateless_login and len(self.pending) >= 32) or len(self.sessions) >= 32:
-            return JSONResponse({"reason": "login_capacity"}, status_code=503)
-        state, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(3))
-        pending = {"nonce": nonce, "verifier": verifier, "expires": now + 300}
-        if not self.config.stateless_login:
-            self.pending[state] = pending
-        state_cookie = self.login_state.issue(state, nonce, verifier) if self.config.stateless_login else state
-        query = urlencode(
-            {
-                "client_id": self.config.client,
-                "response_type": "code",
-                "scope": "openid",
-                "redirect_uri": self.config.origin + "/callback",
-                "state": state,
-                "nonce": nonce,
-                "code_challenge": base64.urlsafe_b64encode(
-                    hashlib.sha256(verifier.encode()).digest()
-                )
-                .decode()
-                .rstrip("="),
-                "code_challenge_method": "S256",
-                "prompt": "login",
-            }
-        )
-        response = RedirectResponse(
-            self.config.issuer + "/protocol/openid-connect/auth?" + query,
-            status_code=302,
-        )
-        response.set_cookie(
-            STATE_COOKIE,
-            state_cookie,
-            secure=True,
-            httponly=True,
-            samesite="lax",
-            max_age=300,
-            path="/",
-        )
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        return response
-
-    async def callback(self, request: Request) -> Response:
-        """Exchange one code and verify ID nonce plus both signed token recipients."""
-        params = parse_qs(request.url.query, max_num_fields=10)
-        if (
-            any(len(v) != 1 for v in params.values())
-            or "code" not in params
-            or "state" not in params
-        ):
-            raise Denied("login_state")
-        state = params["state"][0]
-        pending = (self.login_state.consume(request.cookies.get(STATE_COOKIE, ''), state)
-                   if self.config.stateless_login else self.pending.pop(state, None))
-        if (
-            pending is None
-            or pending["expires"] <= time.time()
-            or (not self.config.stateless_login and not secret_matches(request.cookies.get(STATE_COOKIE, ""), state))
-        ):
-            raise Denied("login_state")
-        fields = urlencode(
-            {
-                "grant_type": "authorization_code",
-                "client_id": self.config.client,
-                "redirect_uri": self.config.origin + "/callback",
-                "code": params["code"][0],
-                "code_verifier": pending["verifier"],
-            }
-        ).encode()
-        tokens = await run_in_threadpool(
-            exchange_code,
-            self.config.issuer_service or self.config.issuer,
-            fields,
-            self.config.issuer_ca,
-        )
-        if (not isinstance(tokens, dict) or not isinstance(tokens.get("access_token"), str)
-                or not isinstance(tokens.get("id_token"), str)):
-            raise Denied("login_exchange")
-        claims = await run_in_threadpool(
-            self.verify, tokens["access_token"], self.config.client
-        )
-        identity = await run_in_threadpool(
-            self.verify, tokens["id_token"], self.config.client
-        )
-        if (
-            identity.get("nonce") != pending["nonce"]
-            or claims["sub"] != identity["sub"]
-            or claims.get("azp") != self.config.client
-        ):
-            raise Denied("login_binding")
-        self.role(claims)
-        if len(self.sessions) >= 32:
-            raise Denied('session_capacity')
-        identifier = secrets.token_urlsafe(32)
-        self.sessions[identifier] = {
-            "claims": claims,
-            "token": tokens["access_token"],
-            "csrf": secrets.token_urlsafe(32),
-        }
-        session = self.sessions[identifier]
-        refresh = tokens.get("refresh_token")
-        lifetime = tokens.get("refresh_expires_in")
-        if refresh is not None:
-            if not isinstance(refresh, str) or not 1 <= len(refresh) <= 16384 or type(lifetime) is not int or lifetime <= 0:
-                self.sessions.pop(identifier)
-                raise Denied("login_binding")
-            now = time.time()
-            absolute = int(now) + SESSION_MAX_SECONDS
-            refresh_expires = min(absolute, int(now) + lifetime)
-            session.update(refresh_token=refresh, refresh_expires=refresh_expires,
-                absolute_expires=absolute, session_expires=min(refresh_expires, int(now) + SESSION_IDLE_SECONDS),
-                last_activity=now)
-        # Replace this browser's old cookie. Preserve only the same owner's original grants.
-        previous_id = request.cookies.get(COOKIE, "")
-        previous = self.sessions.get(previous_id)
-        if previous:
-            async with previous.setdefault("refresh_lock", asyncio.Lock()):
-                if self.sessions.get(previous_id) is previous:
-                    if (previous["claims"]["iss"] == claims["iss"] and previous["claims"]["sub"] == claims["sub"]
-                            and self.role(previous["claims"]) == self.role(claims)):
-                        session["runs"] = previous.get("runs", set()).copy()
-                        session["run_credentials"] = previous.get("run_credentials", {}).copy()
-                        for run in session["runs"]:
-                            session["run_credentials"].setdefault(run, {
-                                "claims": json.loads(json.dumps(previous["claims"])), "token": previous["token"],
-                                "expires_at": self.store.describe(run, previous["claims"]["sub"])["run"]["expires"]})
-                        self.sessions.pop(previous_id, None)
-                    else:
-                        self.end_browser_session(previous_id, previous)
-        response = RedirectResponse("/", status_code=303)
-        response.set_cookie(
-            COOKIE,
-            identifier,
-            secure=True,
-            httponly=True,
-            samesite="lax",
-            path="/",
-            max_age=max(1, int(self.session_deadline(session) - time.time())),
-        )
-        response.delete_cookie(
-            STATE_COOKIE, secure=True, httponly=True, samesite="lax", path="/"
-        )
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        return response
-
-    @staticmethod
-    def role(claims: dict) -> str:
-        """Accept only one approved human role from the verified token."""
-        roles = set(claims.get("realm_access", {}).get("roles", [])) & {
-            "analyst",
-            "viewer",
-        }
-        if len(roles) != 1:
-            raise Denied("user_role")
-        return roles.pop()
 
     def register_run(self, claims: dict, context: dict, *, queue_workflow: str | None = None, expires_at: int | None = None) -> str:
         """Bind validated human claims to an operator-controlled execution context."""
@@ -1282,18 +829,16 @@ class Driver:
     async def console_review_recovery(self, request: Request) -> Response:
         """Require existing operator authentication and a retained reconciliation receipt."""
         self.console_operator(request, 'operator')
-        data = strict_json(await self.body(request, 2048))
-        if set(data) != {'run_id', 'receipt_sha256'}:
-            raise Denied('console_fields')
+        data = await self.json_fields(request, {'run_id', 'receipt_sha256'},
+            limit=2048, reason='console_fields')
         self.console.review_recovery(data['run_id'], data['receipt_sha256'])
         return JSONResponse({'recorded':True}, headers={'Cache-Control':'no-store'})
 
     async def console_next(self, request: Request) -> Response:
         """Claim one browser-created run; no browser controls execution identifiers."""
         self.console_operator(request)
-        data = strict_json(await self.body(request, 1024))
-        if data.keys() != {"worker"}:
-            raise Denied("console_fields")
+        data = await self.json_fields(request, {'worker'},
+            limit=1024, reason='console_fields')
         job = self.console.claim(data["worker"])
         if job:
             context = self.context_for_workload(job["workload"])
@@ -1305,9 +850,8 @@ class Driver:
     async def console_update(self, request: Request) -> Response:
         """Persist allowlisted observations for an exactly claimed execution."""
         self.console_operator(request)
-        data = strict_json(await self.body(request, 8192))
-        if data.keys() != {"run_id", "worker", "stage", "evidence"}:
-            raise Denied("console_fields")
+        data = await self.json_fields(request, {'run_id', 'worker', 'stage', 'evidence'},
+            limit=8192, reason='console_fields')
         self.console.update(data["run_id"], data["worker"], data["stage"], data["evidence"])
         return JSONResponse({"recorded": True})
 
@@ -1337,9 +881,8 @@ class Driver:
     async def operator_run(self, request: Request) -> Response:
         """Bind a real login to a preverified context for headless acceptance only."""
         self.internal(request, self.config.operator_secret)
-        data = strict_json(await self.body(request, 65_536))
-        if data.keys() != {"access_token", "workload"}:
-            raise Denied("operator_fields")
+        data = await self.json_fields(request, {'access_token', 'workload'},
+            limit=65536, reason='operator_fields')
         claims = await run_in_threadpool(
             self.verify, data["access_token"], self.config.client
         )
@@ -1372,9 +915,8 @@ class Driver:
     async def report(self, request: Request) -> Response:
         """Accept the actual workload report/proposal only from trusted coordination."""
         self.execution_operator(request)
-        data = strict_json(await self.body(request, 65_536))
-        if data.keys() != {"run_id", "user", "workload", "assessment", "arguments"}:
-            raise Denied("operator_fields")
+        data = await self.json_fields(request, {'run_id', 'user', 'workload', 'assessment', 'arguments'},
+            limit=65536, reason='operator_fields')
         run = self.store.identity_run(data["user"], data["workload"])
         if run["id"] != data["run_id"]:
             raise Denied("run_binding")
@@ -1429,9 +971,8 @@ class Driver:
     async def adapter_ticket(self, request: Request) -> tuple[dict, str]:
         """Resolve an expiring decision and match the actual upstream body."""
         self.internal(request, self.config.adapter_secret)
-        data = strict_json(await self.body(request))
-        if data.keys() != {"decision_ticket", "actual_body"}:
-            raise Denied("adapter_fields")
+        data = await self.json_fields(request, {'decision_ticket', 'actual_body'},
+            limit=65_536, reason='adapter_fields')
         if not isinstance(data["decision_ticket"], str):
             raise Denied("decision_expired")
         ticket = self.tickets.get(data["decision_ticket"])
@@ -1502,9 +1043,8 @@ class Driver:
     async def finish(self, request: Request) -> Response:
         """Only the scoped adapter may record a claimed backend result."""
         self.internal(request, self.config.adapter_secret)
-        data = strict_json(await self.body(request, 8192))
-        if data.keys() != {"run_id", "action_id", "execution_id", "state", "issue_key"}:
-            raise Denied("adapter_fields")
+        data = await self.json_fields(request, {'run_id', 'action_id', 'execution_id', 'state', 'issue_key'},
+            limit=8192, reason='adapter_fields')
         self.store.finish(
             data["run_id"],
             data["action_id"],
@@ -1517,9 +1057,8 @@ class Driver:
     async def reconciliation(self, request: Request) -> Response:
         """Allow only the scoped trusted adapter to inspect uncertain dispatch state."""
         self.internal(request, self.config.adapter_secret)
-        data = strict_json(await self.body(request, 8192))
-        if data.keys() != {"run_id", "action_id"}:
-            raise Denied("adapter_fields")
+        data = await self.json_fields(request, {'run_id', 'action_id'},
+            limit=8192, reason='adapter_fields')
         return JSONResponse(
             self.store.reconciliation(data["run_id"], data["action_id"])
         )
@@ -1527,15 +1066,8 @@ class Driver:
     async def reconcile(self, request: Request) -> Response:
         """Record a positive backend read; cancellation never authorizes another write."""
         self.internal(request, self.config.adapter_secret)
-        data = strict_json(await self.body(request, 16384))
-        if data.keys() != {
-            "run_id",
-            "action_id",
-            "execution_id",
-            "issue_key",
-            "arguments",
-        }:
-            raise Denied("adapter_fields")
+        data = await self.json_fields(request, {'run_id', 'action_id', 'execution_id', 'issue_key', 'arguments'},
+            limit=16384, reason='adapter_fields')
         self.store.reconcile(
             data["run_id"],
             data["action_id"],
@@ -1557,13 +1089,8 @@ class Driver:
             claims = await run_in_threadpool(
                 self.verify, header[7:], self.config.audience
             )
-            now = time.time()
-            if (
-                not claims["iat"] <= now < claims["exp"]
-                or claims["exp"] - claims["iat"] > 30
-                or not peer_matches(claims, http["headers"])
-            ):
-                raise Denied("sender_binding")
+            if not valid_delegation(claims):
+                raise Denied("delegation_contract")
             run = self.store.identity_run(claims["sub"], claims["azp"])
             if self.role(claims) != run["user_role"]:
                 raise Denied("user_permission")

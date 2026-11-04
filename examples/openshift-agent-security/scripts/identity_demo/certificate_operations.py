@@ -287,17 +287,6 @@ def prepare(args, profile, inputs):
     old_ca = base64.b64decode(inputs['data']['management-ca.crt'], validate=True).decode()
     if hashlib.sha256(old_ca.encode()).hexdigest() != args.certificate_management['ca_sha256']:
         raise ValueError('CA rollover requires reviewed overlap and native trust repackaging')
-    reference = json.loads(base64.b64decode(inputs['data']['sender-trust.receipt.json'], validate=True))
-    observation = read(args, 'configmap', 'fixture-console-sender-trust', profile.core_namespace)
-    from cluster_console_trust import observation_reference
-    observation_reference(inputs, observation, profile)
-    observed = json.loads(observation['data']['observation.json'])
-    trust = read(args, 'secret', managed.SPIRE_TRUST, profile.core_namespace)
-    setup.owned(trust, profile)
-    if (reference.get('automatic_public_refresh') is not True
-            or trust['metadata']['uid'] != observed.get('listener_ca_uid')
-            or trust.get('type') != 'Opaque' or set(trust.get('data', {})) != {'ca.crt'}):
-        raise ValueError('Recorded separate public SPIRE trust required before migration')
     before = []
     for name, expected in managed.targets(profile).items():
         old = read(args, 'secret', name, profile.core_namespace)
@@ -329,9 +318,7 @@ def prepare(args, profile, inputs):
             raise ValueError('Certificate collision; inspect pending receipt rather than replay')
         setup.kube(args, 'create', '--dry-run=server', '-f', '-', '-o', 'json', value=obj)
     plan = {'authority': authority, 'before': before, 'objects': objects, 'public_trust': public,
-            'gateway_before': gateway, 'gateway_after': after_gateway,
-            'spire_trust_uid': trust['metadata']['uid'], 'spire_trust_data': trust['data'],
-            'observation_uid': observation['metadata']['uid'], 'observation_data': observation['data']}
+            'gateway_before': gateway, 'gateway_after': after_gateway}
     setup.write(args.output_dir / 'certificate-migration.plan.private.json', plan)
     return plan
 
@@ -346,13 +333,6 @@ def apply(args, profile, planned):
         raise ValueError('Fenced certain idle maintenance required')
     if preflight(args) != planned['authority']:
         raise ValueError('Issuer changed during drain; retain maintenance stop')
-    observation = read(args, 'configmap', 'fixture-console-sender-trust', profile.core_namespace)
-    if (observation['metadata']['uid'] != planned['observation_uid']
-            or observation['data'] != planned['observation_data']):
-        raise ValueError('Recorded trust observation changed during drain')
-    trust = read(args, 'secret', managed.SPIRE_TRUST, profile.core_namespace)
-    if trust['metadata']['uid'] != planned['spire_trust_uid'] or trust['data'] != planned['spire_trust_data']:
-        raise ValueError('SPIRE trust changed during drain')
     for old in planned['before']:
         live = read(args, 'secret', old['metadata']['name'], profile.core_namespace)
         if live['metadata']['uid'] != old['metadata']['uid'] or setup.fingerprint(live) != setup.fingerprint(old):

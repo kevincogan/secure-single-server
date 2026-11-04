@@ -16,11 +16,41 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import stat
 import time
 from typing import Iterator
 from uuid import UUID, uuid4
 
 from agent_security_contracts import ConnectorContract, Denied, strict_json, tool_arguments
+
+
+
+def prepare_storage(database: Path) -> None:
+    """Restore private modes after a PVC mount without replacing durable state."""
+    os.umask(0o077)
+    parent = database.parent
+    parent.mkdir(mode=0o700, exist_ok=True)
+    info = parent.lstat()
+    groups = {os.getgid(), *os.getgroups()}
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_gid not in groups or info.st_mode & 0o007):
+        raise ValueError("Owned private state directory required")
+    parent.chmod(0o700)
+    # SQLite uses these fixed sibling files, never user-selected paths.
+    for path in (
+        database,
+        Path(str(database) + "-journal"),
+        Path(str(database) + "-wal"),
+        Path(str(database) + "-shm"),
+    ):
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            continue
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_gid not in groups or info.st_mode & 0o007):
+            raise ValueError("Owned regular state file required")
+        path.chmod(0o600)
 
 
 class RunStore:

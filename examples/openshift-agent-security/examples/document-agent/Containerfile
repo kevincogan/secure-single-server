@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+# BASE_RUNTIME must be the completed, digest-pinned candidate runtime build.
+ARG BASE_RUNTIME
+FROM ${BASE_RUNTIME}
+USER 0
+RUN rm -rf /app /usr/local/bin/oc /usr/local/bin/openshell && mkdir -p /app/document-agent && ln -s /usr/bin/python3.12 /usr/bin/python
+COPY agent_security_runtime-0.1.0-py3-none-any.whl /tmp/agent_security_runtime-0.1.0-py3-none-any.whl
+RUN python3.12 -m pip install --no-index --no-deps /tmp/agent_security_runtime-0.1.0-py3-none-any.whl && rm /tmp/agent_security_runtime-0.1.0-py3-none-any.whl
+COPY source/ /app/document-agent/
+RUN chmod -R a+rX /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app/document-agent HOME=/tmp
+USER 1001
+WORKDIR /app/document-agent
+ENTRYPOINT []

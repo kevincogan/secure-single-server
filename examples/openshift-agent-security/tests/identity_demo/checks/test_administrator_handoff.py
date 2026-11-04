@@ -18,13 +18,9 @@ from checks.test_cluster_installer_session import config
 from deployment_profile import LEGACY
 
 
-def shared_role():
-    return next(
-        o
-        for o in permissions(LEGACY, "fixture-step4-read-route-catalog")
-        if o["kind"] == "Role"
-        and o["metadata"].get("namespace") == LEGACY.identity_namespace
-    )
+def shared_policy():
+    from identity_demo_setup import discovery_policy
+    return discovery_policy(LEGACY)
 
 
 def original(args, tmp_path, desired, *, age=0):
@@ -52,12 +48,12 @@ def original(args, tmp_path, desired, *, age=0):
 
 
 @pytest.mark.parametrize(
-    "fault", [None, "expired", "future", "changed-rules", "different-identity"]
+    "fault", [None, "expired", "future", "changed-policy", "different-identity"]
 )
 def test_scoped_installer_uses_only_recent_exact_administrator_observation(
     tmp_path, monkeypatch, fault
 ):
-    obj = shared_role()
+    obj = shared_policy()
     args = SimpleNamespace(
         profile=LEGACY,
         installer_service_account=LEGACY.core_namespace + ":fixture-installer",
@@ -73,8 +69,8 @@ def test_scoped_installer_uses_only_recent_exact_administrator_observation(
         "kube",
         lambda *a, **k: pytest.fail("No shared RBAC API access is granted"),
     )
-    if fault == "changed-rules":
-        obj["rules"][0]["verbs"].append("create")
+    if fault == "changed-policy":
+        obj["spec"]["policyTypes"].append("Egress")
     elif fault == "different-identity":
         obj["metadata"]["name"] = "foreign-role"
     if fault:
@@ -85,7 +81,7 @@ def test_scoped_installer_uses_only_recent_exact_administrator_observation(
 
 
 def test_legacy_administrator_still_observes_live_configuration(monkeypatch):
-    obj = shared_role()
+    obj = shared_policy()
     called = []
     monkeypatch.setattr(
         setup, "kube", lambda *a, **k: called.append(a) or {"live": True}
@@ -94,31 +90,18 @@ def test_legacy_administrator_still_observes_live_configuration(monkeypatch):
     assert called and "get" in called[0]
 
 
-def test_installer_shared_spire_role_has_exact_approved_public_read():
+def test_installer_does_not_receive_retired_shared_public_trust_authority():
     bundle, artifacts = source()
-    obj = shared_role()
-    resources = authority(
-        LEGACY,
-        bundle["objects"],
-        [obj],
-        artifacts,
-        "registry.example/worker@sha256:" + "a" * 64,
-        config(),
-    )
-    role = next(
-        o
-        for o in resources
-        if o["kind"] == "Role"
-        and o["metadata"].get("namespace") == LEGACY.identity_namespace
-    )
-    assert role["rules"] == [
-        {
-            "apiGroups": [""],
-            "resources": ["configmaps"],
-            "resourceNames": ["spire-bundle"],
-            "verbs": ["get"],
-        }
-    ]
+    resources = authority(LEGACY, bundle['objects'], [shared_policy()], artifacts,
+        'registry.example/worker@sha256:'+'a'*64, config())
+    assert not any(o['kind'] in ('Role','RoleBinding') and
+        o['metadata'].get('namespace')==LEGACY.identity_namespace for o in resources)
+    retired={'apiVersion':'rbac.authorization.k8s.io/v1','kind':'Role',
+        'metadata':{'name':'fixture-console-coordinator-public-trust-'+LEGACY.installation_id,
+                    'namespace':LEGACY.identity_namespace},'rules':[]}
+    with pytest.raises(ValueError,match='Unapproved shared prerequisite'):
+        authority(LEGACY, bundle['objects'], [retired], artifacts,
+            'registry.example/worker@sha256:'+'a'*64, config())
 
 
 def test_prerequisite_handoff_accepts_actual_runtime_publication_format(tmp_path):

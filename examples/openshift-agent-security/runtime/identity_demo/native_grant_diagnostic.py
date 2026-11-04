@@ -8,7 +8,7 @@ import base64
 from urllib.parse import unquote
 
 from execution_context import context_of
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 import native_subject_boundary as subject
 
 
@@ -49,7 +49,7 @@ def diagnose(args: argparse.Namespace, human: dict) -> dict:
     This diagnostic does not retry a tool call, contact Jira or change a run.
     Raw responses stay private; a passing diagnostic cannot override a failed read.
     """
-    diagnostic = SenderAcceptance(args, human)
+    diagnostic = DelegationAcceptance(args, human)
     assertion = diagnostic.fetch("jwt")["token"]
     context = context_of(args)
     with diagnostic.tunnel("fixture-openshell", 19445, 8080):

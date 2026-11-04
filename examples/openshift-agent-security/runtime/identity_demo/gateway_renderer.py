@@ -92,7 +92,7 @@ def render(ca, secret, run, credential, inputs, *, action_driver, enable_create)
         raise ValueError("Unexpected router transport; refuse copy")
     # The installed extension puts ext_proc first. It can initialize a
     # backend before frontend authorization, converting viewer denial to
-    # 500. On the owned mTLS listener, authorize the original JWT/run/peer
+    # 500. On the owned HTTPS listener, authorize the verified JWT/run/workload
     # before MCP routing, then mediate credentials on the rewritten route.
     patches = router_patches(patches[0])
     router = route.resource(
@@ -140,7 +140,7 @@ def render(ca, secret, run, credential, inputs, *, action_driver, enable_create)
     )
     registration["metadata"]["name"] = route.READ_NAME
     values.extend([grant, trust, registration])
-    from sender_listener import HOST
+    from protected_listener import HOST
 
     gateway = inputs['gateway']
     desired = deepcopy(gateway["spec"])

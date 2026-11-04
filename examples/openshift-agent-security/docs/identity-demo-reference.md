@@ -23,9 +23,11 @@ the agent inside the exact registered OpenShell sandbox. SPIRE attests the
 sandbox supervisor and supplies its short-lived workload identity.
 
 The native path exchanges the user's delegated credential in two stages. The
-final access token is bound to the supervisor certificate presented on the MCP
-connection. The protected path checks issuer/signature, audience, certificate
-binding, workload, user, project, run expiry/cancellation and exact consent.
+final access token is a bearer grant with a maximum 30-second lifetime. The
+protected path checks issuer/signature, audience, workload, user, project, run
+expiry/cancellation and exact consent. Copying a current grant permits replay
+within its remaining authority; TLS and expiry do not provide sender constraint.
+Adoption requires deployed custody/bypass tests and explicit residual-risk review.
 
 The agent can read permitted Jira context and propose content. It cannot choose
 its identity, permissions, credential, approval or write authority. The LLM sees
@@ -38,7 +40,7 @@ The console's moving diagram projects recorded milestones and tool responses.
 It is a logical architecture view, not a packet capture. Agent activity shows
 observable model turns and reads; it does not expose private model reasoning.
 
-Relevant design references are [certificate-bound OAuth tokens (RFC 8705)](https://www.rfc-editor.org/rfc/rfc8705.html),
+Relevant design references are [OAuth token exchange (RFC 8693)](https://www.rfc-editor.org/rfc/rfc8693.html),
 [MCP authorization](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization)
 and [Kubernetes projected ServiceAccount tokens](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/).
 Implementation conformance and vendor support still require the recorded release reviews.
@@ -99,8 +101,8 @@ below remain the recovery and inspection interface.
 The connected installer creates owned application components on a prepared
 OpenShift platform. OpenShift, RHOAI and shared controllers are platform-team
 prerequisites; this installer does not install or upgrade them. Native
-images must match the selected endpoints, identity domain and generated public CA;
-a new namespace alone does not make a compiled sender portable.
+images must match the reviewed native identity-exchange contract and approved
+public TLS roots. Application endpoints and trust domain are validated configuration.
 Review [scope and release requirements](identity-demo-reference.md).
 
 ## Deployable stack
@@ -183,7 +185,6 @@ Prepare a private JSON file outside Git with these fields:
   "artifacts_file": "/absolute/private/path/artifacts.json",
   "public_trust": {
     "service_ca": "/absolute/private/path/service-ca.pem",
-    "spire_ca": "/absolute/private/path/spire-ca.pem",
     "upstream_ca_bundle": "/absolute/private/path/approved-upstream-roots.pem"
   },
   "kubernetes_api_cidrs": ["192.0.2.1/32"]
@@ -238,8 +239,8 @@ For operator commands against a new installation, set `IDENTITY_DEMO_CONFIG` to
 the rendered absolute profile path. The new application mounts that profile
 read-only. Portability of every historical diagnostic helper is not yet complete;
 do not run a legacy command against a new installation without checking its
-scope. Native sender images must be rebuilt for the exact host, token endpoint,
-audiences and trust domain. The artifact lock must record the matching
+scope. Configure exact hosts, token endpoints, audiences and trust domain, and
+repackage native images when approved TLS roots change. The artifact lock must record the matching
 `native_build_contract`; installation refuses an unmatched source bundle.
 
 The source templates create a `fixture-jira-data` PVC and independent credentials.
@@ -623,6 +624,14 @@ driver state before driver removal and uses UID/version DeleteOptions. It retain
 namespaces, Secrets, PVCs and Jira. Retire native contexts with the execution helper
 before removing their gateway; shared controllers/identity foundation remain untouched.
 
+For a separately authorized removal of disposable namespaces, first delete the
+recorded MCPGatewayExtension and wait for it to disappear while its namespace and
+configuration Secret still exist. The pinned MCP controller clears that Secret
+when finalizing the extension. Deleting the namespace first can remove the Secret
+and leave finalization trying to recreate content in a terminating namespace.
+Keep the original receipts and review exact cleanup dependencies on interruption;
+never strip namespace finalizers or change shared controllers to force progress.
+
 ```bash
 PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_setup.py \
   cleanup --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
@@ -756,23 +765,12 @@ Install the operator dependencies in a private virtual environment using both
 `tests/identity_demo/requirements-operator.txt`. Browser rehearsal uses installed
 Google Chrome; Playwright is not deployed to the cluster.
 
-Before allocating a run, reconcile the current SPIRE public CA bundle with the
-owned Keycloak client trust and bound MCP listener using
-`scripts/identity_demo/identity_demo_sender_trust.py`. Run in plan mode first with a fresh
-private output directory; if the bundle changed, repeat with `--apply` and a
-different directory, then wait for `fixture-keycloak-upstream` rollout. This
-manual step is required after authority rotation in legacy/direct installations.
-Cluster installations using the Setup guide's public-trust opt-in instead refresh
-their two public CA copies automatically while idle. Do not restart Jira. Refresh the catalog-only credential with
-`scripts/identity_demo/identity_demo_adapter_catalog.py --action rotate`; it must have at least
-600 seconds remaining before a rehearsal starts.
+Before allocating a run, verify managed serving certificates and the configured
+issuer/discovery keys. Delegated calls do not require a copied SPIRE X.509 CA or
+client-certificate trust reconciliation. Refresh the catalog-only credential; it
+must have at least 600 seconds remaining before a rehearsal starts.
 
 ```bash
-mkdir -m 700 "$DEMO_PRIVATE_ROOT/trust-check-new"
-PYTHONPATH=scripts/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_sender_trust.py \
-  --kubeconfig "$DEMO_KUBECONFIG" --expected-server "$DEMO_SERVER" \
-  --credentials-file "$DEMO_FIXTURE_CREDENTIALS" \
-  --output-dir "$DEMO_PRIVATE_ROOT/trust-check-new"
 PYTHONPATH=scripts/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_demo_adapter_catalog.py \
   --action rotate --kubeconfig "$DEMO_KUBECONFIG" \
   --expected-server "$DEMO_SERVER" \
@@ -781,9 +779,7 @@ PYTHONPATH=scripts/identity_demo "$DEMO_PYTHON" scripts/identity_demo/identity_d
 export DEMO_CATALOG_CREDENTIAL="$DEMO_PRIVATE_ROOT/catalog-new.private.json"
 ```
 
-Use unused output names. If trust needs reconciliation, repeat the first command
-with `--apply` and a different output directory before creating a run. Wait for
-the owned issuer rollout if reported. Catalog rotation allows at most two live
+Use unused output names. Catalog rotation allows at most two live
 credentials; if both slots are occupied, use `--action revoke` with the exact old
 private credential file and a fresh receipt before issuing another. Revocation
 does not remove run/action/audit state. Never print the credential JSON.
@@ -1034,7 +1030,7 @@ PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_de
   --driver-credentials-file "$DEMO_DRIVER_CREDENTIALS" \
   --driver-check read-security --demo-user analyst \
   --gateway-mode persistent --gateway-receipt "$DEMO_GATEWAY_RECEIPT" \
-  --upstream-development-issuer --bound-sender-listener --check-run-binding \
+  --upstream-development-issuer --protected-listener --check-run-binding \
   --protected-backend-catalog-credential-file "$DEMO_CATALOG_CREDENTIAL" \
   --label fresh-read-security --output-dir "$DEMO_SECURITY_OUTPUT"
 ```
@@ -1042,10 +1038,12 @@ PYTHONPATH=runtime:runtime/identity_demo:scripts/identity_demo:tests/identity_de
 For a separate source installation, export its exact `IDENTITY_DEMO_CONFIG`
 and `IDENTITY_DEMO_ARTIFACTS` first, as in section 0. This selects the existing
 `ReadSecurityFlow`; it does not run the browser/create scenario. The command
-refuses `--enable-create` and users other than analyst. It proves real native
-leaf rotation and same-identity/different-leaf copied-token denial, forged peer
-header rejection, invalid/expired tokens, strict body/parser controls, private
-report isolation and operator revocation of a still-valid bound token. Require
+refuses `--enable-create` and users other than analyst. It tests signed short-lived
+delegation, an explicit copied-token replay positive
+control, forged identity headers, invalid/expired tokens, strict body/parser
+controls, private report isolation and operator revocation of a still-valid
+delegated token. Replay before expiry is an intentionally changed guarantee,
+not a denial provided by this candidate. Require
 all native and read-security assertions, unchanged backend counts and successful
 cleanup. The suite intentionally cancels its run and retains history; never
 reuse that execution identity.
@@ -1059,10 +1057,11 @@ preserve the consumed identity and workspace/history. Cluster preparers still
 require the private retirement check and receive no installer Pod-exec access.
 
 Replay credentials are obtained administratively in the supervisor and kept
-in private operator receipts. The other-identity certificate is an explicitly
-minted negative control, not evidence of workload attestation. These tests do
-not establish that an unprivileged agent can obtain either credential, nor do
-they prove complete platform recovery, model-key rotation or disconnected use.
+in private operator receipts. The document proof separately uses two real
+attested workloads to test subject substitution before credential release.
+Operator replay tests do not establish that an unprivileged agent can obtain
+credentials; the sandbox custody probe tests that boundary. Neither test proves
+complete platform recovery, model-key rotation or disconnected use.
 
 ### Native connection after SVID expiry
 
@@ -1070,7 +1069,7 @@ Use the same native probe command above with `--driver-check native-renewal`
 and a **new unused execution context**, label and existing empty private output
 directory. Stage the diagnostic tools first. This read-only gate requires the
 analyst and refuses create mode. It reads through the actual sandbox proxy,
-waits for the original real SVID leaf to expire, then opens a fresh native MCP
+waits for the original real JWT-SVID and its delegated token to expire, then opens a fresh native MCP
 session and repeats the protected project read without restarting the supervisor
 or injecting credentials into the agent. The existing short SVID lifetime must
 permit the bounded test; the helper never changes registration TTLs.
@@ -1078,11 +1077,11 @@ permit the bounded test; the helper never changes registration TTLs.
 Require the native summary and `.native-renewal.summary.json` to pass, with
 successful cleanup and unchanged backend counts. The proof requires new gateway
 request IDs, the exact broker-normalized read-body hash and the same authenticated user/workload/run;
-the signed token fingerprint must match the actual TLS peer and differ from the
-expired leaf. Operator replay requests and old log entries cannot satisfy it.
+the signed delegation must be issued after the original JWT-SVID expired.
+Operator replay requests and old log entries cannot satisfy it.
 This checks fresh sessions through the persistent native proxy after expiry;
 it does not test uninterrupted long-lived streams or full platform recovery.
-Require actual before/after certificate and native-read receipts on the target cluster.
+Require actual before/after JWT-SVID digests and native-read receipts on the target cluster.
 A local test or recorded source result does not prove real SVID renewal.
 
 ## Retire used contexts safely
@@ -1228,7 +1227,7 @@ not security approval.
   full disconnected installation/operation and separate-cluster acceptance remain
   unproved. No embeddings are required for the selected workflows.
 - Repeatable scripts still need reviewed private inputs, target-compatible images,
-  platform permissions and scenario acceptance. The exact target-bound sender
+  platform permissions and scenario acceptance. The reviewed native identity-exchange
   must be rebuilt when its CA/endpoints/trust contract changes.
 - OpenShift mode does not require local background services after installation.
   The automated browser rehearsal was validated on macOS with Chrome; other
@@ -1247,6 +1246,9 @@ uncertain-write stops must remain enforced. Do not bypass guards to obtain a pas
 
 
 ## Cluster-runtime hardening status
+
+This records the existing comparison deployment before the delegation refactor.
+It does not establish acceptance of the bearer-token candidate.
 
 The verified presentation deployment runs its coordinator, preparer, private
 operator HTTPS listener and authenticated Jira issue view on OpenShift. Acceptance
@@ -1458,30 +1460,20 @@ update requires inspection of the saved pending receipts before any recovery;
 never restart the operation blindly or restore an older database over newer
 history. This stage does not hand over the existing presentation installation.
 
-If the approved SPIRE bundle changes, workers stop admission rather than gaining
-access to serving keys or silently accepting different trust. An installer can
-add `--refresh-sender-trust` to this idle update, supplying the original
-`--ledger` and `--console-ledger-sha256`. This uses the existing owned trust
-refresh helper, preserves the issuer PVC, waits for its rollout, and replaces
-only the exact recorded immutable public observation using UID/version
-preconditions. The new worker input and receipt bind that observation. Shared
-SPIRE is read, never changed. An interrupted maintenance stays stopped for
-operator reconciliation; retain its pending receipts and private before-state.
-This is guarded installer maintenance. To opt in to automatic public CA refresh,
-add `--enable-public-trust-refresh` to that same update with
-`--refresh-sender-trust`. The stage creates a public-only Istio `-cacert` Secret,
-name-scoped coordinator permissions and a fail-closed admission policy, enables
-Keycloak's native 60-second HTTPS reload, and pins the approved source/target
-identities in the immutable observation. No serving-key or SPIRE-write access is
-granted. Future normal bundle changes reconcile while the execution lane is
-closed, followed by a 210-second projection/reload wait and a fresh comparison.
-A source/target substitution or uncertain update remains blocked for review.
+SPIRE JWT verification uses the issuer's trusted discovery/JWKS path. The
+coordinator no longer copies SPIRE X.509 roots, changes Keycloak client trust or
+reconciles an MCP client-CA Secret. Managed application TLS issuance/loading,
+CA rollover review and uncertain-maintenance stops remain required.
 
-Retain exact before-state and created-object receipts for rollback. Keep the
-separate listener CA Secret until its current roots have been copied back to the
-original listener and the effective gateway trust has been inspected; deleting
-it prematurely can restore stale fallback trust. Disable automatic refresh only
-during a guarded idle worker update, preserving pending decisions and history.
+Existing bound deployments require a separate reviewed candidate rollout: retain
+old images, configuration and ownership receipts; do not reuse interrupted worker
+checkpoints with changed stage identities. Remove `spire_ca` from new application
+and installer public-trust inputs. Preserve original source-render state privately
+for rollback; a new configuration fingerprint must not silently adopt old state.
+Keep historical data and original resource UIDs. Persisted `native_bound_read`
+evidence and `fixture-mcp-bound` names are retained for historical compatibility;
+current descriptions refer to a protected delegated read and do not claim proof
+of possession. No retired binding trust grant is needed by a fresh installation.
 
 Parallel installations also need distinct Authorino lookup keys: its host index
 is shared across namespaces. New native-route rendering keeps the broker's
@@ -1845,8 +1837,9 @@ Expected: `security_configuration_ready: true`. This checks the exact API/TLS,
 required served APIs, owned identity foundation, controller generations,
 SPIRE/CSI readiness, live exact-Pod discovery registration, Authorino TLS and
 current public CA bundles. It exports `service-ca.pem` and `spire-ca.pem` for the
-application source configuration. Supply the approved upstream HTTPS CA bundle
-separately. Authorization and certificate-bound tool access still require the
+foundation evidence. The application uses `service-ca.pem` and the approved
+upstream HTTPS CA bundle; it no longer requires a SPIRE CA copy. Authorization
+and protected tool access still require the
 functional tests below. Stage-specific `.pending.json`/`.receipt.json` files identify the failed check
 without disclosing credentials; preserve them. A forbidden API or failed check stops setup; ask the
 platform owner for the documented access rather than bypassing the check.
@@ -2019,7 +2012,7 @@ issuance; a file on the operator workstation does not update running consumers.
 
 Then issue/verify new leaves, prove new management and protected connections, and
 retire/replace only affected unused contexts under the existing guarded path.
-Update pinned issuer/public-trust observations and worker inputs through reviewed
+Update pinned issuer observations and worker inputs through reviewed
 maintenance. Remove the old root only after all consumers use the new chain and
 the overlap has ended. Verify both the accepted new path and rejection of retired
 trust. Preserve the old CA's private recovery inputs until the PKI retention policy

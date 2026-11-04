@@ -248,6 +248,8 @@ def test_register_driver_preserves_profile_and_support_modules(monkeypatch: pyte
     assert desired['data']['installation-profile.json'] == 'synthetic-profile'
     assert desired['data']['support.py'] == '# synthetic support'
     assert 'active_profile' in desired['data']['deployment_profile.py']
+    for module in ('identity_demo_oidc.py', 'identity_demo_login_state.py'):
+        assert desired['data'][module] == (setup.ROOT/'scripts/identity_demo'/module).read_text()
     assert result['persistent_state_and_credentials_preserved']
     assert all('--dry-run=server' in words for words, _ in events)
 

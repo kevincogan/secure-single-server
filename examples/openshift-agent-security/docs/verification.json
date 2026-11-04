@@ -1,13 +1,13 @@
 {
   "schema_version": 3,
-  "date": "2026-10-30",
-  "scope": "Reusable security-core/runtime refactor: offline checks and isolated OpenShift candidate acceptance passed. Installation required reviewed checkpoint recovery. The live demo was not updated; an unassisted clean installation and external release approvals remain outstanding.",
+  "date": "2026-11-04",
+  "scope": "The isolated OpenShift candidate passed the synthetic identity, delegation, reuse, browser workflow and selected restart checks. The reviewed refactor was applied to the local working tree. The live demo and customer release remain outside this acceptance scope.",
   "technical_scope_passed": true,
   "customer_ready": false,
   "evidence_policy": {
     "current_summary": true,
     "raw_receipts_and_prior_checkpoint_records": "Retained privately outside the customer package.",
-    "scope_note": "Earlier sections retain their dated historical evidence. refactor_validation records the October 30 offline and isolated-candidate checks; it does not requalify every earlier migration, rotation or recovery scenario. Skipped or excluded integration checks are not passes."
+    "scope_note": "The current_identity_delegation_candidate section records the final synthetic candidate and local application. Earlier sections record historical results at their original scope. Skipped checks are excluded from pass counts."
   },
   "refactor_validation": {
     "date": "2026-10-30",
@@ -650,5 +650,183 @@
       "external_approved_images_and_platform_inputs_required": true,
       "fully_disconnected_delivery": false
     }
+  },
+  "historical_initial_identity_delegation_candidate": {
+    "date": "2026-11-03",
+    "status": "identity_delegation_proof_passed_broader_readiness_incomplete_review_pending",
+    "scratch_only": true,
+    "real_branch_updated": false,
+    "live_demo_updated": false,
+    "sender_constrained_tokens": false,
+    "proposed_token_model": "Signed bearer delegation with maximum 30-second lifetime; adoption pending owner risk review.",
+    "residual_replay_risk_accepted": false,
+    "copied_bearer_token_can_replay_before_expiry": true,
+    "offline_tests": {
+      "passed": 2282,
+      "skipped": 38,
+      "warnings": 2
+    },
+    "source_checks_passed": true,
+    "native_patches": {
+      "before": 5,
+      "after": 2,
+      "retained": [
+        "Exact attested sandbox subject before intermediate credential release",
+        "Bounded and redacted OAuth response handling"
+      ]
+    },
+    "public_package_onboarding": {
+      "normal_wheel_install": true,
+      "repository_pythonpath": false,
+      "public_conformance_checks": 13,
+      "independent_integration_tests": 17
+    },
+    "native_build": {
+      "fresh_pinned_source_compile_passed": true,
+      "cargo_lock_unchanged": true
+    },
+    "unassisted_clean_install_of_final_exact_source_proven": false,
+    "installation_boundary": "Fresh isolated candidate installation succeeded, followed by a guarded update to current executable/template sources. Installer image predates later corrections.",
+    "remaining_gates": [
+      "Explicit residual bearer replay-risk acceptance and platform/application-owner review before real-checkout adoption",
+      "Reliable broker discovery and SPIRE-controller readiness, ordered MCP cleanup and an unattended clean installation using the final exact source before broader rollout",
+      "Current artifact security/licensing/provenance, distribution and preview-support decisions; historical scans are not approval of current images"
+    ],
+    "deployed_document_reuse_proof": {
+      "passed": true,
+      "real_pkce_and_attested_workloads": true,
+      "credential_custody_and_backend_isolation": true,
+      "exact_subject_before_release": true,
+      "negative_delegation_controls": 9,
+      "copied_bearer_replay_positive_control": true,
+      "exact_approval_concurrency_and_unknown_outcome_reconciliation": true,
+      "original_deadline_revocation_and_history": true,
+      "synthetic_backend_revisions": 3,
+      "proof_resources_removed": 20
+    },
+    "qualification_setup_recovery": {
+      "optional_probe_staging_required": true,
+      "private_diagnostic_issuer_initialization_corrected": true,
+      "wrong_audience_was_rejected_before_release": true,
+      "same_original_unapproved_run_retained": true,
+      "workflow_or_backend_write_resubmitted": false
+    },
+    "native_renewal": {
+      "passed": true,
+      "same_supervisor": true,
+      "original_jwt_expired_before_second_native_read": true,
+      "new_signed_delegation_after_original_expiry": true,
+      "matching_outer_tls_audit": true,
+      "operator_credentials_replaced": false,
+      "original_run_deadline_unchanged": true,
+      "uninterrupted_long_lived_streams_proven": false
+    },
+    "broader_readiness_limit": {
+      "broker_discovery_startup_exceeded_30_second_gate": true,
+      "failed_run_closed_before_actions": true,
+      "same_registration_later_discovered_expected_two_tools": true,
+      "followup": "Readiness timing and final-source unattended clean installation require qualification before broader readiness can be claimed.",
+      "controller_registration_startup_failed_before_native_dispatch": true,
+      "registration_failure_run_revoked_and_cleanup_reviewed": true,
+      "original_pre_action_startup_failures": 2
+    },
+    "identity_delegation_acceptance_passed": true,
+    "broader_candidate_readiness": "incomplete",
+    "deployed_ui_acceptance": {
+      "passed": true,
+      "real_browser_scenarios": 7,
+      "synthetic_jira_issues": 3,
+      "permission_denials": 2,
+      "cancel_and_reject": 2,
+      "genuine_native_inference_workflows": 2,
+      "exact_approved_backend_fields_verified": 3,
+      "original_run_cleanup_verified": 9,
+      "registration_startup_failure_before_actions": 1,
+      "evidence_bound_operator_cleanup_reviews": 1,
+      "closed_discovery_startup_failure_before_actions": 1,
+      "runtime_discovery_readiness_window_seconds": 30,
+      "incident_outside_project_probe_status": 403,
+      "uncertain_actions": 0,
+      "source_boundary": "Current executable/template sources after receipt-bound candidate update; later documentation-only changes are checked offline."
+    },
+    "selected_lifecycle_acceptance": {
+      "passed": true,
+      "certificate_loading": true,
+      "history_preserved": true,
+      "worker_fencing": true,
+      "data_services_restarted": true,
+      "complete_disaster_restore": false,
+      "writes_replayed": false
+    },
+    "historical_views": {
+      "original_positive_runs": 3,
+      "owner_views": 3,
+      "cross_user_denials": 3,
+      "after_retained_pvc_restart": true
+    },
+    "candidate_cleanup": {
+      "original_uid_guarded": true,
+      "namespaces_removed": 4,
+      "history_archived": true,
+      "shared_namespaces_deleted": false,
+      "single_task_mcp_extension_finalizer_recovery": true,
+      "namespace_finalizer_modified": false
+    }
+  },
+  "current_identity_delegation_candidate": {
+    "date": "2026-11-04",
+    "status": "synthetic_candidate_passed_refactor_applied_locally",
+    "tested_source_manifest_sha256": "2f3a526f7359618fb30d20c49b0e020ba1b4e47d7d5ec361b5ef4575861220b3",
+    "post_qualification_source_changes": "Verification record, whitespace, optional boundary rehearsal and source inventory.",
+    "local_working_tree_updated": true,
+    "owner_reviews_reported_complete": true,
+    "live_demo_updated": false,
+    "sender_constrained_tokens": false,
+    "maximum_final_bearer_lifetime_seconds": 30,
+    "copied_bearer_token_can_replay_before_expiry": true,
+    "residual_replay_risk_acceptance_scope": "synthetic demo only",
+    "offline_tests": {
+      "passed": 2295,
+      "skipped": 38,
+      "warnings": 2
+    },
+    "source_checks_passed": true,
+    "identity_delegation_and_document_reuse_proof_passed": true,
+    "final_installation": {
+      "unattended_build_and_application_passed": true,
+      "used_existing_cluster_prerequisites": true,
+      "empty_cluster_bootstrap_proven": false,
+      "post_install_executable_or_template_source_updates": false
+    },
+    "deployed_ui_acceptance": {
+      "passed": true,
+      "real_browser_scenarios": 7,
+      "synthetic_jira_issues": 3,
+      "permission_denials": 2,
+      "cancel_and_reject": 2,
+      "genuine_native_inference_workflows": 2,
+      "exact_approved_backend_fields_verified": 3,
+      "original_run_cleanup_verified": 7,
+      "startup_failures": 0,
+      "runtime_discovery_readiness_window_seconds": 90,
+      "incident_outside_project_probe_status": 403,
+      "uncertain_actions": 0,
+      "source_boundary": "Final source installer image; unattended build/application sessions; no post-install executable/template updates."
+    },
+    "selected_lifecycle_acceptance": {
+      "passed": true,
+      "certificate_loading": true,
+      "history_preserved": true,
+      "worker_fencing": true,
+      "data_services_restarted": true,
+      "complete_disaster_restore": false,
+      "writes_replayed": false,
+      "candidate_scheduling_disabled_before_fencing": true
+    },
+    "remaining_release_gates": [
+      "Independent operator handoff and acceptance in the intended target environment",
+      "Current artifact security, licensing, provenance, distribution and support reviews",
+      "Customer integration qualification and full disaster recovery"
+    ]
   }
 }

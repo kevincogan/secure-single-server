@@ -58,7 +58,7 @@ def test_diagnostic_uses_one_real_assertion_and_keeps_raw_error_private(monkeypa
         exchanges.append((args, kwargs))
         return 9, b"private-response", "issuer echoed private-token"
 
-    monkeypatch.setattr("native_grant_diagnostic.SenderAcceptance", Diagnostic)
+    monkeypatch.setattr("native_grant_diagnostic.DelegationAcceptance", Diagnostic)
     monkeypatch.setattr("native_grant_diagnostic.subject.exchange", exchange)
     result = diagnose(SimpleNamespace(execution_context=context), {"sub": "verified-user"})
     assert len(exchanges) == 1

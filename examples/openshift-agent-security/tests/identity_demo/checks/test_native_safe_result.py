@@ -196,7 +196,7 @@ def test_mcp_error_exposes_only_recognized_concurrency_denial(error: str, expect
 
 
 @pytest.mark.parametrize("flag", [
-    "check_sender_rejection", "check_renewal", "check_key_rollover",
+    "check_delegation_controls", "check_renewal", "check_key_rollover",
     "check_backend_rotation", "retain_run_retirement",
 ])
 def test_driver_flow_never_silently_skips_requested_step4_checks(flag: str) -> None:

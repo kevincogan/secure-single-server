@@ -113,14 +113,14 @@ class OwnedOperations:
         return value
 
     def delete(self, record):
-        from identity_demo_setup import kube, fingerprint, owned
+        from identity_demo_setup import kube, fingerprint, owned, controller_projection
 
         obj = record["object"]
         current = self.read(obj)
         if not current:
             return False
         owned(current, self.profile)
-        projected = deepcopy(current)
+        projected = controller_projection(self.args, current, obj)
         if obj["kind"] == "Pod" and not obj.get("spec", {}).get("nodeName"):
             # Scheduling assigns this one field after creation. Every execution,
             # image, volume and credential field still has to match the receipt.
@@ -452,7 +452,10 @@ def compile_objects(profile, image, environment):
         "backoffLimit": 0,
         "activeDeadlineSeconds": 2400,
         "template": {
-            "metadata": {"labels": job_labels},
+            "metadata": {
+                "labels": job_labels,
+                "annotations": {"cluster-autoscaler.kubernetes.io/safe-to-evict": "false"},
+            },
             "spec": {
                 "serviceAccountName": "fixture-installer-build",
                 "automountServiceAccountToken": False,

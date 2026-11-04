@@ -16,7 +16,7 @@ from deployment_profile import active_profile
 from identity_demo_execution_setup import context_template
 import identity_demo_workspace_retention as retention
 import identity_demo_gateway_persistence as gateway
-from run_binding import live_sender_authorization
+from run_binding import live_delegation_authorization
 
 
 def scratch(tmp_path, monkeypatch):
@@ -121,12 +121,12 @@ def test_gateway_drift_or_revoked_catalog_blocks_before_access(tmp_path,monkeypa
     with pytest.raises(ValueError):gateway.verify(args,ca)
 
 
-def test_stable_sender_gate_has_no_static_user_run_or_grant():
-    policy=live_sender_authorization('https://issuer.example.test/realms/demo','https://mcp.example.test/mcp','agents.example.test')
+def test_stable_delegation_gate_has_no_static_user_run_or_grant():
+    policy=live_delegation_authorization('https://issuer.example.test/realms/demo','https://mcp.example.test/mcp','agents.example.test')
     rego=policy['opa']['rego']
     assert 'bindings :=' not in rego and 'run_id' not in rego
-    for required in ('identity.cnf','count(hash_fields) == 1','count(bad) == 0',
-                     'count(names) == count({name','identity.exp - identity.iat <= 30','/mcp','binding.workload'):
+    for required in ('not identity_keys[\"cnf\"]', 'regex.match(', 'identity.exp - identity.iat <= 30',
+                     'identity.exp > identity.iat', '/mcp', 'identity.azp'):
         assert required in rego
     assert 'default allow' not in rego and 'contains(' not in rego
 

@@ -13,10 +13,10 @@ from pathlib import Path
 import time
 
 from identity_demo_action_policy import DRIVER
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 from permission_flow import PermissionFlow
 import probe_native_exchange as native
-from sender_listener import HOST
+from protected_listener import HOST
 
 
 class ReadSecurityFlow(PermissionFlow):
@@ -30,16 +30,15 @@ class ReadSecurityFlow(PermissionFlow):
         )
         assert status == 200
         human = {"sub": self.user, "access_token": json.loads(body)["access_token"]}
-        sender = SenderAcceptance(
+        sender = DelegationAcceptance(
             argparse.Namespace(**{**vars(self.args), "label": self.args.label + "-security"}),
             human,
         )
         replay = sender.run()
         assert replay["passed"] and self.backend_count() == before
 
-        leaf = sender.certificate("parser-controls")
-        token, _ = sender.final(leaf)
-        sessions = sender.initialize_session("parser-controls", token, leaf)
+        token, _ = sender.final()
+        sessions = sender.initialize_session("parser-controls", token)
         cases = []
         for name, payload, statuses in (
             ("duplicate_json_key", b'{"jsonrpc":"2.0","method":"tools/list","method":"tools/call","id":1}', {403}),
@@ -51,12 +50,11 @@ class ReadSecurityFlow(PermissionFlow):
                 "params": {"name": "step56_jira_updateJiraIssue", "arguments": {"run_id": self.run_id}},
             }).encode(), {403}),
         ):
-            # These controls exercise parsing, not certificate expiry. Real
-            # two-minute SVIDs can rotate while the previous cases execute.
-            leaf = sender.certificate("parser-" + name)
-            token, _ = sender.final(leaf)
+            # These controls exercise parsing, not token expiry. Real
+            # short-lived grants can expire while the previous cases execute.
+            token, _ = sender.final()
             status, _ = sender.request(
-                19444, HOST, "/mcp", payload, leaf,
+                19444, HOST, "/mcp", payload,
                 {"Authorization": "Bearer " + token, "Content-Type": "application/json",
                  "Accept": "application/json, text/event-stream", **sessions},
             )
@@ -79,22 +77,21 @@ class ReadSecurityFlow(PermissionFlow):
         assert status == 403 and report.encode() not in response
         cases.append({"case": "cross_user_report_denied", "http_status": status, "passed": True})
 
-        # Prove live revocation with a current certificate and grant. Reusing
+        # Prove live revocation with a current delegated grant. Reusing
         # the parser snapshot can turn this into an unrelated expiry failure.
-        leaf = sender.certificate("revocation-control")
-        token, claims = sender.final(leaf)
-        positive = sender.gateway("before_operator_revocation", token, leaf)
+        token, claims = sender.final()
+        positive = sender.gateway("before_operator_revocation", token)
         assert positive.get("http_status") == 200
         started = time.monotonic()
         status, _, response = self.http(
             DRIVER + "/internal/operator/revoke", operator=True, value={"run_id": self.run_id}
         )
         assert status == 200 and json.loads(response)["revoked_runs"] == 1
-        revoked = sender.gateway("revoked_run_still_valid_bound_token", token, leaf)
+        revoked = sender.gateway("revoked_run_still_valid_delegation", token)
         assert (
             revoked.get("http_status") == 403
             and claims["exp"] > time.time()
-            and leaf.expires_at > time.time()
+
         )
         elapsed = time.monotonic() - started
         status, _, _ = self.http(
@@ -105,12 +102,12 @@ class ReadSecurityFlow(PermissionFlow):
         assert status == 200 and report.encode() in response
         assert self.backend_count() == before
         cases.append({"case": "operator_revocation", "passed": True,
-                      "bound_gateway_denied": True, "coordination_credential_release_denied": True,
+                      "protected_gateway_denied": True, "coordination_credential_release_denied": True,
                       "credential_still_valid_at_denial": True,
                       "assessment_retained": True, "observed_seconds": round(elapsed, 3),
                       "backend_unchanged": True})
         self.close()
-        result = {"passed": True, "cases": cases, "sender_replay": replay,
+        result = {"passed": True, "cases": cases, "delegation_replay": replay,
                   "backend_before": before, "backend_after": self.backend_count(),
                   "writes_exercised": False, "keycloak_role_propagation_proven": False,
                   "concurrency_proven": False, "steps5_and6_complete": False}

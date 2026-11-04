@@ -108,7 +108,9 @@ def adapter_rules(existing: dict, *, write_scope: bool = False) -> dict:
                 "properties": {
                     "user": {"selector": "auth.identity.sub"},
                     "workload": {"selector": "auth.identity.azp"},
-                    "cnf": {"expression": "auth.identity.cnf['x5t#S256']"},
+                    "delegation": {"value": "short-lived-bearer"},
+                    "issued": {"selector": "auth.identity.iat"},
+                    "expiry": {"selector": "auth.identity.exp"},
                     "run": {"selector": "auth.metadata.driver-decision.run_id"},
                     "policy": {"value": "step56-live-action-v1"},
                     "actual_body_sha256": {

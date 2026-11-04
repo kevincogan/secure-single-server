@@ -166,21 +166,31 @@ def controller_projection(args: argparse.Namespace, current: dict, desired: dict
     result = deepcopy(current)
     meta = current["metadata"]
     if current["kind"] == "ServiceAccount":
+        references = []
         for field in ("secrets", "imagePullSecrets"):
-            if field in desired or field not in current:
+            if field not in desired and field in current:
+                references.extend(current[field])
+                result.pop(field, None)
+        annotation = "openshift.io/internal-registry-pull-secret-ref"
+        if (annotation not in desired["metadata"].get("annotations", {})
+                and annotation in meta.get("annotations", {})):
+            references.append({"name": meta["annotations"][annotation]})
+            result["metadata"]["annotations"].pop(annotation)
+        verified = set()
+        for reference in references:
+            name = reference.get("name", "")
+            if set(reference) != {"name"} or not name.startswith(meta["name"] + "-dockercfg-"):
+                raise ValueError("Unexpected ServiceAccount credential reference")
+            if name in verified:
                 continue
-            for reference in current[field]:
-                name = reference.get("name", "")
-                if set(reference) != {"name"} or not name.startswith(meta["name"] + "-dockercfg-"):
-                    raise ValueError("Unexpected ServiceAccount credential reference")
-                secret = kube(args, "get", "secret", name, "-n", meta["namespace"], "-o", "json")
-                owners = secret["metadata"].get("ownerReferences", [])
-                if (secret.get("type") != "kubernetes.io/dockercfg"
-                        or len(owners) != 1 or owners[0].get("kind") != "ServiceAccount"
-                        or owners[0].get("name") != meta["name"]
-                        or owners[0].get("uid") != meta["uid"]):
-                    raise ValueError("Generated credential owner or type mismatch")
-            result.pop(field, None)
+            secret = kube(args, "get", "secret", name, "-n", meta["namespace"], "-o", "json")
+            owners = secret["metadata"].get("ownerReferences", [])
+            if (secret.get("type") != "kubernetes.io/dockercfg"
+                    or len(owners) != 1 or owners[0].get("kind") != "ServiceAccount"
+                    or owners[0].get("name") != meta["name"]
+                    or owners[0].get("uid") != meta["uid"]):
+                raise ValueError("Generated credential owner or type mismatch")
+            verified.add(name)
     if (current["kind"] == "ConfigMap"
             and desired["metadata"].get("annotations", {}).get("service.beta.openshift.io/inject-cabundle") == "true"
             and not desired.get("data") and not desired.get("binaryData")):
@@ -523,10 +533,10 @@ def administrator_prepared(args, desired, current):
     return True
 
 def administrator_observation(args, desired):
-    """Use a recent administrator observation for one fixed shared RBAC pair.
+    """Use a recent administrator observation for the exact discovery policy.
 
     This is installation evidence, not a live API observation. The scoped
-    installer has no shared RBAC read/write rights; runtime access and actual
+    installer has no shared policy read/write rights; runtime access and actual
     SVID issuance must still pass acceptance before activation is accepted.
     """
     import time
@@ -534,8 +544,7 @@ def administrator_observation(args, desired):
     profile=args.profile
     if (getattr(args,'installer_service_account',None) != profile.core_namespace+':fixture-installer'
             or desired['metadata'].get('namespace') != profile.identity_namespace
-            or not ((desired['kind'] in ('Role','RoleBinding') and desired['metadata']['name'] == 'fixture-console-coordinator-public-trust-'+profile.installation_id)
-                or (desired['kind']=='NetworkPolicy' and desired['metadata']['name']=='identity-demo-'+profile.installation_id+'-discovery-access'))):
+            or not (desired['kind']=='NetworkPolicy' and desired['metadata']['name']=='identity-demo-'+profile.installation_id+'-discovery-access')):
         raise ValueError('Exact scoped installer shared prerequisite required')
     path=private_file(args.administrator_receipt)
     if sha(path)!=args.administrator_receipt_sha256:
@@ -701,7 +710,7 @@ def install(args: argparse.Namespace, objects: list[dict]) -> dict:
         raise ValueError("Installation requires explicit --apply")
     profile = getattr(args, "profile", LEGACY)
     if getattr(args, "bundle_version", 1) == 2 and not getattr(args, "native_build_contract_matches", False):
-        raise ValueError("Native images must have matching recorded sender build inputs")
+        raise ValueError("Native images must have matching recorded native build inputs")
     if getattr(args, "ingress_aliases_configured", None) is False:
         raise ValueError("Resolve retained ingress through connected-install or explicit render input before creation")
     resuming = getattr(args, "action", "install") == "resume"
@@ -1212,7 +1221,7 @@ def main() -> None:
     parser.add_argument("--security-network", help="Private API/worker host-CIDR JSON for guided security rendering")
     parser.add_argument("--oc-archive", help="Exact pinned public Linux oc archive for console-runtime-build")
     parser.add_argument("--cli-archive", help="Exact pinned public Linux OpenShell archive for console-runtime-build")
-    parser.add_argument("--console-runtime-stage", choices=("permissions", "policies", "realm-permissions", "configure", "trust-observation", "gateway-observation", "workloads", "update-workloads", "status", "automatic-enable", "automatic-disable"), default="permissions")
+    parser.add_argument("--console-runtime-stage", choices=("permissions", "policies", "realm-permissions", "configure", "gateway-observation", "workloads", "update-workloads", "status", "automatic-enable", "automatic-disable"), default="permissions")
     parser.add_argument("--console-worker-receipt", help="Completed scoped worker creation summary for initial automatic pool activation")
     parser.add_argument("--console-worker-sha256", help="Exact scoped worker creation summary hash")
     parser.add_argument("--console-configuration-receipt", help="Completed private-listener configuration summary")
@@ -1220,15 +1229,12 @@ def main() -> None:
     parser.add_argument("--runtime-publication-receipt", help="Completed cluster console image publication receipt")
     parser.add_argument("--runtime-publication-sha256", help="Exact console image publication receipt hash")
     parser.add_argument("--runtime-gateway-receipt", help="Current verified persistent gateway receipt")
-    parser.add_argument("--enable-public-trust-refresh", action="store_true", help="Idle update: enable scoped public-CA reconciliation and native issuer/SDS reload")
     parser.add_argument('--managed-certificate-config', help='Approved issuer UID/public CA configuration; explicit idle migration during update-workloads')
     parser.add_argument('--verify-certificate-loading', action='store_true', help='Read-only strict TLS listener/projection comparison for certificate-status')
-    parser.add_argument("--refresh-sender-trust", action="store_true", help="Installer-only idle worker update: reconcile recorded owned trust copies and replace their public observation")
     parser.add_argument("--isolate-private-authorizer", action="store_true", help="Installer-only idle worker update: repair the recorded legacy private-host collision")
     parser.add_argument("--resume-worker-update", help="Pinned private manifest for an interrupted host repair before worker activation")
     parser.add_argument("--resume-worker-update-sha256", help="Exact reviewed worker recovery manifest hash")
     parser.add_argument("--refresh-adapter-code", action="store_true", help="Idle worker update: replace only the fixed catalog/action modules on the recorded protected adapter")
-    parser.add_argument("--console-trust-observation-receipt", help="Installer-created public trust observation reference; no serving keys")
     parser.add_argument("--console-management-ca", help="Public target-specific native management CA")
     parser.add_argument("--console-catalog-credential", help="Current private discovery catalog credential")
     parser.add_argument("--console-ledger-sha256", help="Exact application creation ledger hash for private console configuration")

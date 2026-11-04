@@ -13,7 +13,7 @@ from typing import Callable
 import jwt
 
 import probe_native_exchange as native
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 from probe_discovery import run as discovery_run
 
 
@@ -44,7 +44,7 @@ def check(args: argparse.Namespace, execute: Callable, human: dict, resource: st
     issuer_before = native.kube(args, "get", "pods", "-n", native.NAMESPACE,
         "-l", "app=fixture-keycloak-upstream", "-o", "json")
     before_uids = sorted(p["metadata"]["uid"] for p in issuer_before["items"])
-    sender = SenderAcceptance(argparse.Namespace(**{**vars(args), "label": args.label + "-rollover"}), human)
+    sender = DelegationAcceptance(argparse.Namespace(**{**vars(args), "label": args.label + "-rollover"}), human)
 
     def authority(operation: str, *parts: str) -> dict:
         result = subprocess.run(["oc", "--kubeconfig=" + args.kubeconfig, "--request-timeout=20s",
@@ -88,13 +88,10 @@ def check(args: argparse.Namespace, execute: Callable, human: dict, resource: st
     active = authority("activate", "-authorityID", new_id)
     if active["activated_authority"]["authority_id"] != new_id:
         raise ValueError("Unexpected activated authority")
-    from sender_listener import NAME
-    with sender.tunnel("fixture-keycloak-upstream", 19443, 8443), sender.tunnel(NAME, 19444, 443):
-        leaf = sender.certificate("old-key-overlap")
-        token, _ = sender.final(leaf, old_assertion)
-        overlap = sender.gateway("old_native_assertion_overlap", token, leaf)
-        if overlap.get("http_status") != 200:
-            raise ValueError("Prior real workload assertion must remain valid during overlap")
+    token, _ = sender.final(old_assertion)
+    overlap = sender.gateway("old_native_assertion_overlap", token)
+    if overlap.get("http_status") != 200:
+        raise ValueError("Prior real workload assertion must remain valid during overlap")
     deadline, attempts = time.monotonic() + 90, []
     while time.monotonic() < deadline:
         assertion = sender.fetch("jwt")["token"]

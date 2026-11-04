@@ -157,7 +157,7 @@ def test_managed_state_has_no_application_signing_or_leaf_keys(inputs, monkeypat
     contract, _ = managed.configuration(config)
     monkeypatch.setattr(renderer, '_ca', lambda: pytest.fail('Managed mode generated an issuer'))
     monkeypatch.setattr(renderer, '_leaf', lambda *a, **k: pytest.fail('Managed mode signed a leaf'))
-    trust = {name: pem for name in ('service_ca', 'spire_ca', 'upstream_ca_bundle')}
+    trust = {name: pem for name in ('service_ca', 'upstream_ca_bundle')}
     state = renderer.initial_state(LEGACY, trust, contract, pem)
     renderer.validate_state(state, LEGACY, trust, contract, pem)
     assert 'application_ca_key' not in state
@@ -259,24 +259,15 @@ def test_independent_client_trust_requires_exact_original_wiring():
         managed.openshell_trust(after)
 
 
-def test_migration_uses_hash_pinned_observation_not_summary_uid(inputs, monkeypatch, tmp_path):
+def test_migration_retains_exact_ca_and_original_secret_uids(inputs, monkeypatch, tmp_path):
     import hashlib
     import cluster_console_install as install
     import cluster_console_operator as operator
     config,key,ca,pem=inputs;contract,_=managed.configuration(config)
     args=Namespace(certificate_management=contract,certificate_authority_pem=pem,ledger='private',
                    console_ledger_sha256='pinned',output_dir=tmp_path)
-    observation_data=json.dumps({'profile':LEGACY.to_dict(),'listener_ca_uid':'public-trust-uid'})
-    observation={'kind':'ConfigMap','metadata':{'name':'fixture-console-sender-trust',
-        'namespace':LEGACY.core_namespace,'uid':'observation-uid','labels':LEGACY.labels},
-        'immutable':True,'data':{'observation.json':observation_data}}
-    reference={'uid':'observation-uid','observation_sha256':hashlib.sha256(observation_data.encode()).hexdigest(),
-               'automatic_public_refresh':True}
-    worker={'data':{'management-ca.crt':base64.b64encode(pem.encode()).decode(),
-        'sender-trust.receipt.json':base64.b64encode(json.dumps(reference).encode()).decode()}}
-    values={('configmap','fixture-console-sender-trust'):observation}
-    trust=managed.public_trust(LEGACY,pem);trust['metadata'].update(name=managed.SPIRE_TRUST,uid='public-trust-uid')
-    values['secret',managed.SPIRE_TRUST]=trust
+    worker={'data':{'management-ca.crt':base64.b64encode(pem.encode()).decode()}}
+    values={}
     ledger={'completed':True,'installation_profile':LEGACY.to_dict(),'created':[]}
     for name,identity in managed.targets(LEGACY).items():
         cert,private=leaf(key,ca,identity)
@@ -284,7 +275,7 @@ def test_migration_uses_hash_pinned_observation_not_summary_uid(inputs, monkeypa
             'labels':LEGACY.labels,'uid':name},'data':{'tls.crt':base64.b64encode(cert).decode(),
             'tls.key':base64.b64encode(private).decode()}}
         values['secret',name]=value
-        ledger['created'].append({'kind':'Secret','namespace':LEGACY.core_namespace,'metadata':value['metadata']})
+        ledger['created'].append({'kind':'Secret','namespace':LEGACY.core_namespace,'metadata':deepcopy(value['metadata'])})
     template=json.loads((Path(__file__).resolve().parents[3]/'infra/identity-demo/templates/application.json').read_text())
     template=template['objects'] if isinstance(template,dict) else template
     gateway=deepcopy(next(v for v in template if v.get('kind')=='StatefulSet'))
@@ -304,11 +295,14 @@ def test_migration_uses_hash_pinned_observation_not_summary_uid(inputs, monkeypa
         calls.append(a);return {}
     monkeypatch.setattr(operations.setup,'kube',dry)
     planned=operations.prepare(args,LEGACY,worker)
-    assert planned['spire_trust_uid']=='public-trust-uid'
-    assert planned['observation_uid']=='observation-uid' and len(calls)==4
-    reference['observation_sha256']='0'*64
-    worker['data']['sender-trust.receipt.json']=base64.b64encode(json.dumps(reference).encode()).decode()
-    with pytest.raises(ValueError,match='Exact current worker'):
+    assert len(planned['before']) == 3 and len(calls) == 4
+    original=values['secret',managed.SECRETS[0]]
+    original['metadata']['uid']='replacement'
+    with pytest.raises(ValueError,match='Exact original TLS target'):
+        operations.prepare(args,LEGACY,worker)
+    original['metadata']['uid']=managed.SECRETS[0]
+    worker['data']['management-ca.crt']=base64.b64encode(pki()[1].public_bytes(serialization.Encoding.PEM)).decode()
+    with pytest.raises(ValueError,match='CA rollover'):
         operations.prepare(args,LEGACY,worker)
 
 
@@ -484,55 +478,3 @@ def test_fresh_leaf_secret_traces_original_certificate_and_approved_crypto(
         assert (
             ledger["created"][0]["kind"] == "Certificate"
         )  # No invented Secret creation receipt.
-
-
-@pytest.mark.parametrize("changed_authority", [False, True])
-def test_idle_trust_observation_uses_validated_worker_managed_contract(
-    inputs, tmp_path, monkeypatch, changed_authority
-):
-    import cluster_console_install as console
-    import identity_demo_execution_setup as execution
-    import identity_demo_sender_trust as sender
-
-    config, _, _, pem = inputs
-    contract, _ = managed.configuration(config)
-    names = [("Secret", managed.SPIRE_TRUST),
-             ("Secret", "fixture-keycloak-upstream-client-trust"),
-             ("Deployment", "fixture-keycloak-upstream")]
-    objects = {name: {"kind": kind, "metadata": {
-        "name": name, "namespace": LEGACY.core_namespace,
-        "uid": name + "-original", "labels": LEGACY.labels},
-        "type": "Opaque", "data": {"ca.crt": "public"}}
-        for kind, name in names}
-    listener = {"kind": "Secret", "metadata": {
-        "name": "fixture-mcp-bound-mutual", "namespace": LEGACY.core_namespace,
-        "uid": "controller-issued-leaf", "labels": LEGACY.labels}}
-    objects[listener["metadata"]["name"]] = listener
-    ledger = {"completed": True, "installation_profile": LEGACY.to_dict(),
-        "created": [{"kind": v["kind"], "namespace": LEGACY.core_namespace,
-                     "metadata": v["metadata"]} for v in objects.values() if v is not listener]}
-    path = tmp_path / "ledger.json"
-    path.write_text(json.dumps(ledger))
-    path.chmod(0o600)
-    args = Namespace(ledger=str(path), console_ledger_sha256=operations.setup.sha(path),
-        certificate_management=contract, certificate_authority_pem=pem,
-        output_dir=tmp_path, apply=False)
-    if changed_authority:
-        args.certificate_authority_pem = pki()[1].public_bytes(serialization.Encoding.PEM).decode()
-    monkeypatch.setattr(console.setup, "kube", lambda args, *words, **kwargs:
-                        deepcopy(objects[words[2]]))
-    monkeypatch.setattr(execution, "inspect_state", lambda args: {"rollback_quiescent": True})
-    monkeypatch.setattr(sender, "current", lambda args: True)
-    monkeypatch.setattr(operations, "configure", lambda *args: pytest.fail("Worker contract triggered migration"))
-
-    class RecordedLeafReached(Exception):
-        pass
-
-    def verify_recorded_leaf(actual, profile, saved, secret):
-        assert profile == LEGACY and saved == ledger and secret == listener
-        assert actual.public_trust_ca_uid == managed.SPIRE_TRUST + "-original"
-        raise RecordedLeafReached
-
-    monkeypatch.setattr(operations, "recorded_secret", verify_recorded_leaf)
-    with pytest.raises(ValueError if changed_authority else RecordedLeafReached):
-        console.trust_observation(args, LEGACY)

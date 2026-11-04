@@ -67,13 +67,13 @@ def test_parallel_gateway_identity_and_registration_do_not_collide() -> None:
     assert fresh.gateway_registration_name != LEGACY.gateway_registration_name
 
 
-def test_native_provider_endpoint_matches_compiled_sender_contract(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A public issuer and the internal mTLS token destination are distinct."""
+def test_native_provider_endpoint_is_profile_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A public issuer and the internal verified-TLS token destination are distinct."""
     import probe_native_exchange as native
     profile = DeploymentProfile.from_dict({**LEGACY.to_dict(), 'core_namespace': 'new-core'})
     monkeypatch.setattr(native, 'active_profile', lambda: profile)
     assert native.provider_token_endpoint('https://public-issuer.invalid/realms/demo', True) == (
-        profile.native_build_contract['OPENSHELL_DEMO_TOKEN_ENDPOINT'])
+        'https://' + profile.service_host('fixture-keycloak-upstream') + ':8443/realms/identity-demo/protocol/openid-connect/token')
     assert native.provider_token_endpoint('https://public-issuer.invalid/realms/demo', False) == (
         'https://public-issuer.invalid/realms/demo/protocol/openid-connect/token')
 
@@ -143,7 +143,7 @@ import identity_demo_workspaces as workspaces
 import identity_demo_spire_network as spire
 import identity_demo_step4_isolation as isolation
 import identity_demo_execution_setup as execution
-import sender_listener as listener
+import protected_listener as listener
 import gateway_credential_route as route
 import execution_context as context
 import concurrency_flow as concurrency

@@ -12,7 +12,6 @@ configured copy, with
 | `identity_demo_execution_setup.py` | Exact context provision/registration/retirement and UI code snapshots | [Execution](../../docs/identity-demo-reference.md) |
 | `identity_demo_cluster_bootstrap.py` | OpenShift coordinator/preparer entry point; scoped projected tokens and durable leases | [Setup](../../docs/identity-demo-customer-quickstart.md#5-review-the-application-handoff-and-activate) |
 | `identity_demo_presentation.py` | Automatic pool configuration and legacy manual preparation | [Console](../../docs/identity-demo-console.md) |
-| `identity_demo_sender_trust.py` | Guarded owned trust-copy reconciliation | [Execution](../../docs/identity-demo-reference.md) |
 
 The remaining modules implement the driver, server-rendered UI, OIDC/exchange,
 run/action/approval store, scoped backend adapter, native runtime and installer.

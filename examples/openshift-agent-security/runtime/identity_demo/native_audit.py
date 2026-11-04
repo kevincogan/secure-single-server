@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-import base64
 import json
-import re
 import subprocess
 import time
 
@@ -19,7 +17,7 @@ class AuditPending(ValueError):
 
 
 def assess(lines: str, run: ReadRun) -> dict:
-    """Require a successful real TLS hop with matching verified cnf and run."""
+    """Require a successful TLS request with verified delegated identity and run."""
     matched = []
     for line in lines.splitlines():
         try:
@@ -31,25 +29,22 @@ def assess(lines: str, run: ReadRun) -> dict:
             continue
         if metadata.get("run") != run.run_id:
             continue
-        if set(value) - {"event", "status", "detail", "upstream", "request", "peer_hash", "verified",
-                         "denied_identity", "denied_peer", "denied_grant"}:
+        if set(value) - {"event", "status", "detail", "upstream", "request", "tls_version", "verified",
+                         "denied_identity", "denied_grant"}:
             raise ValueError("Unexpected fields in scoped audit record")
-        if set(metadata) != {"cnf", "expiry", "policy", "run", "user", "workload"}:
+        if set(metadata) != {"delegation", "expiry", "policy", "run", "user", "workload"}:
             raise ValueError("Unexpected verified metadata; refuse credential leakage")
         if (metadata["user"] != run.user_subject or metadata["workload"] != run.workload
                 or metadata["policy"] != "step4-protected-read" or metadata["expiry"] > run.expires_at
-                or not re.fullmatch(r"[A-Za-z0-9_-]{43}", metadata["cnf"])):
+                or metadata["delegation"] != "short-lived-bearer"):
             raise ValueError("Audit identity does not match the trusted run")
-        expected_hash = base64.urlsafe_b64decode(metadata["cnf"] + "=").hex()
-        if value.get("peer_hash"):
-            if value["peer_hash"].replace(":", "").lower() != expected_hash:
-                raise ValueError("Signed certificate binding does not match the actual TLS peer")
-            if str(value.get("status")) == "200" and value.get("request"):
-                matched.append(value)
+        if (value.get("tls_version") in ("TLSv1.2", "TLSv1.3")
+                and str(value.get("status")) == "200" and value.get("request")):
+            matched.append(value)
     if not matched:
         raise AuditPending("No successful native TLS read with correlated verified metadata")
-    return {"passed": True, "successful_bound_read_records": len(matched),
-            "actual_tls_peer_equals_signed_cnf": True, "verified_user_workload_run_correlated": True,
+    return {"passed": True, "successful_delegated_read_records": len(matched),
+            "verified_tls": True, "verified_user_workload_run_correlated": True,
             "request_identifiers_present": True, "allowlisted_fields_only": True,
             "credential_or_body_fields_logged": False}
 
@@ -74,4 +69,4 @@ def check(backend: NativeBackend, run: ReadRun) -> dict:
         summary["log_read_attempts"] = attempt
         backend.save("audit.summary.json", summary)
         return summary
-    raise AuditPending("Correlated bound access log did not arrive within the bounded wait")
+    raise AuditPending("Correlated delegated access log did not arrive within the bounded wait")

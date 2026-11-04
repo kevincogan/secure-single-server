@@ -17,10 +17,10 @@ from uuid import uuid4
 
 from identity_demo_action_policy import DRIVER
 from lifecycle_flow import LifecycleFlow
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 from identity_demo_keycloak_upstream import BASE
 import probe_native_exchange as native
-from sender_listener import HOST
+from protected_listener import HOST
 from identity_demo_fixture_http import NoRedirect
 
 
@@ -119,7 +119,7 @@ class DependencyFlow(LifecycleFlow):
         status, _, _ = self.http(DRIVER + "/runs/" + self.run_id + "/approve",
             fields={"csrf": self.csrf, "action": self.proposal["action_id"], "digest": self.proposal["digest"]})
         assert status == 303 and self.action_record()["dispatch_claims"] == 0
-        sender = SenderAcceptance(argparse.Namespace(**{**vars(self.args), "label": self.args.label + "-dependencies"}), {"sub": self.user})
+        sender = DelegationAcceptance(argparse.Namespace(**{**vars(self.args), "label": self.args.label + "-dependencies"}), {"sub": self.user})
         cases = []
         clients = self.issuer_admin("/clients?clientId=fixture-gateway-service")
         assert len(clients) == 1 and clients[0]["attributes"]["identity-demo-owner"] == active_profile().owner
@@ -149,28 +149,26 @@ class DependencyFlow(LifecycleFlow):
             raise TimeoutError("Dependency endpoint transition not confirmed")
 
         for name in ("fixture-identity-driver", "fixture-keycloak-upstream", "fixture-protected-adapter"):
-            leaf = sender.certificate(name)
-            assert leaf.expires_at > time.time() + 50
-            token, claims = sender.final(leaf)
-            sessions = sender.initialize_session(name, token, leaf)
+            token, claims = sender.final()
+            sessions = sender.initialize_session(name, token)
             isolation = IsolatedService(read, patch, name, lambda: endpoints(name, True))
             native.private_write(self.args.output_dir / (name + "-service-before.private.json"), isolation.before)
             # Acquire fresh credentials after initialization, immediately before interruption.
-            token, claims = sender.final(leaf)
+            token, claims = sender.final()
             with isolation.unavailable():
                 endpoints(name, False)
                 started = time.monotonic()
                 status, response = sender.request(19444, HOST, "/mcp",
                     json.dumps({"jsonrpc": "2.0", "id": 12, "method": "tools/call",
                         "params": {"name": "step56_jira_createJiraIssue", "arguments": arguments}}).encode(),
-                    leaf, {"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                    {"Authorization": "Bearer " + token, "Content-Type": "application/json",
                            "Accept": "application/json, text/event-stream", **sessions})
                 sender.save(name + "-unavailable.private.json", {"status": status, "body": response.decode()})
                 assert status in (403, 500, 502, 503, 504), "Unavailable dependency must reject the approved mutation"
-                assert claims["exp"] > time.time() and leaf.expires_at > time.time(), "Denial must precede credential expiry"
+                assert claims["exp"] > time.time() , "Denial must precede credential expiry"
                 assert self.action_record()["dispatch_claims"] == 0
                 cases.append({"case": name + "_unavailable", "http_status": status,
-                    "valid_bound_credential_at_denial": True, "dispatch_claims": 0,
+                    "valid_delegation_at_denial": True, "dispatch_claims": 0,
                     "elapsed_seconds": round(time.monotonic() - started, 3), "passed": True})
                 if name == "fixture-keycloak-upstream":
                     grant_status, body = grant()

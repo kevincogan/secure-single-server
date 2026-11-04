@@ -28,7 +28,7 @@ For the standalone archive, run `cd openshift-agent-security` instead.
 | Control | What the system enforces |
 |---|---|
 | **Identity and isolation** | Keycloak authenticates the person. SPIRE attests the OpenShell supervisor; the agent runs in an isolated sandbox. |
-| **Protected tool access** | Certificate-bound token exchange protects MCP calls. Trusted components keep backend credentials outside the agent. |
+| **Protected tool access** | Attested native exchange and short-lived delegated tokens protect MCP calls. Trusted components keep backend credentials outside the agent. |
 | **Permission and consent** | User, workload, project and run checks apply to protected requests. A create must match the exact approved Jira fields. |
 | **Lifecycle and evidence** | Single-use identities, original run deadlines, correlated audit and independently verified Jira outcomes. |
 
@@ -63,6 +63,15 @@ approval never supplies missing authority.
 
 The workstation can disconnect after setup: browser workflows, replenishment
 and authenticated issue viewing run on OpenShift.
+
+## Reuse the security boundary
+
+The optional [document proof](examples/document-agent/README.md) uses real
+Keycloak login and attested OpenShell transport with a separate protected backend.
+The [artifact-metadata example](examples/artifact-metadata-agent/README.md)
+demonstrates independent offline onboarding through the installed package.
+Start with the [public runtime contract](docs/security-runtime.md). These examples
+have separate setup and acceptance requirements from the three browser workflows.
 
 ## Verified scope and review
 

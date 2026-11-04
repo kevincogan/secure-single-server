@@ -354,7 +354,7 @@ install_application() {
       if [[ $namespace == openshift-ingress ]]; then
         [[ ( $kind == Role || $kind == RoleBinding ) && $name == "identity-demo-$installation-installer-application" ]] || { echo 'Unexpected shared ingress grant' >&2; exit 1; }
       elif [[ $namespace == "$identity" ]]; then
-        [[ ( ( $kind == Role || $kind == RoleBinding ) && ( $name == "identity-demo-$installation-installer-application" || $name == "fixture-console-coordinator-public-trust-$installation" ) ) || ( $kind == NetworkPolicy && $name == "identity-demo-$installation-discovery-access" ) ]] || { echo 'Unexpected shared identity grant' >&2; exit 1; }
+        [[ ( ( $kind == Role || $kind == RoleBinding ) && $name == "identity-demo-$installation-installer-application" ) || ( $kind == NetworkPolicy && $name == "identity-demo-$installation-discovery-access" ) ]] || { echo 'Unexpected shared identity grant' >&2; exit 1; }
       else echo 'Unexpected administrator resource namespace' >&2; exit 1
       fi
     fi
@@ -491,7 +491,7 @@ else
     "${api[@]}" create configmap fixture-installer-configuration -n "$core" --from-file=installation.json="$out/installation.json" --dry-run=client -o json > "$out/input-configuration.raw.json"
     label_manifest "$out/input-configuration.raw.json" "$out/input-configuration.plan.json"
     files=()
-    for filename in service-ca.pem spire-ca.pem upstream-ca.pem kubernetes-ca.pem application-ca.pem; do
+    for filename in service-ca.pem upstream-ca.pem kubernetes-ca.pem application-ca.pem; do
       if [[ -f $trust/$filename ]]; then
         [[ ! -L $trust/$filename ]] || usage
         if grep -Eq -- '-----BEGIN .*PRIVATE KEY-----' "$trust/$filename"; then echo 'Public trust must not contain signing keys' >&2; exit 1; fi

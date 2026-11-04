@@ -38,7 +38,6 @@ APPLICATION_FIELDS = {
 }
 TRUST_FILES = {
     "service_ca": "service-ca.pem",
-    "spire_ca": "spire-ca.pem",
     "upstream_ca_bundle": "upstream-ca.pem",
     "kubernetes_ca": "kubernetes-ca.pem",
 }
@@ -60,7 +59,7 @@ def configuration(value):
         or set(value["application"]) != APPLICATION_FIELDS
         or not isinstance(value["public_trust"], dict)
         or set(value["public_trust"])
-        != {"service_ca", "spire_ca", "upstream_ca_bundle", "kubernetes_ca"}
+        != {"service_ca", "upstream_ca_bundle", "kubernetes_ca"}
     ):
         raise ValueError(
             "Exact installer configuration with fixed credential references required"

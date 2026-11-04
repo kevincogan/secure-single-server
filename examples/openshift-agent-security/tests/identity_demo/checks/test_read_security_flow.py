@@ -13,7 +13,7 @@ import pytest
 import read_security_flow as security
 
 
-@pytest.mark.parametrize("fault", [None, "revocation_allowed", "expired_token", "expired_leaf", "parser_allowed"])
+@pytest.mark.parametrize("fault", [None, "revocation_allowed", "expired_token", "parser_allowed"])
 def test_security_gate_requires_real_denials_and_unexpired_control(
     tmp_path, monkeypatch, fault: str | None
 ) -> None:
@@ -52,12 +52,7 @@ def test_security_gate_requires_real_denials_and_unexpired_control(
         def run(self) -> dict:
             return {"passed": True}
 
-        def certificate(self, name: str) -> object:
-            certificate_names.append(name)
-            return SimpleNamespace(expires_at=time.time() + (
-                -1 if fault == "expired_leaf" and name == "revocation-control" else 300))
-
-        def final(self, leaf: object) -> tuple[str, dict]:
+        def final(self) -> tuple[str, dict]:
             return "synthetic", {"exp": time.time() + (-1 if fault == "expired_token" else 30)}
 
         def initialize_session(self, *args: object) -> dict:
@@ -81,7 +76,7 @@ def test_security_gate_requires_real_denials_and_unexpired_control(
         def http(self, url: str) -> tuple[int, dict, bytes]:
             return 403, {}, b'{"reason":"run_binding"}'
 
-    monkeypatch.setattr(security, "SenderAcceptance", Sender)
+    monkeypatch.setattr(security, "DelegationAcceptance", Sender)
     monkeypatch.setattr(security, "PermissionFlow", Viewer)
     if fault:
         with pytest.raises(AssertionError):
@@ -94,6 +89,4 @@ def test_security_gate_requires_real_denials_and_unexpired_control(
         saved = json.loads((tmp_path / "synthetic.read-security.summary.json").read_text())
         assert saved["backend_before"] == saved["backend_after"] == 1
         assert not saved["steps5_and6_complete"]
-        assert certificate_names == ["parser-controls", "parser-duplicate_json_key", "parser-malformed_json",
-            "parser-unsupported_batch", "parser-oversized_body", "parser-unregistered_mutation_tool",
-            "revocation-control"]
+        assert certificate_names == []

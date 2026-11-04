@@ -83,11 +83,11 @@ the launcher never changes shared policy.
 Native base images are pinned in the template; the installer replaces them with verified,
 target-built images before deployment. Do not insert passwords into this file.
 
-Create `public-trust/` containing `service-ca.pem`, `spire-ca.pem`,
+Create `public-trust/` containing `service-ca.pem`,
 `upstream-ca.pem`, `kubernetes-ca.pem` and `application-ca.pem`. These contain
-**public certificates only**. SPIRE client trust and the application serving CA
-remain separate. Use approved SPIRE anchors with enough remaining lifetime for
-builds, installation and acceptance. A rollover anchor expiring between render
+**public certificates only**. Use approved HTTPS trust anchors with enough
+remaining lifetime for builds, installation and acceptance. SPIRE attestation
+uses its independent discovery and workload-identity configuration. A rollover anchor expiring between render
 stages changes the trust hash and stops setup. Preserve that checkpoint and
 prepare fresh approved inputs; never bypass the trust check or replay a failed stage.
 Put only the approved model API key in the mode-0600 file
@@ -238,5 +238,5 @@ re-enable a completed installer principal for ongoing runtime work.
 
 Read [Operations](identity-demo-console.md) for daily use, certificate renewal,
 backup, rollback and safe cleanup. Additional backends require a reviewed connector,
-policy mappings and acceptance tests; the automated document-backend fixture is
-not a supported non-Jira cluster installation.
+policy mappings and acceptance tests; the optional [document proof](../examples/document-agent/README.md) has its own
+isolated setup and acceptance procedure. It is separate from this Jira installer.

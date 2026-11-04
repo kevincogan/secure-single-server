@@ -9,7 +9,6 @@ receipts separately before the scoped installer can verify these prerequisites.
 from copy import deepcopy
 
 from cluster_console_resources import permissions, capacity
-from cluster_console_public_trust import resources as public_trust
 from deployment_artifacts import validate_artifacts
 from deployment_profile import active_profile
 from identity_demo_controller_identity import policy, gateway_policy
@@ -67,10 +66,6 @@ def objects(profile, bundle, artifacts):
     ]
     result.append(gateway_policy(profile, artifacts["images"]["openshell_gateway"]))
     result.append(setup.discovery_policy(profile))
-    # The first entry is the public CA Secret, already created by application
-    # installation. Only the existing fixed admission/RBAC prerequisites belong
-    # in this administrator handoff. Issuer/signing keys never appear here.
-    result += [o for o in public_trust(profile, "") if o["kind"] != "Secret"]
     identities = [
         (o["kind"], o["metadata"].get("namespace"), o["metadata"]["name"])
         for o in result

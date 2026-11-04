@@ -84,7 +84,7 @@ def worker(args, profile, records, role):
     port=18443 if role=='coordinator' else 18444
     names=['installation-profile.json','artifacts.json','runtime-credentials.json','driver-credentials.json',
            'management-ca.crt','service-ca.crt','kubernetes-ca.crt']
-    names += ['catalog-credential.json','gateway.receipt.json','sender-trust.receipt.json','inference.json','inference.key'] if role=='coordinator' else ['capacity-budget.json']
+    names += ['catalog-credential.json','gateway.receipt.json','inference.json','inference.key'] if role=='coordinator' else ['capacity-budget.json']
     inputs = recorded(args, profile, records, 'Secret', name + '-inputs')
     if 'certificate-management.json' in inputs.get('data', {}):
         names.append('certificate-management.json')
@@ -219,7 +219,7 @@ def demo_configuration(workload_image=None):
         "supervisor_image": supervisor,
         "policy": policy,
         "trust_domain": installation.trust_domain,
-        "issuer": installation.native_build_contract["OPENSHELL_DEMO_JWT_AUDIENCE"],
+        "issuer": installation.delegation_issuer,
         "tools": ["jira.issue.read", "jira.issue.create"],
     }
     value = {

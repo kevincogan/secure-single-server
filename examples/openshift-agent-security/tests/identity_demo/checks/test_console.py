@@ -165,7 +165,7 @@ def test_observed_evidence_is_owner_scoped_and_audited(tmp_path: Path) -> None:
         'evidence': {'native_bound_read': True, 'gateway_ready': True, 'tool_names': ['createJiraIssue']}})
     assert response.status_code == 200
     page = client.get('/runs/' + job['run_id'])
-    assert 'Verified native certificate-bound read' in page.text and 'createJiraIssue' in page.text
+    assert 'Verified native protected delegated read' in page.text and 'createJiraIssue' in page.text
     assert worker not in page.text
     client.cookies.clear()
     assert client.get('/runs/' + job['run_id']).status_code == 403

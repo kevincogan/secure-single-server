@@ -119,15 +119,13 @@ class DeploymentProfile:
 
     @property
     def native_build_contract(self) -> dict[str, str]:
-        """Bind native sender destinations and identity to this installation."""
-        return {
-            "OPENSHELL_DEMO_SENDER_HOST": self.service_host("fixture-mcp-bound"),
-            "OPENSHELL_DEMO_TOKEN_ENDPOINT": "https://" + self.service_host("fixture-keycloak-upstream")
-                + ":8443/realms/identity-demo/protocol/openid-connect/token",
-            "OPENSHELL_DEMO_JWT_AUDIENCE": self.origin("fixture-keycloak-upstream") + "/realms/identity-demo",
-            "OPENSHELL_DEMO_MCP_AUDIENCE": "https://" + self.service_host("fixture-mcp-bound") + "/mcp",
-            "OPENSHELL_DEMO_TRUST_DOMAIN": self.trust_domain,
-        }
+        """Identify the reviewed native security behavior independently of target DNS."""
+        return {"identity_exchange": "exact-sandbox-jwt-svid-v1"}
+
+    @property
+    def delegation_issuer(self) -> str:
+        """Keep the runtime issuer explicit without compiling it into OpenShell."""
+        return self.origin("fixture-keycloak-upstream") + "/realms/identity-demo"
 
     @property
     def labels(self) -> dict[str, str]:

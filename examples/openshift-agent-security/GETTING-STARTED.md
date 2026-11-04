@@ -77,7 +77,7 @@ editing this checkout alone does not change an existing deployment.
 | Exact approval, one-time dispatch and backend verification | `identity_demo_action_policy.py`, `identity_demo_jira_action_adapter.py`, `identity_demo_backend_observation.py` |
 | Connector contracts and backend-specific validation | `identity_demo_connector.py`, `identity_demo_jira_contract.py` |
 | Atomic allocation, profile compatibility, quarantine and restart recovery | `identity_demo_console_store.py`, `identity_demo_pool_profiles.py`, `identity_demo_warm_pool.py`, `identity_demo_worker_lease.py` |
-| Cluster permissions, private endpoints and public trust | `cluster_console_resources.py`, `identity_demo_controller_identity.py`, `identity_demo_public_trust.py` |
+| Cluster permissions, private endpoints and public trust | `cluster_console_resources.py`, `identity_demo_controller_identity.py`, `managed_certificates.py` |
 | Native changes and build pins | `infra/openshell/patches/README.md`, `infra/openshell/native-build/inputs.lock.json` |
 
 The shared mechanisms are described in [the reuse guide](docs/security-runtime.md).

@@ -139,7 +139,7 @@ def main() -> None:
     parser.add_argument("--gateway-image", default=GATEWAY_IMAGE,
                         help="Explicit owned digest for the approved development candidate")
     parser.add_argument("--supervisor-image", default=SUPERVISOR_IMAGE,
-                        help="Explicit owned digest for the approved sender candidate")
+                        help="Explicit owned digest for the approved native candidate")
     parser.add_argument("--registration-name", default="identity-demo-openshell-cve-test")
     parser.add_argument("--workload-service-account", default="fixture-openshell-sandbox")
     parser.add_argument("--workload-namespace", choices=active_profile().application_namespaces,

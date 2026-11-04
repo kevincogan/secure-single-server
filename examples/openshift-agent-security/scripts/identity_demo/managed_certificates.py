@@ -28,7 +28,6 @@ from cryptography.x509.verification import (PolicyBuilder, Store, ExtensionPolic
 from deployment_profile import dns_name
 
 MODE = 'certificate_management'
-SPIRE_TRUST = 'fixture-mcp-bound-mutual-cacert'
 APPLICATION_TRUST = 'fixture-openshell-client-ca'
 SECRETS = ('fixture-openshell-server-tls', 'fixture-openshell-client-tls', 'fixture-mcp-bound-mutual')
 DURATION = 720

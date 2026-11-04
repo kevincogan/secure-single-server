@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-security-runtime"
+version = "0.1.0"
+description = "In-process exact-action security contracts for trusted agent hosts"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+
+[tool.setuptools]
+package-dir = {"" = "runtime"}
+packages = ["agent_security_runtime"]
+py-modules = ["agent_security", "agent_security_contracts", "agent_security_service"]

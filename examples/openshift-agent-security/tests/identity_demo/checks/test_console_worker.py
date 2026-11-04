@@ -239,7 +239,6 @@ def test_tunnel_startup_failure_closes_only_a_proven_unused_run(tmp_path: Path, 
 def test_readiness_observation_preserves_only_recent_verified_admission(
         tmp_path, monkeypatch, age, expiry, first_phase, network_failure):
     """Read-only checks do not flicker; stale/startup state and maintenance close admission."""
-    import identity_demo_sender_trust as trust
     import identity_demo_spire_network as network
     credential = tmp_path / 'catalog.json'
     credential.write_text(json.dumps({'token': 'discovery_synthetic', 'expires_at': int(time.time()) + expiry}))
@@ -255,7 +254,6 @@ def test_readiness_observation_preserves_only_recent_verified_admission(
     monkeypatch.setattr(worker, 'guard', lambda _: checks.append('guard'))
     monkeypatch.setattr(worker, 'private_inference', lambda _: checks.append('inference'))
     monkeypatch.setattr(worker, 'recover_catalog_reference', lambda _: True)
-    monkeypatch.setattr(trust, 'current', lambda _: checks.append('trust') or True)
     monkeypatch.setattr(network, 'kubelet_coverage_current', lambda _: checks.append('network') or not network_failure)
     monkeypatch.delenv('IDENTITY_DEMO_RUNTIME', raising=False)
     def rotate(_):
@@ -271,7 +269,7 @@ def test_readiness_observation_preserves_only_recent_verified_admission(
         return
     assert result
     assert checks[:3] == ['guard', 'inference', first_phase]
-    assert {'guard', 'inference', 'trust', 'network'} <= set(checks)
+    assert {'guard', 'inference', 'network'} <= set(checks)
     assert ('rotate' in checks) == (expiry < 900)
     assert control.readiness['phase'] == 'ready' and control.readiness['checked_at'] >= int(time.time()) - 1
     if first_phase == 'ready':
@@ -280,7 +278,6 @@ def test_readiness_observation_preserves_only_recent_verified_admission(
 
 def test_queued_run_defers_catalog_mutation_without_claim_or_recovery_reset(tmp_path, monkeypatch):
     """A browser request racing maintenance cannot trigger a credential mutation."""
-    import identity_demo_sender_trust as trust
     credential = tmp_path / 'catalog.json'
     credential.write_text(json.dumps({'token': 'discovery_synthetic', 'expires_at': int(time.time()) + 700}))
     credential.chmod(0o600)
@@ -292,7 +289,6 @@ def test_queued_run_defers_catalog_mutation_without_claim_or_recovery_reset(tmp_
     monkeypatch.setattr(worker, 'guard', lambda _: None)
     monkeypatch.setattr(worker, 'private_inference', lambda _: None)
     monkeypatch.setattr(worker, 'recover_catalog_reference', lambda _: True)
-    monkeypatch.setattr(trust, 'current', lambda _: True)
     monkeypatch.setattr(worker, 'refresh_catalog', lambda _: pytest.fail('Must not rotate while queued'))
     args = Namespace(output_dir=tmp_path, inference_config='private', catalog_credential_file=str(credential), auto_refresh_catalog=True)
     assert worker.readiness_check(args, control) is False

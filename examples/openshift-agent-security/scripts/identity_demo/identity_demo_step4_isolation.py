@@ -20,7 +20,6 @@ from deployment_profile import active_profile
 from identity_demo_keycloak_recovery import command, resource, write_private
 from identity_demo_lab import LABELS
 from identity_demo_runtime import NAMESPACE, guard
-from identity_demo_sender_trust import patch
 from identity_demo_spire_network import SERVER
 from deployment_profile import in_source_checkout
 
@@ -30,6 +29,16 @@ ADAPTER = {"app": "fixture-protected-adapter"}
 JIRA = {"app": "fixture-jira"}
 SUPERVISOR = {"openshell.ai/boundary-role": "supervisor",
               "openshell.ai/gateway-id": active_profile().gateway_id}
+
+
+def patch(current: dict, field: str, desired: Any) -> list[dict]:
+    """Reject UID, version or exact field drift before an owned mutation."""
+    return [
+        {"op": "test", "path": "/metadata/uid", "value": current["metadata"]["uid"]},
+        {"op": "test", "path": "/metadata/resourceVersion", "value": current["metadata"]["resourceVersion"]},
+        {"op": "test", "path": "/" + field, "value": current[field]},
+        {"op": "replace", "path": "/" + field, "value": desired},
+    ]
 
 
 def rule(peers: list[dict], ports: list[int], direction: str) -> dict:

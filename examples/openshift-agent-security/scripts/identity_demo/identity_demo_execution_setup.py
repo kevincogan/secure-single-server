@@ -172,14 +172,15 @@ def provision(args: argparse.Namespace) -> dict:
     owned(gateway)
     supervisor = read(args, "pod", "os-supervisor-" + context.sandbox_id, context.namespace)
     if controller_identities():
-        from identity_demo_controller_identity import wait_ready, verify_gateway
+        from identity_demo_controller_identity import verify, verify_gateway
         verify_gateway(lambda k, n, ns=None: read(args, k, n, ns))
-        policy = wait_ready(context, lambda k, n, ns=None: read(args, k, n, ns))
-        native.private_write(args.output_dir / "controller-policy.private.json", policy)
         location = args.output_dir / "context.private.json"
         native.private_write(location, asdict(context))
-        require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns), contract=contract) == context,
+        require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns),
+                                contract=contract, wait_timeout=60) == context,
                 "Fresh controller-derived context validation failed")
+        policy = verify(context, lambda k, n, ns=None: read(args, k, n, ns))
+        native.private_write(args.output_dir / "controller-policy.private.json", policy)
         return {"applied": True, "native_ready": True, "registration_exact": True,
                 "registration_mode": "controller", "namespace": context.namespace,
                 "sandbox_name": context.sandbox_name,
@@ -352,7 +353,7 @@ def stage(args: argparse.Namespace) -> dict:
     """Repeat accepted tool staging, then verify the actual supervisor's SVID."""
     require(len(args.context_file) == 1, "Exactly one fresh context receipt required")
     guard(args)
-    context = resolve_context(args.context_file[0], lambda k, n, ns=None: read(args, k, n, ns))
+    context = resolve_context(args.context_file[0], lambda k, n, ns=None: read(args, k, n, ns), contract=getattr(args, "pool_profile", None))
     files = []
     for supplied, destination in [(args.spire_agent_binary, "step4-spire-agent"),
                                   (args.mcp_client_binary, "step4-read-native-projection")]:
@@ -559,7 +560,7 @@ def register_driver(args: argparse.Namespace) -> dict:
     # Dropping deployment_profile.py breaks source-rendered driver startup.
     data = dict(current['data'])
     updates = {name: (ROOT / "scripts" / "identity_demo" / name).read_text()
-               for name in ("identity_demo_driver.py", "identity_demo_run_store.py", "deployment_profile.py",
+               for name in ("identity_demo_driver.py", "identity_demo_oidc.py", "identity_demo_login_state.py", "identity_demo_run_store.py", "deployment_profile.py",
                             "identity_demo_console.py", "identity_demo_console_store.py", "identity_demo_console_visuals.py", "identity_demo_warm_pool.py", 'identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py')}
     public_sources = provider_sources()
     require('identity_demo_console_store.py' in data

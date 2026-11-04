@@ -79,7 +79,7 @@ def main() -> None:
             page.locator('#password').fill(credentials[args.username])
             page.locator('#kc-login').click()
             page.wait_for_url(DRIVER + '/')
-            page.get_by_text('Signed in as', exact=False).wait_for()
+            page.get_by_label('Account options for ' + args.username, exact=True).wait_for()
             name = {'cve': 'Start assessment', 'service-request': 'Start remediation request', 'incident-triage': 'Start incident triage'}[args.workflow]
             form = page.locator('form').filter(has=page.get_by_role('button', name=name, exact=True))
             if args.workflow == 'cve':

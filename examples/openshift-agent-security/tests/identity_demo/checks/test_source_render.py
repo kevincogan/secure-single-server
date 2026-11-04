@@ -57,7 +57,7 @@ def config(tmp_path: Path) -> Path:
     path.write_text(json.dumps({"schema_version": 1, "profile": profile.to_dict(),
         "artifacts_file": str(artifacts),
         "public_trust": {name: str(trust) for name in
-                         ("service_ca", "spire_ca", "upstream_ca_bundle")},
+                         ("service_ca", "upstream_ca_bundle")},
         "kubernetes_api_cidrs": ["192.0.2.1/32"]}))
     return path
 
@@ -99,7 +99,7 @@ def test_render_from_source_is_complete_and_repeatable(config: Path) -> None:
                    for subject in item.get("subjects", []))
 
 
-def test_managed_render_uses_platform_issuance_and_separate_spire_trust(config: Path) -> None:
+def test_managed_render_uses_platform_issuance_without_sender_trust(config: Path) -> None:
     from uuid import uuid4
     import managed_certificates as managed
     authority = renderer._ca()[1].public_bytes(serialization.Encoding.PEM)
@@ -112,9 +112,8 @@ def test_managed_render_uses_platform_issuance_and_separate_spire_trust(config: 
     setup.validate(bundle)
     assert len([o for o in bundle['objects'] if o['kind']=='Certificate']) == 3
     assert not any(o['kind']=='Secret' and o['metadata']['name'] in managed.SECRETS for o in bundle['objects'])
-    trust, = [o for o in bundle['objects'] if o['kind']=='Secret' and o['metadata']['name']==managed.SPIRE_TRUST]
-    assert set(trust['data']) == {'ca.crt'}
-    assert base64.b64decode(trust['data']['ca.crt']).decode() != authority.decode()
+    assert not any(o['metadata']['name'] in ('fixture-mcp-bound-client-ca',
+        'fixture-keycloak-upstream-client-trust') for o in bundle['objects'])
     assert 'application_ca_key' not in state
     gateway, = [o for o in bundle['objects'] if o['kind']=='StatefulSet']
     pod=gateway['spec']['template']['spec']
@@ -220,7 +219,7 @@ def test_state_refuses_cross_installation_or_silent_trust_change(config: Path,
     if change == "profile":
         value["profile"]["trust_domain"] = "other.example.org"
     else:
-        value["public_trust"]["spire_ca"] = str(ca_file(config.parent / "other.pem"))
+        value["public_trust"]["service_ca"] = str(ca_file(config.parent / "other.pem"))
     config.write_text(json.dumps(value))
     with pytest.raises(ValueError):
         renderer.render(config, state)
@@ -258,7 +257,7 @@ def test_source_installation_refuses_names_exceeding_native_workspace_limit(conf
 def test_public_ca_input_rejects_private_material(config: Path) -> None:
     """Do not accidentally package an operator's CA signing key as public trust."""
     value = json.loads(config.read_text())
-    path = Path(value["public_trust"]["spire_ca"])
+    path = Path(value["public_trust"]["service_ca"])
     path.write_text(path.read_text() + "\n-----BEGIN PRIVATE KEY-----\n")
     with pytest.raises(ValueError, match="Public certificates only"):
         renderer.render(config)

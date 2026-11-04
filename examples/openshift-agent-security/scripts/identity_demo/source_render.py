@@ -21,7 +21,6 @@ from uuid import uuid4
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
-from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from deployment_profile import DeploymentProfile
@@ -108,7 +107,7 @@ def load_inputs(path: Path) -> tuple[DeploymentProfile, dict, dict, list[str]]:
         raise ValueError("Absolute artifacts file required")
     artifacts = validate_artifacts(read_json(artifact_path))
     trust = config["public_trust"]
-    if not isinstance(trust, dict) or set(trust) != {"service_ca", "spire_ca", "upstream_ca_bundle"}:
+    if not isinstance(trust, dict) or set(trust) != {"service_ca", "upstream_ca_bundle"}:
         raise ValueError("Exact public-trust inputs required")
     certificates = {}
     for name, filename in trust.items():
@@ -134,7 +133,7 @@ def api_addresses(cidrs):
 
 
 def native_build_contract(profile: DeploymentProfile) -> dict:
-    """Return the exact endpoint/domain inputs required by the native sender build."""
+    """Return the reviewed native identity-exchange contract."""
     return profile.native_build_contract
 
 
@@ -216,7 +215,7 @@ def initial_state(profile: DeploymentProfile, trust: dict, certificate_config: d
         key, cert = _leaf(ca_key, ca, hosts, client=client)
         put(name, "tls.key", key)
         put(name, "tls.crt", cert)
-        put(name, "ca.crt", trust["spire_ca"] if name == "fixture-mcp-bound-mutual" else ca_pem)
+        put(name, "ca.crt", ca_pem)
     signing = ed25519.Ed25519PrivateKey.generate()
     put("fixture-openshell-jwt-keys", "signing.pem", _key_bytes(signing))
     put("fixture-openshell-jwt-keys", "public.pem", signing.public_key().public_bytes(
@@ -228,12 +227,6 @@ def initial_state(profile: DeploymentProfile, trust: dict, certificate_config: d
     put("fixture-adapter-catalog-trust-v1", "digests.json", "{}")
     for name, credential in (("keycloak-admin", "keycloak_admin"), ("jira-admin", "jira_admin")):
         put("fixture-credentials", name, values["credential." + credential])
-    password = secrets.token_urlsafe(32)
-    public_certs = [pkcs12.PKCS12Certificate(c, b"spire-" + str(i).encode())
-                    for i, c in enumerate(x509.load_pem_x509_certificates(trust["spire_ca"].encode()))]
-    store = pkcs12.serialize_java_truststore(public_certs, serialization.BestAvailableEncryption(password.encode()))
-    put("fixture-keycloak-upstream-client-trust", "password", password)
-    put("fixture-keycloak-upstream-client-trust", "truststore.p12", store)
     return {"schema_version": 1, "profile_sha256": canonical_hash(profile.to_dict()),
             "trust_sha256": canonical_hash(trust),
             "certificate_management": contract,
@@ -307,7 +300,7 @@ def realm_template(name):
 def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, dict]:
     """Produce a complete private application bundle from checked-in templates."""
     profile, artifacts, trust, cidrs = load_inputs(config_file)
-    from managed_certificates import configuration, resources, public_trust, openshell_trust, SECRETS, SPIRE_TRUST
+    from managed_certificates import configuration, resources, public_trust, openshell_trust, SECRETS
     config = read_json(config_file)
     contract, application_ca = configuration(config)
     ingress = config.get('ingress_cluster_ip')
@@ -392,10 +385,6 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
         objects.append(public_trust(profile, state['application_ca']))
     if contract['mode'] == 'managed':
         objects.extend(resources(profile, contract))
-        objects.append({'apiVersion': 'v1', 'kind': 'Secret',
-            'metadata': {'name': SPIRE_TRUST, 'namespace': profile.core_namespace,
-                         'labels': dict(profile.labels)},
-            'type': 'Opaque', 'data': {'ca.crt': encoded(trust['spire_ca'])}})
     if not ingress:
         # Offline native-contract rendering needs no captured router IP. The
         # connected installer resolves this retained prerequisite before install.

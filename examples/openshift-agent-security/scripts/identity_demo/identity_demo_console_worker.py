@@ -267,10 +267,10 @@ def execute_job(base: argparse.Namespace, control: Control, job: dict) -> bool:
     args.protected_backend_catalog_credential_file = args.catalog_credential_file
     args.enable_create, args.presentation_only = True, True
     args.reuse_management_session = not getattr(base, 'fresh_management_per_command', False)
-    for name in ('investigate_substitution', 'require_substitution_denial', 'check_sender_rejection',
+    for name in ('investigate_substitution', 'require_substitution_denial', 'check_delegation_controls',
                  'retain_run_retirement', 'check_key_rollover', 'check_backend_rotation', 'check_renewal'):
         setattr(args, name, False)
-    for name in ('upstream_development_issuer', 'check_run_binding', 'bound_sender_listener', 'diagnose_native_grant'):
+    for name in ('upstream_development_issuer', 'check_run_binding', 'protected_listener', 'diagnose_native_grant'):
         setattr(args, name, True)
     flow_type = {'cve': ConsoleCveFlow, 'service-request': ConsoleModelFlow,
                  'incident-triage': ConsoleIncidentFlow}[job['workflow']]
@@ -414,59 +414,8 @@ def refresh_catalog(args: argparse.Namespace) -> int:
     return credential['expires_at']
 
 
-class SenderTrustMutationUncertain(RuntimeError):
-    """An owned trust mutation needs reconciliation and cannot be blindly repeated."""
 
 
-def reconcile_sender_trust(args: argparse.Namespace, before_mutation=None) -> bool:
-    """Repair only changed owned copies while admission is paused and state is idle."""
-    from identity_demo_sender_trust import current, refresh
-    from identity_demo_execution_setup import inspect_state
-    from deployment_profile import active_profile
-    installation = active_profile().installation_id
-    checkpoint = args.output_dir.parent / ('sender-trust-' + installation + '.pending.private.json')
-    if checkpoint.exists() or checkpoint.is_symlink():
-        raise SenderTrustMutationUncertain('Prior trust mutation needs explicit reconciliation')
-    if current(args):
-        return True
-    if not getattr(args, 'auto_refresh_sender_trust', False):
-        return False
-    if before_mutation is not None and not before_mutation():
-        return False
-    cluster_public = os.environ.get('IDENTITY_DEMO_RUNTIME') == 'cluster'
-    if cluster_public:
-        # The private control callback already closed admission and checked the
-        # durable execution lane; runtime has no installer/Pod-exec credential.
-        if before_mutation is None:
-            return False
-        from identity_demo_public_trust import refresh
-    elif not inspect_state(args)['rollback_quiescent']:
-        return False
-    output = args.output_dir / ('sender-trust-' + uuid4().hex)
-    output.mkdir(mode=0o700)
-    repair = argparse.Namespace(**vars(args))
-    repair.output_dir, repair.apply = str(output), True
-    pending = {'installation':installation, 'phase':'started', 'receipt_dir':str(output)}
-    native.private_write(checkpoint, pending)
-    try:
-        result = refresh(repair)  # Existing UID/RV/spec tests, complete dry-run and owned resources only.
-        if result['issuer_rollout_started']:
-            rollout = subprocess.run(['oc', '--kubeconfig', args.kubeconfig, '-n', native.NAMESPACE,
-                'rollout', 'status', 'deployment/fixture-keycloak-upstream', '--timeout=90s'],
-                capture_output=True, text=True, timeout=100)
-            if rollout.returncode:
-                raise RuntimeError('Owned issuer rollout is not ready')
-        if not current(args):
-            raise RuntimeError('Trust bundle changed during reconciliation')
-        native.private_write(output / 'automatic-reconciliation.private.json',
-            {'passed':True, 'automatic_owned_refresh':True, 'shared_foundation_changed':False,
-             'tls_verification_preserved':True, 'quiescence_verified':True})
-        if json.loads(private_path(str(checkpoint)).read_text()) != pending:
-            raise RuntimeError('Trust checkpoint changed during reconciliation')
-        checkpoint.unlink()
-        return True
-    except Exception:
-        raise SenderTrustMutationUncertain('Owned sender trust needs operator reconciliation; no automatic replay') from None
 
 
 def pause_for_maintenance(control: Control) -> bool:
@@ -557,21 +506,6 @@ def readiness_check(args: argparse.Namespace, control: Control) -> bool:
         control.state('blocked', 'recovery_required')
         control.publish()
         return False
-    # Discovery renewal is independent of workload CA trust. Keep its bounded
-    # credential alive while trust admission is stopped, avoiding a second outage.
-    try:
-        if not reconcile_sender_trust(args, lambda: pause_for_maintenance(control)):
-            control.state('blocked', 'sender_trust')
-            control.publish()
-            return False
-    except SenderTrustMutationUncertain:
-        control.state('blocked', 'sender_trust')
-        control.publish()
-        raise
-    except Exception:
-        control.state('blocked', 'sender_trust')
-        control.publish()
-        return False  # Observation failed before mutation; safe to observe again.
     # Observe node churn before accepting a run. Policy changes require the
     # explicit guarded operator command; readiness never mutates network rules.
     from identity_demo_spire_network import kubelet_coverage_current
@@ -671,8 +605,6 @@ def main() -> None:
     parser.add_argument('--gateway-receipt')
     parser.add_argument('--operator-login-file', help='Optional private same-operator login for proactive renewal')
     parser.set_defaults(operator_access_check=True)
-    parser.add_argument('--auto-refresh-sender-trust', action='store_true',
-                        help='Reconcile only owned issuer/listener public SPIRE trust while idle')
     parser.add_argument('--auto-refresh-catalog', action='store_true', help='Renew only catalog discovery access while idle')
     parser.add_argument('--fresh-management-per-command', action='store_true',
                         help='Rollback: reconnect and authenticate before every native command')
@@ -744,7 +676,7 @@ def main() -> None:
                     continue
                 except Exception:
                     # A failed credential mutation still requires explicit review.
-                    control.state('blocked', control.readiness['reason'] if control.readiness['reason'] in ('catalog_refresh_failed', 'sender_trust') else 'recovery_required')
+                    control.state('blocked', control.readiness['reason'] if control.readiness['reason'] in ('catalog_refresh_failed',) else 'recovery_required')
                     blocked = True
                     continue
             if control.readiness['phase'] != 'ready':

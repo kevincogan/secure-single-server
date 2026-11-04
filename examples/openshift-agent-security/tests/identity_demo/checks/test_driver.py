@@ -21,7 +21,7 @@ from identity_demo_driver import (
     COOKIE,
     Driver,
     Verifier,
-    peer_matches,
+    valid_delegation,
     NoIssuerRedirect,
     prepare_storage,
 )
@@ -70,11 +70,6 @@ def setup(
         "a" * 40,
     )
     now = int(time.time())
-    thumb = (
-        base64.urlsafe_b64encode(hashlib.sha256(b"public-cert-fixture").digest())
-        .decode()
-        .rstrip("=")
-    )
     user = {
         "iss": config.issuer,
         "sub": "user-a",
@@ -89,7 +84,6 @@ def setup(
         "aud": config.audience,
         "azp": workload,
         "exp": now + 30,
-        "cnf": {"x5t#S256": thumb},
     }
 
     def verify(token: str, audience: str) -> dict:
@@ -195,8 +189,7 @@ def test_reauthentication_cannot_approve_expired_run(tmp_path: Path, monkeypatch
 
 
 def auth_context(driver: Driver, run: str, claims: dict, p: dict) -> dict:
-    """Shape the tested Authorino context, with a simulated trusted TLS peer."""
-    fingerprint = base64.urlsafe_b64decode(claims["cnf"]["x5t#S256"] + "=").hex()
+    """Shape the authenticated gateway context without unsigned identity authority."""
     body = {
         "jsonrpc": "2.0",
         "id": 1,
@@ -214,10 +207,6 @@ def auth_context(driver: Driver, run: str, claims: dict, p: dict) -> dict:
                     "method": "POST",
                     "headers": {
                         "authorization": "Bearer final",
-                        "x-forwarded-client-cert": "Hash="
-                        + fingerprint
-                        + ";URI="
-                        + claims["azp"],
                     },
                     "body": json.dumps(body),
                 }
@@ -252,7 +241,7 @@ def test_actual_body_matches_approval_and_authorization_does_not_claim(
 
 
 @pytest.mark.parametrize(
-    "change", ["missing_body", "peer", "run", "expired_run", "missing_token"]
+    "change", ["missing_body", "old_constrained_token", "run", "expired_run", "missing_token"]
 )
 def test_auth_context_fails_closed(tmp_path: Path, change: str) -> None:
     """Identity, body and current state must all remain valid."""
@@ -262,10 +251,8 @@ def test_auth_context_fails_closed(tmp_path: Path, change: str) -> None:
     http = ctx["context"]["request"]["http"]
     if change == "missing_body":
         del http["body"]
-    if change == "peer":
-        http["headers"]["x-forwarded-client-cert"] = (
-            "Hash=" + "0" * 64 + ";URI=" + claims["azp"]
-        )
+    if change == "old_constrained_token":
+        claims["cnf"] = {"x5t#S256": "retired-constraint"}
     if change == "run":
         rpc = json.loads(http["body"])
         rpc["params"]["arguments"]["run_id"] = "f" * 32
@@ -455,21 +442,16 @@ def test_standard_library_rejects_invalid_jwt(change: str) -> None:
         verifier(token, "driver")
 
 
-def test_peer_duplicates_or_wrong_certificate_rejected() -> None:
-    """A caller cannot smuggle another TLS peer or reuse only its SPIFFE string."""
-    digest = hashlib.sha256(b"cert").digest()
-    claims = {
-        "azp": "spiffe://example.test/workload",
-        "cnf": {"x5t#S256": base64.urlsafe_b64encode(digest).decode().rstrip("=")},
-    }
-    good = "Hash=" + digest.hex() + ";URI=" + claims["azp"]
-    assert peer_matches(claims, {"x-forwarded-client-cert": good})
-    assert not peer_matches(
-        claims, {"x-forwarded-client-cert": good + ";Hash=" + digest.hex()}
-    )
-    assert not peer_matches(
-        claims, {"x-forwarded-client-cert": good + ",Hash=" + digest.hex()}
-    )
+@pytest.mark.parametrize("change", [
+    {"cnf": {}}, {"cnf": {"x5t#S256": "old-constrained-token"}},
+    {"exp": 101}, {"exp": 140}, {"iat": 102}, {"iat": True},
+    {"exp": True}, {"sub": ""}, {"azp": ""}, {"azp": "a" * 257},
+])
+def test_bearer_contract_refuses_ambiguous_or_overbroad_grants(change) -> None:
+    """Binding retirement never silently turns a constrained token into bearer."""
+    claims = {"iat": 100, "exp": 130, "sub": "user-a", "azp": "workload-a"}
+    assert valid_delegation(claims, now=101)
+    assert not valid_delegation({**claims, **change}, now=101)
 
 
 def test_internal_issuer_transport_retains_public_issuer() -> None:
@@ -524,7 +506,7 @@ def test_real_callback_contract(
         human if token == "human" else {**human, "nonce": nonce}
     )
     monkeypatch.setattr(
-        "identity_demo_driver.exchange_code",
+        "identity_demo_oidc.exchange_code",
         lambda *args: {"access_token": "human", "id_token": "identity"},
     )
     callback = "/callback?state=" + state + "&code=one-use"

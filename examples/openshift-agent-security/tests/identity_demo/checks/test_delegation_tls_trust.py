@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import native_sender_acceptance as sender
+import native_delegation_acceptance as sender
 
 
 @pytest.mark.parametrize("port", [19443, 19444])
@@ -30,10 +30,10 @@ def test_bound_listener_adds_only_explicit_application_ca(
 
     monkeypatch.setattr(sender.ssl, "create_default_context", ssl_context)
     monkeypatch.setattr(sender.socket, "create_connection", stop)
-    probe = sender.SenderAcceptance.__new__(sender.SenderAcceptance)
+    probe = sender.DelegationAcceptance.__new__(sender.DelegationAcceptance)
     probe.ca, probe.native_ca = Path("/private/platform.pem"), Path("/private/application.pem")
     with pytest.raises(RuntimeError, match="stop-before-network"):
-        probe._request_once(port, "owned.example", "/mcp", b"{}", None, {})
+        probe._request_once(port, "owned.example", "/mcp", b"{}", {})
     assert ("platform", {"cafile": "/private/platform.pem"}) in calls
     extra = [(kind, value) for kind, value in calls if kind == "application"]
     assert extra == ([("application", {"cafile": "/private/application.pem"})] if port == 19444 else [])

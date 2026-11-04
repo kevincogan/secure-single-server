@@ -63,7 +63,7 @@ def authority(
             "fixture-step4-read-route-catalog",
             "fixture-openshell-server-client-ca",
         ],
-        "ConfigMap": ["fixture-console-sender-trust", "fixture-step4-retired-runs"],
+        "ConfigMap": ["fixture-step4-retired-runs"],
         "Service": ["fixture-identity-operator"],
         "NetworkPolicy": [
             "fixture-identity-operator",
@@ -174,7 +174,7 @@ def authority(
             "Exact installation ownership is required",
         ),
         (
-            "variables.target.metadata.name in variables.names[request.kind.kind] || (request.kind.kind == 'ConfigMap' && variables.target.metadata.name.matches('^fixture-(identity-driver-code|adapter-action-code)-[a-f0-9]{10}$')) || (request.dryRun == true && request.operation == 'CREATE' && request.kind.kind == 'ConfigMap' && variables.target.metadata.name == 'fixture-console-sender-trust-review')",
+            "variables.target.metadata.name in variables.names[request.kind.kind] || (request.kind.kind == 'ConfigMap' && variables.target.metadata.name.matches('^fixture-(identity-driver-code|adapter-action-code)-[a-f0-9]{10}$'))",
             "Only reviewed application destinations may be changed",
         ),
         (
@@ -520,14 +520,8 @@ def authority(
                 }
             )
         elif meta.get("namespace") == profile.identity_namespace:
-            # The administrator verifies its own exact public-trust RBAC
-            # before launch. The installer can read only the public bundle.
-            expected = (
-                "fixture-console-coordinator-public-trust-" + profile.installation_id
-            )
+            # The administrator verifies the exact discovery policy before launch.
             permitted = (
-                kind in ("Role", "RoleBinding") and meta["name"] == expected
-            ) or (
                 kind == "NetworkPolicy"
                 and meta["name"]
                 == "identity-demo-" + profile.installation_id + "-discovery-access"
@@ -551,14 +545,6 @@ def authority(
                     "verbs": ["get"],
                 }
             )
-    scoped[profile.identity_namespace].append(
-        {
-            "apiGroups": [""],
-            "resources": ["configmaps"],
-            "resourceNames": ["spire-bundle"],
-            "verbs": ["get"],
-        }
-    )
     scoped["openshift-ingress"].append(
         {
             "apiGroups": [""],

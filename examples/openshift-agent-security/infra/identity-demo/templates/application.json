@@ -167,28 +167,6 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "fixture-keycloak-upstream-client-trust",
-        "labels": {
-          "app.kubernetes.io/part-of": "identity-demo-preflight",
-          "identity-demo-owner": "${owner}"
-        },
-        "annotations": {},
-        "namespace": "${core_namespace}"
-      },
-      "type": "Opaque",
-      "data": {
-        "password": {
-          "$secret": "fixture-keycloak-upstream-client-trust/password"
-        },
-        "truststore.p12": {
-          "$secret": "fixture-keycloak-upstream-client-trust/truststore.p12"
-        }
-      }
-    },
-    {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
         "name": "fixture-keycloak-upstream-realm",
         "labels": {
           "app.kubernetes.io/part-of": "identity-demo-preflight",
@@ -437,6 +415,9 @@
         },
         "identity_demo_issue_view.py": {
           "$source": "scripts/identity_demo/identity_demo_issue_view.py"
+        },
+        "identity_demo_oidc.py": {
+          "$source": "scripts/identity_demo/identity_demo_oidc.py"
         },
         "identity_demo_login_state.py": {
           "$source": "scripts/identity_demo/identity_demo_login_state.py"
@@ -3372,27 +3353,6 @@
                     "value": "/etc/keycloak/serving-tls/tls.key"
                   },
                   {
-                    "name": "KC_HTTPS_CLIENT_AUTH",
-                    "value": "request"
-                  },
-                  {
-                    "name": "KC_HTTPS_TRUST_STORE_FILE",
-                    "value": "/etc/keycloak/client-trust/truststore.p12"
-                  },
-                  {
-                    "name": "KC_HTTPS_TRUST_STORE_TYPE",
-                    "value": "PKCS12"
-                  },
-                  {
-                    "name": "KC_HTTPS_TRUST_STORE_PASSWORD",
-                    "valueFrom": {
-                      "secretKeyRef": {
-                        "key": "password",
-                        "name": "fixture-keycloak-upstream-client-trust"
-                      }
-                    }
-                  },
-                  {
                     "name": "IDENTITY_DEMO_CONFIG",
                     "value": "/configuration/installation.json"
                   }
@@ -3457,11 +3417,6 @@
                     "readOnly": true
                   },
                   {
-                    "mountPath": "/etc/keycloak/client-trust",
-                    "name": "client-trust",
-                    "readOnly": true
-                  },
-                  {
                     "name": "installation-profile",
                     "mountPath": "/configuration/installation.json",
                     "subPath": "installation.json",
@@ -3512,19 +3467,6 @@
                 "secret": {
                   "defaultMode": 420,
                   "secretName": "fixture-keycloak-upstream-tls"
-                }
-              },
-              {
-                "name": "client-trust",
-                "secret": {
-                  "defaultMode": 420,
-                  "items": [
-                    {
-                      "key": "truststore.p12",
-                      "path": "truststore.p12"
-                    }
-                  ],
-                  "secretName": "fixture-keycloak-upstream-client-trust"
                 }
               },
               {
@@ -4434,10 +4376,7 @@
                   "name": "fixture-mcp-bound-mutual"
                 }
               ],
-              "mode": "Terminate",
-              "options": {
-                "gateway.istio.io/tls-terminate-mode": "MUTUAL"
-              }
+              "mode": "Terminate"
             }
           }
         ]
@@ -4797,11 +4736,7 @@
                 "name": "envoy.filters.network.http_connection_manager",
                 "typed_config": {
                   "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-                  "forward_client_cert_details": "SANITIZE_SET",
-                  "set_current_client_cert_details": {
-                    "subject": true,
-                    "uri": true
-                  }
+                  "forward_client_cert_details": "SANITIZE"
                 }
               }
             }

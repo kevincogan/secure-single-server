@@ -119,7 +119,7 @@ def validate(value):
 
         if (
             p["issuer"]
-            != installation.native_build_contract["OPENSHELL_DEMO_JWT_AUDIENCE"]
+            != installation.delegation_issuer
             or p["supervisor_image"] not in native_supervisor_images()
         ):
             raise Denied("pool_profile")

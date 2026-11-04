@@ -287,12 +287,6 @@ def finish_installation(args, env, stages, run, rendered, objects, cli,
     if read_json(bundle_path).get('certificate_management', {}).get('mode') == 'managed':
         run(trust_name, 'certificate-status', ['--installation-profile', str(rendered/'installation-profile.json'),
             '--managed-certificate-config', args.installation_config, '--verify-certificate-loading'])
-    else:
-        stages.run(trust_name, "scripts/identity_demo/identity_demo_sender_trust.py", [
-            "--kubeconfig", args.kubeconfig, "--expected-server", args.expected_server,
-            "--credentials-file", credentials_path, "--apply",
-            "--output-dir", str(args.output_dir / trust_name)], create_output=True,
-            summary_name="sender-trust.summary.json")
     wait_controllers(args, objects)
     return finish_execution_setup(args, env, stages, rendered, objects, cli,
         suggested_presenter, inference_path, dormant=dormant, creation_ledger=creation_ledger)
@@ -524,25 +518,6 @@ def activate_cluster_services(args, env, stages, rendered, cli, inference_path, 
     wait_controllers(args, [o for o in read_json(rendered/'stack.private.json').get('objects', [])
         if o['kind'] == 'Deployment' and o['metadata']['name'] in (
             'fixture-identity-driver', 'fixture-protected-adapter')])
-    # Long builds can span SPIRE CA overlap changes. Reconcile only the owned
-    # public copies while the execution lane is still closed, before observing.
-    ca_args = []
-    if certificate:
-        from managed_certificates import SPIRE_TRUST
-        records = [v for v in read_json(ledger)['created'] if v['kind'] == 'Secret'
-            and v.get('namespace') == args.profile.core_namespace
-            and v['metadata']['name'] == SPIRE_TRUST]
-        if len(records) != 1:
-            raise ValueError('Original separate public SPIRE trust identity required')
-        ca_args = ['--public-trust-ca-uid', records[0]['metadata']['uid']]
-    stages.run('23a-public-trust-reconcile', 'scripts/identity_demo/identity_demo_sender_trust.py', [
-        '--kubeconfig', args.kubeconfig, '--expected-server', args.expected_server,
-        '--namespace', args.profile.core_namespace, '--credentials-file', str(credentials),
-        *ca_args, '--output-dir', str(root/'23a-public-trust-reconcile'), '--apply'],
-        create_output=True, summary_name='sender-trust.summary.json')
-    wait_controllers(args, [o for o in read_json(rendered/'stack.private.json').get('objects', [])
-        if o['kind'] == 'Deployment' and o['metadata']['name'] == 'fixture-keycloak-upstream'])
-    _, trust = console('24-trust-observation', 'trust-observation', [*ledger_args, *certificate])
     configuration_args = ['--console-configuration-receipt', str(configuration/'setup.summary.json'),
         '--console-configuration-sha256', setup.sha(configuration/'setup.summary.json')]
     _, gateway = stages.run('25-persistent-gateway', 'scripts/identity_demo/identity_demo_execution_setup.py', [
@@ -562,20 +537,13 @@ def activate_cluster_services(args, env, stages, rendered, cli, inference_path, 
         '--artifacts-file', env['IDENTITY_DEMO_ARTIFACTS'],
         '--console-management-ca', str(rendered/'runtime-gateway-ca.pem'),
         '--console-catalog-credential', str(root/'catalog-credential.private.json'),
-        '--console-trust-observation-receipt', str(trust/'sender-trust.receipt.json'),
         '--inference-config', inference_path])
     wait_controllers(args, read_json(workers/'runtime-workloads.plan.private.json')['objects'])
     worker_args = ['--console-worker-receipt', str(workers/'setup.summary.json'),
                    '--console-worker-sha256', setup.sha(workers/'setup.summary.json')]
-    _, refreshed = console('28-public-trust-refresh', 'update-workloads', [*ledger_args,
-        *configuration_args, *worker_args, *publication_args, *gateway_args,
-        '--refresh-sender-trust', '--enable-public-trust-refresh'])
-    # Trust refresh replaces both workers. Observe the replacement Pods before
-    # their exact management-profile and lease checks authorize scheduling.
-    wait_controllers(args, read_json(workers/'runtime-workloads.plan.private.json')['objects'])
     _, enabled = console('29-automatic-preparation', 'automatic-enable', [*configuration_args,
-        '--console-worker-receipt', str(refreshed/'setup.summary.json'),
-        '--console-worker-sha256', setup.sha(refreshed/'setup.summary.json'),
+        '--console-worker-receipt', str(workers/'setup.summary.json'),
+        '--console-worker-sha256', setup.sha(workers/'setup.summary.json'),
         '--pool-mode', args.pool_mode,
         *(['--workload-image', args.workload_image] if getattr(args, 'workload_image', None) else []),
         *(['--pool-profile-configuration', args.pool_profile_configuration]

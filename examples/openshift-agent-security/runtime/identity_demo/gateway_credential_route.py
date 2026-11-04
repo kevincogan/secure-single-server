@@ -180,7 +180,7 @@ it must never be exposed as an alternative bearer-only agent entrypoint.
         + str(run.not_before) + " && has(auth.identity.exp) && int(auth.identity.exp) <= "
         + str(run.expires_at) + " && int(auth.identity.exp) > int(auth.identity.iat)"
         + " && int(auth.identity.exp) - int(auth.identity.iat) <= 30"
-        + " && has(auth.identity.cnf) && 'x5t#S256' in auth.identity.cnf"
+        + " && !has(auth.identity.cnf)"
         + " && has(auth.identity.realm_access) && has(auth.identity.realm_access.roles)"
         + " && 'analyst' in auth.identity.realm_access.roles"
         + " && request.path == '/mcp' && request.method in ['GET', 'POST', 'DELETE']"
@@ -192,25 +192,23 @@ it must never be exposed as an alternative bearer-only agent entrypoint.
     # This is the private broker boundary. The mandatory certificate comparison
     # remains on the external bound frontend; topology must enforce this split.
     auth["authorization"]["native-read-run"] = run_authorization(
-        [run], require_sender_binding=True)
+        [run])
     # Bounded development diagnostics expose only booleans on denials, never
     # credentials or claims. These disposable resources are removed by the probe.
     auth["response"]["unauthorized"] = {"headers": {
         "x-step4-identity": {"expression": "string(" + allowed + ")"},
-        "x-step4-peer": {"expression": "string('x-forwarded-client-cert' in request.headers)"},
         "x-step4-grant": {"expression": "string(has(auth.metadata['adapter-token'].access_token))"},
     }}
     auth["response"]["success"]["dynamicMetadata"] = {"step4-audit": {
         "key": "step4", "json": {"properties": {
             "user": {"selector": "auth.identity.sub"},
             "workload": {"selector": "auth.identity.azp"},
-            "cnf": {"expression": "auth.identity.cnf['x5t#S256']"},
+            "delegation": {"value": "short-lived-bearer"},
             "run": {"value": run.run_id}, "policy": {"value": "step4-protected-read"},
             "expiry": {"selector": "auth.identity.exp"},
         }}}}
-    # Original requests retain the actual verified TLS peer. The broker's
-    # private initialization forwards that already verified header. Only the
-    # trusted broker reaches this HTTP listener; arbitrary Pods are denied.
+    # Outer requests use verified TLS and signed delegated identity. Only the
+    # trusted broker reaches the private HTTP listener; arbitrary Pods are denied.
     values[2]["spec"]["parentRefs"].append({"name": "fixture-mcp", "sectionName": "bound"})
     http = next(p for p in values[3]["spec"]["configPatches"] if p["applyTo"] == "HTTP_FILTER")
     bound_http = deepcopy(http)
@@ -231,23 +229,21 @@ it must never be exposed as an alternative bearer-only agent entrypoint.
         "patch": {"operation": "MERGE", "value": {
             "name": "envoy.filters.network.http_connection_manager", "typed_config": {
                 "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-                # Envoy FORWARD_ONLY requires an mTLS downstream connection and
-                # strips this verified peer on the broker's private HTTP hop.
-                # Only the network-isolated trusted broker reaches port 8080.
-                "forward_client_cert_details": "ALWAYS_FORWARD_ONLY",
+                # Reject caller-supplied certificate identity headers. The
+                # broker's private HTTP hop is not evidence of downstream TLS.
+                "forward_client_cert_details": "SANITIZE",
                 "access_log": [{"name": "envoy.access_loggers.stdout", "typed_config": {
                     "@type": "type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog",
                     "log_format": {"json_format": {"event": "step4-private-read",
                         "status": "%RESPONSE_CODE%", "detail": "%RESPONSE_CODE_DETAILS%",
                         "upstream": "%UPSTREAM_CLUSTER%", "request": "%REQ(X-REQUEST-ID)%",
-                        "peer_hash": "%DOWNSTREAM_PEER_FINGERPRINT_256%",
+                        "tls_version": "%DOWNSTREAM_TLS_VERSION%",
                         "denied_identity": "%RESP(X-STEP4-IDENTITY)%",
-                        "denied_peer": "%RESP(X-STEP4-PEER)%",
                         "denied_grant": "%RESP(X-STEP4-GRANT)%",
                         "verified": "%DYNAMIC_METADATA(envoy.filters.http.ext_authz:step4)%"}}}}],
             }}}})
     bound_log = deepcopy(values[3]["spec"]["configPatches"][-1])
     bound_log["match"]["listener"]["portNumber"] = 8443
-    bound_log["patch"]["value"]["typed_config"].pop("forward_client_cert_details")
+    bound_log["patch"]["value"]["typed_config"]["forward_client_cert_details"] = "SANITIZE"
     values[3]["spec"]["configPatches"].append(bound_log)
     return values

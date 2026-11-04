@@ -8,7 +8,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-import identity_demo_driver as driver
+import identity_demo_oidc as driver
 from identity_demo_run_store import Denied
 
 

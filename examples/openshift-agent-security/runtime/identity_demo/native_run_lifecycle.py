@@ -10,7 +10,7 @@ import time
 from typing import Callable
 
 import probe_native_exchange as native
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 from run_binding import ReadRun, authorization
 from execution_context import context_of
 
@@ -74,7 +74,7 @@ def check(args: argparse.Namespace, execute: Callable, human: dict, login: dict,
           frontend: str, before: dict, spec: dict, backend: object, provider_id: str) -> tuple[dict, dict]:
     """Expire at native release, cancel at gateway first, detach, then persist retirement."""
     sender_args = argparse.Namespace(**{**vars(args), "label": args.label + "-lifecycle"})
-    sender = SenderAcceptance(sender_args, human)
+    sender = DelegationAcceptance(sender_args, human)
     cases = []
     execute(["provider", "update", context_of(args).provider_prefix, "--credential", "subject_token", "--credential-expires-at",
              "subject_token=" + str(run.expires_at * 1000), "--wait", "--timeout", "30"], subject=login["access_token"])

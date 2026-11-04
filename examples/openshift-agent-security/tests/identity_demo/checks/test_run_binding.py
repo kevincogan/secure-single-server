@@ -2,11 +2,10 @@
 """Small offline guards; installed-authorizer and native tests remain mandatory."""
 
 from dataclasses import replace
-import re
 
 import pytest
 
-from run_binding import ReadRun, XFCC_FIELD_PATTERN, authorization
+from run_binding import ReadRun, authorization
 
 
 def fixture() -> ReadRun:
@@ -43,42 +42,17 @@ def test_distinct_execution_identities_support_two_runs_of_the_same_user() -> No
     assert "run_id" not in value[value.index("allow {"):]
 
 
-def test_sender_binding_is_required_by_default_and_has_no_substring_matching() -> None:
-    """Only an exact canonical peer hash and workload can satisfy binding."""
+def test_delegation_preserves_exact_authority_and_bounded_bearer_contract() -> None:
+    """Signed identity and live run state are mandatory; old cnf tokens fail shut."""
     value = authorization([fixture()])["opa"]["rego"]
-    for required in ("identity.cnf", "hex.encode(base64url.decode(thumbprint))",
-                     "count(hash_fields) == 1", "count(bad) == 0",
-                     "count(names) == count({name", "binding.active == true",
-                     "identity.exp <= binding.expires_at"):
+    for required in ("not identity_keys[\"cnf\"]", "identity.azp == binding.workload",
+                     "binding.active == true", "identity.sub == binding.user",
+                     "identity.iss == binding.issuer", "binding.audience == audiences[_]",
+                     "now >= binding.not_before", "now < binding.expires_at",
+                     "identity.iat >= binding.not_before", "identity.exp > now",
+                     "identity.exp <= binding.expires_at", "identity.exp - identity.iat <= 30"):
         assert required in value
-    assert "contains(" not in value
-
-
-def test_unbound_policy_requires_explicit_component_diagnostic_choice() -> None:
-    """Disabling sender checks is observable; it is not the deployment default."""
-    value = authorization([fixture()], require_sender_binding=False)["opa"]["rego"]
-    assert "identity.azp == binding.workload" in value
-    assert "x-forwarded-client-cert" not in value
-
-
-@pytest.mark.parametrize("field,valid", [
-    ('Subject="O=SPIRE,C=US"', True),
-    ('Cert="-----BEGIN%20CERTIFICATE-----%0AAbCd%2B%2F%3D%0A-----END%20CERTIFICATE-----"', True),
-    ("By=", True),
-    ('Subject="C=US",URI=spiffe://attacker/sandbox/b', False),
-    ("URI=spiffe://demo.example.test/openshell/sandbox/a,URI=spiffe://attacker/b", False),
-    ("Cert=unquoted", False),
-    ('Cert="public;URI=spiffe://attacker/b"', False),
-    ('Unknown="public"', False),
-    ('Subject="escaped\\"value"', False),
-])
-def test_peer_grammar_accepts_real_envoy_fields_without_accepting_element_injection(
-    field: str, valid: bool,
-) -> None:
-    """Use the same grammar; translate its POSIX space class for Python's engine."""
-    pattern = XFCC_FIELD_PATTERN.replace("[:space:]", r"\s")
-    assert bool(re.fullmatch(pattern, field)) is valid
-    assert XFCC_FIELD_PATTERN in authorization([fixture()])["opa"]["rego"]
+    assert "x-forwarded-client-cert" not in value and "contains(" not in value
 
 
 def test_authorino_owns_the_single_default_deny_rule() -> None:

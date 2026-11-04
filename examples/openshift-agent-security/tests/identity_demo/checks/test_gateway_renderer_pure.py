@@ -7,7 +7,7 @@ import native_backend as backend
 import gateway_credential_route as route
 import probe_broker_discovery as shared
 from run_binding import ReadRun
-from sender_listener import HOST
+from protected_listener import HOST
 from identity_demo_keycloak_upstream import BASE
 from deployment_profile import active_profile
 
@@ -38,7 +38,7 @@ def test_pure_gateway_renderer_matches_baseline_and_does_not_read_api(monkeypatc
         action_driver=True,enable_create=True)
     actual={'objects':values,'gateway':gateway,'spec':spec}
     assert len(values)==11
-    assert hashlib.sha256(json.dumps(actual,sort_keys=True,separators=(',',':')).encode()).hexdigest() == '484e94170a296ddbf535b8b4bcbbc02188e3be7546f329736c15eead92afc32a'
+    assert hashlib.sha256(json.dumps(actual,sort_keys=True,separators=(',',':')).encode()).hexdigest() == '1c48fd81fad2de5a4443bf9c8bf6dd5c25a4b9a2c4407f7b473f8cc7081acf44'
     assert operations[0] == {'op':'test','path':'/metadata/uid','value':'fixture-uid'}
 
 

@@ -11,7 +11,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-import identity_demo_driver as module
+import identity_demo_oidc as module
 from checks.test_console import configured, operator, submit
 from identity_demo_driver import COOKIE, Driver
 from identity_demo_run_store import Denied

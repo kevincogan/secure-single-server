@@ -155,6 +155,9 @@ def test_installer_phase_remount_preserves_private_checkpoint_permissions(phase)
     job = build_job(
         config(), "registry.example/installer@sha256:" + "a" * 64, phase=phase
     )
+    assert job["spec"]["template"]["metadata"]["annotations"] == {
+        "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
+    }
     pod = job["spec"]["template"]["spec"]
     assert pod["securityContext"]["fsGroupChangePolicy"] == "OnRootMismatch"
     assert pod["securityContext"]["runAsNonRoot"] is True

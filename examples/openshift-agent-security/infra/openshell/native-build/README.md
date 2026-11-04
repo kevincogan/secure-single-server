@@ -15,9 +15,8 @@ outputs as an official OpenShell release or a supported production component.
 - The exact upstream archive identified in `inputs.lock.json`. The source URL is
   recorded there; download or obtain it from an approved artifact mirror, then
   supply the local file. A changed archive is refused even for the same commit.
-- Five checked-in patches, in recorded order. Upstream and patched Cargo locks
-  have **different pinned hashes**: the sender patch deliberately adds its X.509
-  dependencies. No implicit dependency updates are allowed during compilation.
+- Two security patches in recorded order. Upstream and executed Cargo locks
+  have the same pinned hash. No implicit dependency updates are permitted.
 - Rust 1.95.0 official multi-architecture base pinned by digest, signed Debian
   snapshot `20260520T000000Z`, and pinned official AMD64 runtime bases.
 - Pinned `cargo-auditable` 0.7.7, installed as a build tool with its dependency
@@ -80,7 +79,8 @@ and audience contract, public CA hash, builder ID, runtime IDs and executable
 hashes. `builder-packages.txt` records installed build-package versions. Logs,
 source and cache remain in the protected output directory. Failed attempts are
 not overwritten; inspect the specific stage log before starting another attempt.
-Changing trust or any sender destination/domain requires a new image contract.
+Changing approved public TLS roots requires verified repackaging. Changing the
+source, patch set or generic identity-exchange contract requires a new build.
 
 Local image IDs are not published registry manifest digests. After review, export
 or publish only to the approved repository, record the actual pullable digests,
@@ -239,7 +239,7 @@ An optional `--compiler-cache-receipt` plus `--compiler-cache-sha256` reuses the
 exact immutable local compiler image from a completed private native-build
 receipt. The helper checks its compiler inputs, recipe hashes and local image ID.
 Native sources/patches, generated public trust, compilation, packaged executable
-hashes and startup checks still run. It does not reuse the old sender binary.
+hashes and startup checks still run. It does not reuse a binary with an obsolete sender patch set.
 Without this option the normal pinned compiler-image build remains unchanged.
 Keep the prior receipt outside Git; its checksum is not a security approval.
 

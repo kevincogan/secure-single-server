@@ -102,7 +102,6 @@ def test_overlap_expiry_allows_one_rotation_without_eviction(tmp_path, monkeypat
 
 @pytest.mark.parametrize('remaining,expected,phase', [(700, True, 'ready'), (500, False, 'preparing')])
 def test_deferred_capacity_keeps_lifetime_gates_and_recovers(tmp_path, monkeypatch, remaining, expected, phase):
-    import identity_demo_sender_trust as trust
     import identity_demo_spire_network as network
     credential = tmp_path/'catalog.json'
     credential.write_text(json.dumps({'token': 'discovery_synthetic', 'expires_at': int(time.time()) + remaining}))
@@ -114,7 +113,6 @@ def test_deferred_capacity_keeps_lifetime_gates_and_recovers(tmp_path, monkeypat
     monkeypatch.setattr(worker, 'guard', lambda _: None)
     monkeypatch.setattr(worker, 'private_inference', lambda _: None)
     monkeypatch.setattr(worker, 'recover_catalog_reference', lambda _: True)
-    monkeypatch.setattr(trust, 'current', lambda _: True)
     monkeypatch.setattr(network, 'kubelet_coverage_current', lambda _: True)
     monkeypatch.delenv('IDENTITY_DEMO_RUNTIME', raising=False)
     def deferred(_):
@@ -131,7 +129,6 @@ def test_deferred_capacity_keeps_lifetime_gates_and_recovers(tmp_path, monkeypat
 
 
 def test_unknown_refresh_failure_keeps_operator_stop(tmp_path, monkeypatch):
-    import identity_demo_sender_trust as trust
     credential = tmp_path/'catalog.json'
     credential.write_text(json.dumps({'token': 'discovery_synthetic', 'expires_at': int(time.time()) + 700}))
     credential.chmod(0o600)
@@ -141,7 +138,6 @@ def test_unknown_refresh_failure_keeps_operator_stop(tmp_path, monkeypatch):
     monkeypatch.setattr(worker, 'guard', lambda _: None)
     monkeypatch.setattr(worker, 'private_inference', lambda _: None)
     monkeypatch.setattr(worker, 'recover_catalog_reference', lambda _: True)
-    monkeypatch.setattr(trust, 'current', lambda _: True)
     def uncertain(_):
         raise RuntimeError('reply lost after patch')
     monkeypatch.setattr(worker, 'refresh_catalog', uncertain)

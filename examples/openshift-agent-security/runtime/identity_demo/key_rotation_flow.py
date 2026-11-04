@@ -13,7 +13,7 @@ import jwt
 
 from identity_demo_action_policy import DRIVER
 from lifecycle_flow import LifecycleFlow
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 from permission_flow import PermissionFlow
 import probe_native_exchange as native
 
@@ -86,24 +86,23 @@ class KeyRotationFlow(PermissionFlow):
     def accept(self, execute: Callable, resource: str, context: object) -> dict:
         """Use real keys/tokens and reads; no Jira mutation is dispatched."""
         before = self.backend_count()
-        sender = SenderAcceptance(argparse.Namespace(**{**vars(self.args), "label": self.args.label + "-keys"}), {"sub": self.user})
-        leaf = sender.certificate("key-overlap")
-        token, claims = sender.final(leaf)
+        sender = DelegationAcceptance(argparse.Namespace(**{**vars(self.args), "label": self.args.label + "-keys"}), {"sub": self.user})
+        token, claims = sender.final()
         old_kid = jwt.get_unverified_header(token)["kid"]
-        assert sender.gateway("before_realm_key_change", token, leaf)["http_status"] == 200
+        assert sender.gateway("before_realm_key_change", token)["http_status"] == 200
         probe = RealmKeyProbe(self.issuer_admin)
         native.private_write(self.args.output_dir / "realm-keys-before.private.json", probe.before)
         # Fresh old-key token immediately before the administrative transition.
-        token, claims = sender.final(leaf)
+        token, claims = sender.final()
         with probe.active() as created:
             native.private_write(self.args.output_dir / "temporary-key-provider.private.json", created)
             active = self.issuer_admin("/keys")["active"]["RS256"]
             assert active != old_kid
-            overlap = sender.gateway("published_old_key_overlap", token, leaf)
+            overlap = sender.gateway("published_old_key_overlap", token)
             assert overlap["http_status"] == 200 and claims["exp"] > time.time()
-            fresh, _ = sender.final(leaf)
+            fresh, _ = sender.final()
             assert jwt.get_unverified_header(fresh)["kid"] == active
-            assert sender.gateway("unknown_kid_live_refresh", fresh, leaf)["http_status"] == 200
+            assert sender.gateway("unknown_kid_live_refresh", fresh)["http_status"] == 200
             recovered = execute(["sandbox", "exec", "--name", context.sandbox_name,
                 "--no-login-shell", "--timeout", "90", "--no-tty", "--", "python", "-c",
                 self.read_program(resource)], json_output=True)
@@ -129,7 +128,7 @@ class KeyRotationFlow(PermissionFlow):
             self.close()
         assert self.issuer_admin("/keys")["active"]["RS256"] == old_kid
         summary = {"passed": True, "original_keys_preserved": True,
-            "old_signed_bound_token_accepted_during_published_overlap": True,
+            "old_signed_token_accepted_during_published_overlap": True,
             "new_final_token_signed_by_new_active_key": True,
             "new_key_gateway_and_driver_refresh_passed": True,
             "actual_cve_protected_read_with_new_service_signatures_passed": True,

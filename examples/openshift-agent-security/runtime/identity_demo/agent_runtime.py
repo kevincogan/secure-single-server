@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Trusted adapter for sandbox model turns and existing certificate-bound MCP reads."""
+"""Trusted adapter for sandbox model turns and existing protected MCP reads."""
 
 from __future__ import annotations
 
@@ -176,7 +176,7 @@ except AgentFailure as error:
         query = agent.scoped_jql(jql, flow.project)
         started = time.monotonic()
         # Dedicated synthetic boundary test: never relax model JQL validation.
-        # This trusted probe uses the same sandbox, run and certificate-bound MCP
+        # This trusted probe uses the same sandbox, run and protected MCP
         # transport and must observe the gateway's own actual 403 response.
         probe_project = getattr(flow, "agent_scope_probe", None)
         if probe_project is not None and scope_feedback is None:
@@ -215,7 +215,7 @@ except AgentFailure as error:
                 "denied": True,
                 "http_status": 403,
                 "reason": "project_permission",
-                "boundary": "certificate_bound_gateway",
+                "boundary": "protected_delegation_gateway",
             }
             native.private_write(
                 flow.args.output_dir / (flow.args.label + ".scope-probe.summary.json"),

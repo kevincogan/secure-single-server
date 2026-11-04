@@ -31,7 +31,7 @@ COMPONENTS = {
         "CA",
         "SPIFFE / SPIRE",
         "Attested workload identity",
-        "SPIRE supplies the workload certificate through the trusted runtime. A successful bound read proves its use; issuance and rotation timestamps require separate evidence.",
+        "SPIRE attests the workload and supplies credentials through the trusted runtime. A protected read verifies delegated identity; issuance and renewal timestamps require separate evidence.",
     ),
     "model": (
         "AI",
@@ -138,7 +138,7 @@ EVENTS = {
     "console_verifying_native_read": (
         1,
         "gateway",
-        "Checking certificate-bound access",
+        "Checking protected delegated access",
         "A protected read is requested before assessment can proceed.",
     ),
     "console_retrying_identity": (
@@ -151,7 +151,7 @@ EVENTS = {
         1,
         "sandbox",
         "Workload access verified",
-        "The native certificate-bound read passed for this user and workload.",
+        "The native protected delegated read passed for this user and workload.",
     ),
     "console_egress_verified": (
         2,
@@ -372,7 +372,7 @@ REASONS = {
     "run_inactive": "The run is closed, cancelled or outside its original authorization window.",
     "approval_required": "Consent for these exact fields has not been recorded.",
     "recovery_required": "Cleanup or a write outcome is uncertain. Operator reconciliation is required.",
-    "native_read_failed": "Certificate-bound access failed before assessment.",
+    "native_read_failed": "Protected delegated access failed before assessment.",
     "agent_failed": "The agent did not return an accepted draft.",
     "session_expired": "The original authorization deadline passed.",
 }
@@ -781,7 +781,7 @@ def response_signals(record: dict, job: dict | None, online: bool) -> str:
                 "gateway",
                 "sandbox",
                 "M665 198 V264 H285 V198",
-                "Certificate-bound read verified",
+                "Protected delegated read verified",
                 "allowed",
             )
         elif (
@@ -916,12 +916,12 @@ def architecture(
     }
     notes = {
         "user": "Authenticated role: " + str(record["run"]["user_role"]),
-        "keycloak": "Authenticated session recorded. Token exchange is corroborated by the native bound read."
+        "keycloak": "Authenticated session recorded. Token exchange is corroborated by the protected delegated read."
         if e.get("native_bound_read")
         else "User authentication recorded. Token exchange not yet verified.",
-        "spire": "Certificate used in a successful bound read."
+        "spire": "Attested workload verified in a protected read."
         if e.get("native_bound_read")
-        else "Workload registered. Certificate use not yet observed.",
+        else "Workload registered. Protected access not yet observed.",
         "sandbox": "Socket-denial checks passed."
         if e.get("egress_denied")
         else "Live socket-denial evidence not reported.",

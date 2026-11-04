@@ -351,7 +351,7 @@ def test_evidence_page_groups_actual_controls_without_duplicating_run_table() ->
     html = console.evidence_view(
         [(row, {"evidence": {"native_bound_read": True, "cleanup_verified": True}})]
     )
-    assert "Certificate-bound access" in html and "1 observed runs" in html
+    assert "Protected delegated access" in html and "1 observed runs" in html
     assert "No positive receipt" in html and "#security-context" in html
     assert "<table" not in html and "Browse your run history" in html
 
@@ -406,7 +406,7 @@ def test_unverified_certificate_or_cleanup_configuration_creates_no_response() -
     assert visual.response_signals(r, j, True) == ""
     j["evidence"].update(native_bound_read=True, cleanup_verified=True)
     html = visual.response_signals(r, j, True)
-    assert "Certificate-bound read verified" in html
+    assert "Protected delegated read verified" in html
     assert "Temporary access cleanup verified" not in html
     r["run"]["active"] = 0
     assert "Temporary access cleanup verified" in visual.response_signals(r, j, True)

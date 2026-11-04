@@ -20,7 +20,6 @@ MARKERS = {
         "token exchange failed",
         "failed to exchange",
         "credential resolution failed",
-        "final_exchange_failed",
     ),
     "upstream_unavailable": (
         "connection refused",
@@ -36,8 +35,6 @@ MARKERS = {
         "category=peer_alert",
         "category=no_peer_certificate",
     ),
-    "sender_io_failure": ("pilot sender io failure",),
-    "sender_request_failure": ("pilot sender http failure",),
     "gateway_502": ("502 bad gateway", "status=502", "status: 502"),
     "gateway_503": ("503 service unavailable", "status=503", "status: 503"),
 }

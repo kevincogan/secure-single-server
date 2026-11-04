@@ -37,7 +37,6 @@ def config():
         ),
         "public_trust": dict(
             service_ca="service-ca.pem",
-            spire_ca="spire-ca.pem",
             upstream_ca_bundle="upstream-ca.pem",
             kubernetes_ca="kubernetes-ca.pem",
         ),

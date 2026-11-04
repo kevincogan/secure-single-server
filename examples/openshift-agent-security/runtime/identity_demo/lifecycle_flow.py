@@ -12,11 +12,11 @@ from typing import Callable
 from uuid import UUID
 
 from identity_demo_action_policy import DRIVER
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 from permission_flow import PermissionFlow
 from recovery_flow import RecoveryFlow
 import probe_native_exchange as native
-from sender_listener import HOST
+from protected_listener import HOST
 
 
 def role_ids(values: list[dict]) -> set[tuple[str, str]]:
@@ -108,29 +108,26 @@ print(json.dumps({'run_expires':r['expires'],'approval_expires':a['approval_expi
         assert record["run_expires"] == record["approval_expires"] == self.expires
         assert self.expires > time.time() + 100
 
-        sender = SenderAcceptance(argparse.Namespace(**{**vars(self.args), "label": self.args.label + "-lifecycle"}), {"sub": self.user})
-        leaf = sender.certificate("role-check")
-        original, claims = sender.final(leaf)
+        sender = DelegationAcceptance(argparse.Namespace(**{**vars(self.args), "label": self.args.label + "-lifecycle"}), {"sub": self.user})
+        original, claims = sender.final()
         assert "analyst" in claims["realm_access"]["roles"]
-        sessions = sender.initialize_session("role-check", original, leaf)
+        sessions = sender.initialize_session("role-check", original)
         roles = RoleChange(self.issuer_admin, self.user)
         native.private_write(self.args.output_dir / "role-mappings-before.private.json", roles.before)
-        original, claims = sender.final(leaf)
+        original, claims = sender.final()
         propagation = None
         try:
             started = time.monotonic()
             roles.remove()
-            old = sender.gateway("original_token_after_role_removal", original, leaf)
+            old = sender.gateway("original_token_after_role_removal", original)
             assert old["http_status"] in (200, 403) and claims["exp"] > time.time()
             for attempt in range(7):
-                if leaf.expires_at <= time.time() + 30:
-                    leaf = sender.certificate("role-renewal-" + str(attempt))
-                fresh, changed = sender.final(leaf)
+                fresh, changed = sender.final()
                 if "analyst" not in changed.get("realm_access", {}).get("roles", []):
                     status, _ = sender.request(19444, HOST, "/mcp",
                         json.dumps({"jsonrpc": "2.0", "id": 9, "method": "tools/call",
                                     "params": {"name": "step56_jira_createJiraIssue", "arguments": arguments}}).encode(),
-                        leaf, {"Authorization": "Bearer " + fresh, "Content-Type": "application/json",
+                        {"Authorization": "Bearer " + fresh, "Content-Type": "application/json",
                                "Accept": "application/json, text/event-stream", **sessions})
                     assert status == 403 and self.backend_count() == before
                     propagation = {"new_final_token_has_no_analyst_role": True,
@@ -144,11 +141,9 @@ print(json.dumps({'run_expires':r['expires'],'approval_expires':a['approval_expi
         finally:
             roles.restore()
             native.private_write(self.args.output_dir / "role-restoration.summary.json", {"original_mappings_restored": True})
-        if leaf.expires_at <= time.time() + 30:
-            leaf = sender.certificate("restored-role-renewal")
-        restored, restored_claims = sender.final(leaf)
+        restored, restored_claims = sender.final()
         assert "analyst" in restored_claims["realm_access"]["roles"]
-        assert sender.gateway("after_role_restoration", restored, leaf)["http_status"] == 200
+        assert sender.gateway("after_role_restoration", restored)["http_status"] == 200
         print(json.dumps({"stage": "role_propagation_passed", **propagation}), flush=True)
 
         while time.time() <= self.expires + 2:

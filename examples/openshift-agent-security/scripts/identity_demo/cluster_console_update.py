@@ -99,12 +99,6 @@ def run(args, profile):
             raise ValueError('Current worker differs from its exact prior receipt')
     proofs = [worker(args,profile,records,r) for r in ('coordinator','preparer')]
     setup.write(args.output_dir/'worker-proofs-before.private.json',proofs)
-    trust_refresh = None
-    if getattr(args,'enable_public_trust_refresh',False) and not getattr(args,'refresh_sender_trust',False):
-        raise ValueError('Automatic public trust requires the guarded idle trust refresh')
-    if getattr(args,'refresh_sender_trust',False):
-        from cluster_console_trust import prepare
-        trust_refresh = prepare(args,profile,inputs)
     path = setup.private_file(args.runtime_gateway_receipt)
     if path.stat().st_size>2_000_000:
         raise ValueError('Bounded private gateway receipt required')
@@ -164,15 +158,6 @@ def run(args, profile):
         from cluster_console_gateway import repair
         gateway = repair(args,profile,gateway,gateway_repair)
         new_inputs['data']['gateway.receipt.json'] = base64.b64encode(json.dumps(gateway).encode()).decode()
-        secret_patch(args,profile,live_inputs,new_inputs,dry=True)
-    if trust_refresh is not None:
-        from cluster_console_trust import refresh
-        reference = refresh(args,profile,trust_refresh)
-        if trust_refresh.get('automatic_created'):
-            previous = deepcopy(previous)
-            previous['created'] += [{'kind':v['kind'],'name':v['metadata']['name'],'namespace':v['metadata'].get('namespace'),
-                'uid':v['metadata']['uid'],'fingerprint':setup.fingerprint(v)} for v in trust_refresh['automatic_created']]
-        new_inputs['data']['sender-trust.receipt.json'] = base64.b64encode(json.dumps(reference).encode()).decode()
         secret_patch(args,profile,live_inputs,new_inputs,dry=True)
     if adapter_update is not None:
         changed = apply_adapter(args,profile,adapter_update)
@@ -318,7 +303,7 @@ def recovery_plan(args,profile,previous,publication,gateway):
     required = {'before','plan','idle','proofs','stop0','stop1','AuthConfig','EnvoyFilter'}
     if (manifest.get('kind')!='private-host-update-recovery-v1' or manifest.get('profile')!=profile.to_dict()
             or set(manifest.get('files',{}))!=required or not args.isolate_private_authorizer
-            or getattr(args,'refresh_sender_trust',False) or getattr(args,'refresh_adapter_code',False)):
+            or getattr(args,'refresh_adapter_code',False)):
         raise ValueError('Exact private-host-only recovery manifest required')
     saved = {}
     for key,value in manifest['files'].items():

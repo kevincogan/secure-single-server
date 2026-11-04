@@ -81,7 +81,7 @@ def test_handoff_uses_the_existing_generators_and_excludes_private_application_s
         not in {"Secret", "Deployment", "StatefulSet", "PersistentVolumeClaim"}
         for o in result
     )
-    assert any(o["kind"] == "ValidatingAdmissionPolicy" for o in result)
+    assert not any(o["metadata"]["name"] == "identity-demo-"+LEGACY.installation_id+"-public-trust" for o in result)
     assert len([o for o in result if o["kind"] == "ClusterSPIFFEID"]) == 3
     for obj in result:
         namespace = obj["metadata"].get("namespace")

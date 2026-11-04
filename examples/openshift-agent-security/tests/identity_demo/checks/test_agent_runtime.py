@@ -417,7 +417,7 @@ def test_agent_progress_contract_reaches_the_real_console_store(
         assert state["evidence"]["scope_probe_denied"] is True
         assert (
             "scope_check" in programs[-1]
-            and "certificate_bound_gateway" in programs[-1]
+            and "protected_delegation_gateway" in programs[-1]
         )
 
 

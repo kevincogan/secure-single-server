@@ -30,7 +30,7 @@ def configuration():
             "network_policies": {},
         },
         "trust_domain": p.trust_domain,
-        "issuer": p.native_build_contract["OPENSHELL_DEMO_JWT_AUDIENCE"],
+        "issuer": p.delegation_issuer,
         "tools": ["jira.issue.read", "jira.issue.create"],
     }
     return {

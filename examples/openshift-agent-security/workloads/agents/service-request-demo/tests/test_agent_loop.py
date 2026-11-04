@@ -368,7 +368,7 @@ def test_real_scope_denial_metadata_is_tool_feedback_without_foreign_data() -> N
                 "denied": True,
                 "http_status": 403,
                 "reason": "project_permission",
-                "boundary": "certificate_bound_gateway",
+                "boundary": "protected_delegation_gateway",
             },
         }
 

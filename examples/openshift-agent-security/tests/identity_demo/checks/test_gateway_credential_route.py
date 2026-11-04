@@ -128,20 +128,20 @@ def test_native_backend_requires_verified_run_before_replacing_credentials() -> 
     assert spec["authentication"]["human"]["jwt"]["audiences"] == [run.audience]
     predicate = spec["metadata"]["adapter-token"]["when"][0]["predicate"]
     assert run.user_subject in predicate and run.workload in predicate
-    assert "int(auth.identity.exp) <= 300" in predicate and "auth.identity.cnf" in predicate
+    assert "int(auth.identity.exp) <= 300" in predicate and "!has(auth.identity.cnf)" in predicate
     assert "binding.active == true" in spec["authorization"]["native-read-run"]["opa"]["rego"]
     assert spec["metadata"]["adapter-token"]["http"]["sharedSecretRef"]["name"] == route.READ_NAME
-    # The actual TLS peer is checked on both bound hosts; the private listener
-    # receives its already verified header only from the trusted broker.
-    assert "x-forwarded-client-cert" in spec["authorization"]["native-read-run"]["opa"]["rego"]
+    # Identity comes from the signed delegation. Both listeners discard
+    # client-provided certificate headers instead of trusting forwarded proof.
+    assert "x-forwarded-client-cert" not in spec["authorization"]["native-read-run"]["opa"]["rego"]
     assert values[2]["spec"]["parentRefs"][-1]["sectionName"] == "bound"
     patches = values[3]["spec"]["configPatches"]
     private_hcm = next(p for p in patches if p["applyTo"] == "NETWORK_FILTER"
                        and p["match"]["listener"]["portNumber"] == 8080)
-    assert private_hcm["patch"]["value"]["typed_config"]["forward_client_cert_details"] == "ALWAYS_FORWARD_ONLY"
+    assert private_hcm["patch"]["value"]["typed_config"]["forward_client_cert_details"] == "SANITIZE"
     bound_hcm = next(p for p in patches if p["applyTo"] == "NETWORK_FILTER"
                      and p["match"]["listener"]["portNumber"] == 8443)
-    assert "forward_client_cert_details" not in bound_hcm["patch"]["value"]["typed_config"]
+    assert bound_hcm["patch"]["value"]["typed_config"]["forward_client_cert_details"] == "SANITIZE"
 
 
 def test_broker_initialization_is_not_protected_adapter_evidence() -> None:

@@ -2,7 +2,6 @@
 """Synthetic renewal evidence must distinguish native reads from stale logs."""
 
 import argparse
-import base64
 from copy import deepcopy
 import hashlib
 import json
@@ -16,39 +15,40 @@ import native_renewal_flow as renewal
 
 
 def record() -> dict:
-    """Return a safe attributed native tool-call record with a public leaf hash."""
-    digest = b"a" * 32
+    """Return a safely attributed read with signed bounded delegation times."""
     return {"event": "step4-private-read", "status": 200, "request": "new-request",
-            "peer_hash": digest.hex(), "verified": {"user": "user", "workload": "workload",
-                "cnf": base64.urlsafe_b64encode(digest).decode().rstrip("="), "run": "run",
+            "tls_version": "TLSv1.3", "verified": {"user": "user", "workload": "workload",
+                "delegation": "short-lived-bearer", "issued": 100, "expiry": 130, "run": "run",
                 "policy": "step56-live-action-v1", "actual_body_sha256": "body"}}
 
 
-@pytest.mark.parametrize("fault", [None, "wrong-peer", "missing-peer", "wrong-user", "wrong-workload",
-                                   "wrong-policy", "extra-field", "extra-metadata", "bad-cnf", "bad-request"])
+@pytest.mark.parametrize("fault", [None, "wrong-delegation", "missing-issued", "wrong-user", "wrong-workload",
+                                   "wrong-policy", "extra-field", "extra-metadata", "long-ttl", "bad-request", "bool-time"])
 def test_native_renewal_audit_checks_each_trust_input(fault: str | None) -> None:
-    """A successful status alone cannot prove sender binding or run attribution."""
+    """A successful status alone cannot prove verified run attribution."""
     value = record()
-    if fault == "wrong-peer":
-        value["peer_hash"] = "00" * 32
-    elif fault == "missing-peer":
-        value.pop("peer_hash")
+    if fault == "wrong-delegation":
+        value["verified"]["delegation"] = "different"
+    elif fault == "missing-issued":
+        value["verified"].pop("issued")
     elif fault in ("wrong-user", "wrong-workload", "wrong-policy"):
         value["verified"][fault.removeprefix("wrong-")] = "different"
     elif fault == "extra-field":
         value["raw_token"] = "must-not-be-accepted"
     elif fault == "extra-metadata":
         value["verified"]["credential"] = "must-not-be-accepted"
-    elif fault == "bad-cnf":
-        value["verified"]["cnf"] = "bad"
+    elif fault == "long-ttl":
+        value["verified"]["expiry"] = 131
+    elif fault == "bool-time":
+        value["verified"].update(issued=True, expiry=30)
     elif fault == "bad-request":
         value["request"] = "unsafe\nrequest"
     if fault:
         with pytest.raises(ValueError):
-            renewal.bound_reads(json.dumps(value), run="run", user="user", workload="workload", body_hash="body")
+            renewal.delegated_reads(json.dumps(value), run="run", user="user", workload="workload", body_hash="body")
     else:
-        assert renewal.bound_reads(json.dumps(value), run="run", user="user", workload="workload", body_hash="body") == {
-            "new-request": value["verified"]["cnf"]}
+        assert renewal.delegated_reads(json.dumps(value), run="run", user="user", workload="workload", body_hash="body") == {
+            "new-request": 100}
 
 
 @pytest.mark.parametrize("change", ["other-run", "other-body", "denied", "non-object", "non-json"])
@@ -62,7 +62,7 @@ def test_unrelated_or_denied_logs_cannot_prove_renewal(change: str) -> None:
     elif change == "denied":
         value["status"] = 403
     text = "not-json" if change == "non-json" else json.dumps([] if change == "non-object" else value)
-    assert renewal.bound_reads(text, run="run", user="user", workload="workload", body_hash="body") == {}
+    assert renewal.delegated_reads(text, run="run", user="user", workload="workload", body_hash="body") == {}
 
 
 def test_read_hash_matches_normalized_generated_native_request() -> None:
@@ -101,13 +101,12 @@ urllib.request.build_opener=lambda *args:Client()
 
 
 def test_conflicting_request_rejected() -> None:
-    """The same request ID cannot be attributed to two different certificates."""
+    """The same request ID cannot be attributed to conflicting signed issuance times."""
     first = record()
     second = deepcopy(first)
-    second["peer_hash"] = (b"b" * 32).hex()
-    second["verified"]["cnf"] = base64.urlsafe_b64encode(b"b" * 32).decode().rstrip("=")
+    second["verified"].update(issued=101, expiry=131)
     with pytest.raises(ValueError, match="Conflicting"):
-        renewal.bound_reads(json.dumps(first) + "\n" + json.dumps(second),
+        renewal.delegated_reads(json.dumps(first) + "\n" + json.dumps(second),
             run="run", user="user", workload="workload", body_hash="body")
 
 
@@ -133,7 +132,7 @@ def test_only_log_capture_retries_with_all_attempts_retained(tmp_path, monkeypat
 
     monkeypatch.setattr(renewal.subprocess, "run", capture)
     if recover:
-        assert flow.audit_reads(SimpleNamespace(workload="workload")) == {"new-request": value["verified"]["cnf"]}
+        assert flow.audit_reads(SimpleNamespace(workload="workload")) == {"new-request": value["verified"]["issued"]}
     else:
         with pytest.raises(RuntimeError, match="details withheld"):
             flow.audit_reads(SimpleNamespace(workload="workload"))
@@ -143,7 +142,7 @@ def test_only_log_capture_retries_with_all_attempts_retained(tmp_path, monkeypat
 
 
 @pytest.mark.parametrize("fault", [None, "no-renewal", "read-failed", "backend-changed", "long-ttl", "stale-audit", "supervisor-restarted"])
-def test_native_renewal_sequence_uses_expired_leaf_and_new_request(tmp_path, monkeypatch, fault) -> None:
+def test_native_renewal_sequence_uses_expired_identity_and_new_request(tmp_path, monkeypatch, fault) -> None:
     """No restart, reissued credential or operator request stands in for native proof."""
     now = [100.0]
     monkeypatch.setattr(renewal.time, "time", lambda: now[0])
@@ -166,14 +165,14 @@ def test_native_renewal_sequence_uses_expired_leaf_and_new_request(tmp_path, mon
         def __init__(self, *args):
             pass
 
-        def certificate(self, name):
-            return SimpleNamespace(fingerprint="old" if name == "native-baseline" or fault == "no-renewal" else "new",
-                                   expires_at=1000 if fault == "long-ttl" else 105)
+        def identity_snapshot(self):
+            return {"sha256": "old" if now[0] < 105 or fault == "no-renewal" else "new",
+                    "expires_at": 1000 if fault == "long-ttl" else 105}
 
-    monkeypatch.setattr(renewal, "SenderAcceptance", Sender)
-    flow.audit_reads = lambda context: {"old-request": "old", **(
-        {"baseline": "old"} if calls else {}), **(
-        {"renewed": "new"} if len(calls) > 1 and fault != "stale-audit" else {})}
+    monkeypatch.setattr(renewal, "DelegationAcceptance", Sender)
+    flow.audit_reads = lambda context: {"old-request": 90, **(
+        {"baseline": 100} if calls else {}), **(
+        {"renewed": 137} if len(calls) > 1 and fault != "stale-audit" else {})}
 
     def execute(words, **kwargs):
         calls.append({"at": now[0], "words": words, "kwargs": kwargs})
@@ -186,7 +185,7 @@ def test_native_renewal_sequence_uses_expired_leaf_and_new_request(tmp_path, mon
         assert not closed
     else:
         result = flow.accept(execute, "synthetic", context)
-        assert result["passed"] and result["old_leaf_expired_before_second_read"]
+        assert result["passed"] and result["old_jwt_expired_before_second_read"]
         assert len(calls) == 2 and calls[0]["at"] < 105 < calls[1]["at"]
         assert all(call["words"][:2] == ["sandbox", "exec"] for call in calls)
         assert result["renewed_requests"] == ["renewed"] and closed == [True]

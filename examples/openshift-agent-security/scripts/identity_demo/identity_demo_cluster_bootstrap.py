@@ -32,7 +32,7 @@ def prepare(role, inputs, state, namespace, pod_uid):
     names = ['installation-profile.json', 'artifacts.json', 'runtime-credentials.json',
              'driver-credentials.json', 'management-ca.crt', 'service-ca.crt', 'kubernetes-ca.crt']
     if role == 'coordinator':
-        names += ['catalog-credential.json', 'gateway.receipt.json', 'sender-trust.receipt.json', 'inference.json', 'inference.key']
+        names += ['catalog-credential.json', 'gateway.receipt.json', 'inference.json', 'inference.key']
     else:
         names += ['capacity-budget.json']
     if (inputs / 'certificate-management.json').exists():
@@ -129,10 +129,6 @@ def prepare(role, inputs, state, namespace, pod_uid):
         '--service-account-name', 'fixture-console-'+role, '--pod-uid', pod_uid,
         '--management-port', '18443' if role == 'coordinator' else '18444']
     if role == 'coordinator':
-        environment['IDENTITY_DEMO_SENDER_TRUST_RECEIPT'] = str(config/'sender-trust.receipt.json')
-        trust_reference = json.loads(files['sender-trust.receipt.json'])
-        if trust_reference.get('automatic_public_refresh') is True:
-            arguments += ['--auto-refresh-sender-trust']
         inference = json.loads(files['inference.json'])
         inference['chat']['credential_file'] = str(config/'inference.key')
         runtime_inference = config/'inference.runtime.json'

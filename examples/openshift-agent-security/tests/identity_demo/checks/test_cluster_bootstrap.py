@@ -73,7 +73,7 @@ def test_nested_management_credentials_cannot_smuggle_bootstrap_passwords(tmp_pa
         prepare('preparer',root,tmp_path/'state',LEGACY.core_namespace,'pod-uid')
 
 
-def test_coordinator_receives_only_two_owned_realm_clients_and_public_trust_reference(tmp_path):
+def test_coordinator_receives_only_two_owned_realm_clients_without_sender_inputs(tmp_path):
     root,version=inputs(tmp_path)
     path=version/'runtime-credentials.json';value=json.loads(path.read_text())
     value['realm_management']={LEGACY.origin(name):{'client_id':'fixture-console-realm-coordinator','client_secret':'s'*40}
@@ -86,8 +86,8 @@ def test_coordinator_receives_only_two_owned_realm_clients_and_public_trust_refe
         (version/name).write_text(json.dumps(data));(root/name).symlink_to(Path('..version')/name)
     (version/'inference.key').write_text('synthetic-model-key');(root/'inference.key').symlink_to(Path('..version')/'inference.key')
     arguments,env=prepare('coordinator',root,tmp_path/'state',LEGACY.core_namespace,'pod-uid')
-    reference=Path(env['IDENTITY_DEMO_SENDER_TRUST_RECEIPT'])
-    assert reference.read_text()==json.dumps(extra['sender-trust.receipt.json'])
+    assert 'IDENTITY_DEMO_SENDER_TRUST_RECEIPT' not in env
+    reference=Path(arguments[arguments.index('--inference-config')+1])
     assert '--auto-refresh-sender-trust' not in arguments and '--auto-refresh-catalog' in arguments
     runtime=json.loads((reference.parent/'inference.runtime.json').read_text())
     assert runtime['chat']['credential_file']==str(reference.parent/'inference.key')

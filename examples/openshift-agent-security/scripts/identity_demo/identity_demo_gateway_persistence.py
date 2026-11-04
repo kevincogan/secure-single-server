@@ -27,15 +27,15 @@ def frontend_policy(args):
 def policies(args):
     """Render stable cryptographic guards; live hooks remain the run/action authority."""
     import probe_broker_discovery as shared
-    from run_binding import live_sender_authorization
+    from run_binding import live_delegation_authorization
     from identity_demo_keycloak_upstream import BASE
-    from sender_listener import HOST
+    from protected_listener import HOST
     issuer, audience = BASE + '/realms/identity-demo', 'https://' + HOST + '/mcp'
     before = [frontend_policy(args), shared.owned(args, 'authpolicy', 'fixture-mcp-tools-auth')]
     after = deepcopy(before)
     after[0]['spec']['rules'] = {
         'authentication': {'keycloak': {'jwt': {'issuerUrl': issuer, 'issuer': issuer, 'audiences': [audience], 'ttl': 60}}},
-        'authorization': {'native-live-bound': live_sender_authorization(issuer, audience, active_profile().trust_domain)}}
+        'authorization': {'native-live-delegation': live_delegation_authorization(issuer, audience, active_profile().trust_domain)}}
     tool = after[1]['spec']['rules']
     if set(tool.get('authentication', {})) != {'keycloak'} or not {'issuer', 'audience'}.issubset(tool.get('authorization', {})):
         raise ValueError('Exact existing tool policy contract required')
@@ -152,7 +152,7 @@ def install(args):
     import probe_broker_discovery as shared
     from native_backend import NativeBackend
     from run_binding import ReadRun
-    from sender_listener import HOST
+    from protected_listener import HOST
     from identity_demo_keycloak_upstream import BASE
     from probe_native_exchange import private_write
     if not inspect_state(args)['rollback_quiescent']:

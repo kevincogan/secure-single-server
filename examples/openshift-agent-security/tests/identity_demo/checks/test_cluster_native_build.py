@@ -100,6 +100,9 @@ def test_offline_compilation_job_has_no_api_token_no_retry_and_bounded_resources
         "Egress"
     ]
     assert job["spec"]["backoffLimit"] == 0
+    assert job["spec"]["template"]["metadata"]["annotations"] == {
+        "cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
+    }
     spec = job["spec"]["template"]["spec"]
     assert (
         spec["automountServiceAccountToken"] is False

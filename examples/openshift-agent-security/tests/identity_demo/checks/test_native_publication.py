@@ -143,7 +143,7 @@ def test_changed_or_untrusted_inputs_are_refused(prepared: tuple, change: str) -
         path.symlink_to(root / "supervisor/openshell-supervisor")
     elif change == "wrong-profile":
         value = json.loads(Path(args.installation_profile).read_text())
-        value["core_namespace"] = "other-owned-core"
+        value["expected_server"] = "https://different-api.example.test:443"
         save(Path(args.installation_profile), value)
     else:
         recipe = root / "gateway/Containerfile"

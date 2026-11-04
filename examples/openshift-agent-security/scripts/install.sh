@@ -65,7 +65,7 @@ if [[ $action == build ]]; then
   while read -r digest path; do
     [[ $digest =~ ^[a-f0-9]{64}$ && $path =~ ^[A-Za-z0-9_.:/-]+$ && $path != /* && $path != *..* && $path != *.private.* ]] || { echo 'Unsafe inventory entry' >&2; exit 1; }
     case $path in
-      .gitignore|AGENTS.md|LICENSE|README.md|GETTING-STARTED.md|Makefile|pytest.ini|config/*|docs/*|examples/*|infra/*|runtime/*|scripts/*|tests/*|workloads/*) ;;
+      .gitignore|AGENTS.md|LICENSE|README.md|GETTING-STARTED.md|Makefile|pytest.ini|pyproject.toml|config/*|docs/*|examples/*|infra/*|runtime/*|scripts/*|tests/*|workloads/*) ;;
       *) echo 'Unapproved source root' >&2; exit 1;;
     esac
     [[ -f $path && ! -L $path ]] || { echo 'Regular inventoried source required' >&2; exit 1; }

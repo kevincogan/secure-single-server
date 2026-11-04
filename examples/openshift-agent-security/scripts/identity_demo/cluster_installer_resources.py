@@ -699,7 +699,8 @@ def build_job(value, image, *, phase="build", ingress_address=None):
                         profile.labels,
                         app="fixture-installer",
                         **{"identity-demo-installer-phase": phase},
-                    )
+                    ),
+                    "annotations": {"cluster-autoscaler.kubernetes.io/safe-to-evict": "false"},
                 },
                 "spec": pod,
             },

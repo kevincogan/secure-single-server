@@ -76,7 +76,6 @@ def test_live_verifier_checks_native_identity_and_empty_provider_bindings(
     tmp_path: Path, monkeypatch, attached: bool
 ) -> None:
     import execution_context
-    import identity_demo_sender_trust
     from dataclasses import asdict
     context = replace(context_template('triage', 'xyz'), sandbox_id=str(uuid4()))
     item = {**asdict(context), 'workload': context.workload, 'workflow': 'cve'}
@@ -84,7 +83,6 @@ def test_live_verifier_checks_native_identity_and_empty_provider_bindings(
     snapshot = {'batch': {'id': identifier, 'filled': True}, 'preparation_pending': False, 'contexts': [item]}
     args = Namespace(output_dir=tmp_path)
     monkeypatch.setattr(presentation, 'guard', lambda a: (None, {}, None))
-    monkeypatch.setattr(identity_demo_sender_trust, 'current', lambda a: True)
     monkeypatch.setattr(execution_context, 'validate_context', lambda *a: context)
     monkeypatch.setattr(presentation, 'owned', lambda *a: None)
     monkeypatch.setattr(presentation, 'check_capacity', lambda *a: {})

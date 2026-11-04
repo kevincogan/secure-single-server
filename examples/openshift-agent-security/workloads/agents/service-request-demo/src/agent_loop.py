@@ -388,7 +388,7 @@ class AgentLoop:
                         or type(probe["http_status"]) is not int
                         or probe["http_status"] != 403
                         or probe["reason"] != "project_permission"
-                        or probe["boundary"] != "certificate_bound_gateway"
+                        or probe["boundary"] != "protected_delegation_gateway"
                     ):
                         raise AgentFailure("denial_schema")
                     observation["scope_check"] = dict(probe)

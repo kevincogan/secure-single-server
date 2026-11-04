@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import json
 import re
@@ -13,7 +12,7 @@ import time
 from typing import Callable
 
 from deployment_profile import active_profile
-from native_sender_acceptance import SenderAcceptance
+from native_delegation_acceptance import DelegationAcceptance
 from permission_flow import PermissionFlow
 import probe_native_exchange as native
 
@@ -31,11 +30,11 @@ def read_body_hash(run_id: str, project: str) -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def bound_reads(lines: str, *, run: str, user: str, workload: str, body_hash: str) -> dict[str, str]:
-    """Extract only attributed successful reads whose signed cnf equals TLS peer.
+def delegated_reads(lines: str, *, run: str, user: str, workload: str, body_hash: str) -> dict[str, int]:
+    """Return signed token issuance times for attributed successful native reads.
 
-    Return safe request IDs and public fingerprints, never arbitrary log fields.
-    Other runs and non-tool requests cannot satisfy the renewal proof.
+    This proves delegated identity/run/body attribution, without claiming that a
+    bearer token proves possession of a workload private key on every request.
     """
     matches = {}
     for line in lines.splitlines():
@@ -50,28 +49,25 @@ def bound_reads(lines: str, *, run: str, user: str, workload: str, body_hash: st
             continue
         if str(record.get("status")) != "200" or verified.get("actual_body_sha256") != body_hash:
             continue
-        if (set(record) - {"event", "status", "detail", "upstream", "request", "peer_hash", "verified",
-                           "denied_identity", "denied_peer", "denied_grant"}
-                or set(verified) != {"user", "workload", "cnf", "run", "policy", "actual_body_sha256"}
+        if (set(record) - {"event", "status", "detail", "upstream", "request", "tls_version", "verified",
+                           "denied_identity", "denied_grant"}
+                or set(verified) != {"user", "workload", "delegation", "issued", "expiry", "run", "policy", "actual_body_sha256"}
                 or verified.get("user") != user or verified.get("workload") != workload
-                or verified.get("policy") != "step56-live-action-v1"):
+                or verified.get("policy") != "step56-live-action-v1"
+                or verified.get("delegation") != "short-lived-bearer"):
             raise ValueError("Unexpected native renewal audit contract")
-        fingerprint = verified.get("cnf")
-        request = record.get("request")
-        peer = record.get("peer_hash")
-        if (not isinstance(fingerprint, str) or not re.fullmatch(r"[A-Za-z0-9_-]{43}", fingerprint)
-                or not isinstance(request, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", request)
-                or not isinstance(peer, str)
-                or peer.replace(":", "").lower() != base64.urlsafe_b64decode(fingerprint + "=").hex()):
-            raise ValueError("Native renewal read requires exact TLS peer/cnf correlation")
-        if request in matches and matches[request] != fingerprint:
+        issued, expiry, request = verified["issued"], verified["expiry"], record.get("request")
+        if (type(issued) is not int or type(expiry) is not int or not 0 < expiry - issued <= 30
+                or not isinstance(request, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", request)):
+            raise ValueError("Bounded signed delegation and safe request correlation required")
+        if request in matches and matches[request] != issued:
             raise ValueError("Conflicting native renewal audit request")
-        matches[request] = fingerprint
+        matches[request] = issued
     return matches
 
 
 class NativeRenewalFlow(PermissionFlow):
-    """Keep the actual native proxy alive while its original leaf expires."""
+    """Keep the actual native proxy alive across JWT-SVID and token expiry."""
 
     def supervisor_state(self, context: object) -> dict:
         """Verify exact native Pod/process identity before and after renewal."""
@@ -90,7 +86,7 @@ class NativeRenewalFlow(PermissionFlow):
         return {"pod_uid": pod["metadata"]["uid"], "container_id": statuses[0]["containerID"],
                 "restart_count": statuses[0]["restartCount"]}
 
-    def audit_reads(self, context: object) -> dict[str, str]:
+    def audit_reads(self, context: object) -> dict[str, int]:
         """Capture only the verified owned data plane's logs into private receipts."""
         profile = active_profile()
         deployment = native.kube(self.args, "get", "deployment", "fixture-mcp-openshift-ai-inference",
@@ -114,33 +110,31 @@ class NativeRenewalFlow(PermissionFlow):
             if attempt == 2:
                 raise RuntimeError("Native renewal audit capture failed; details withheld")
             time.sleep(1)
-        return bound_reads(response.stdout, run=self.run_id, user=self.user, workload=context.workload,
+        return delegated_reads(response.stdout, run=self.run_id, user=self.user, workload=context.workload,
                            body_hash=read_body_hash(self.run_id, self.project))
 
-    def wait_read(self, context: object, excluded: set[str], *, fingerprint: str | None = None,
-                  different_from: str | None = None) -> dict[str, str]:
-        """Wait only for log delivery; never retry an unsuccessful native operation."""
+    def wait_read(self, context: object, excluded: set[str], *, issued_after: int | None = None) -> dict[str, int]:
+        """Wait only for audit delivery, never retry an unsuccessful tool call."""
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
-            found = {request: leaf for request, leaf in self.audit_reads(context).items()
-                     if request not in excluded and (fingerprint is None or leaf == fingerprint)
-                     and (different_from is None or leaf != different_from)}
+            found = {request: issued for request, issued in self.audit_reads(context).items()
+                     if request not in excluded and (issued_after is None or issued > issued_after)}
             if found:
                 return found
             time.sleep(1)
-        raise TimeoutError("Fresh correlated native bound read was not observed")
+        raise TimeoutError("Fresh correlated native delegated read was not observed")
 
     def accept(self, execute: Callable, resource: str, context: object) -> dict:
-        """Read before/after real leaf expiry with no supervisor restart or key injection."""
+        """Read across real identity expiry without restarting the supervisor."""
         self.renewal_audit_sequence = 0
         before = self.backend_count()
         supervisor_before = self.supervisor_state(context)
-        sender = SenderAcceptance(argparse.Namespace(**{
+        sender = DelegationAcceptance(argparse.Namespace(**{
             **vars(self.args), "label": self.args.label + "-renewal"}), {"sub": self.user})
-        first = sender.certificate("native-baseline")
+        first = sender.identity_snapshot()
         # Existing demo registrations use short SVIDs. Refuse a long unexplained
         # wait rather than changing the identity TTL or the platform foundation.
-        remaining = first.expires_at - time.time() + 2
+        remaining = first["expires_at"] - time.time() + 2
         if not 0 < remaining <= 185:
             raise ValueError("Native renewal test requires the existing short SVID lifetime")
         existing = set(self.audit_reads(context))
@@ -154,31 +148,31 @@ class NativeRenewalFlow(PermissionFlow):
             return result
 
         read()
-        baseline = self.wait_read(context, existing, fingerprint=first.fingerprint)
-        print(json.dumps({"stage": "waiting_for_native_leaf_expiry"}), flush=True)
-        deadline = time.monotonic() + 185
-        while time.time() <= first.expires_at + 2:
+        baseline = self.wait_read(context, existing)
+        print(json.dumps({"stage": "waiting_for_native_jwt_expiry"}), flush=True)
+        deadline = time.monotonic() + 220
+        while time.time() <= first["expires_at"] + 32:
             if time.monotonic() > deadline:
-                raise TimeoutError("Native leaf expiry wait exceeded")
-            time.sleep(min(5, max(0.1, first.expires_at + 2 - time.time())))
-        current = sender.certificate("native-after-expiry")
-        if current.fingerprint == first.fingerprint:
-            raise ValueError("Native SVID did not renew")
+                raise TimeoutError("Native identity expiry wait exceeded")
+            time.sleep(min(5, max(0.1, first["expires_at"] + 32 - time.time())))
+        current = sender.identity_snapshot()
+        if current["sha256"] == first["sha256"]:
+            raise ValueError("Native JWT-SVID did not renew")
         # Exclude every pre-read request, including any operator requests. Only
         # the following credential-free sandbox execution can close this gate.
         previous = set(self.audit_reads(context))
         read()
-        renewed = self.wait_read(context, previous, different_from=first.fingerprint)
+        renewed = self.wait_read(context, previous, issued_after=first["expires_at"])
         if self.supervisor_state(context) != supervisor_before:
             raise ValueError("Native supervisor changed during renewal; uninterrupted proxy not proven")
-        result = {"passed": True, "native_read_before_and_after_real_leaf_expiry": True,
-            "old_leaf_expired_before_second_read": first.expires_at < time.time(),
+        result = {"passed": True, "native_read_before_and_after_real_jwt_expiry": True,
+            "old_jwt_expired_before_second_read": first["expires_at"] < time.time(),
             "baseline_requests": sorted(baseline), "renewed_requests": sorted(renewed),
-            "old_leaf_fingerprint": first.fingerprint, "renewed_peer_fingerprints": sorted(set(renewed.values())),
-            "actual_tls_peer_equals_signed_cnf": True, "same_user_workload_run_and_read_body": True,
+            "old_jwt_sha256": first["sha256"], "renewed_delegation_issued_at": sorted(set(renewed.values())),
+            "signed_delegation_issued_after_original_jwt_expiry": True, "same_user_workload_run_and_read_body": True,
             "supervisor_restarted": False, "operator_replay_used_as_native_proof": False,
             "backend_before": before, "backend_after": self.backend_count(), "writes_exercised": False,
-            "scope": "Fresh native MCP sessions after leaf expiry; uninterrupted long-lived streams are unproven"}
+            "scope": "Fresh native MCP sessions after JWT-SVID and access-token expiry; uninterrupted long-lived streams are unproven"}
         native.private_write(self.args.output_dir / (self.args.label + ".native-renewal.summary.json"), result)
         self.close()
         return result

@@ -165,7 +165,7 @@ def readiness_panel(claims: dict, coordinator: dict) -> str:
                   'presentation_preparing':'The planned single-use sandboxes are being prepared serially. Start becomes available after the operator verifies the complete presentation batch.',
                   'context_preparation_failed':'Fresh preparation stopped safely. The operator must review its private receipt; no mutation will be replayed automatically.',
                   'identity_network':'A current worker node is missing from the owned SPIRE kubelet-egress rule. The operator must review the guarded network reconciliation command before a new run.',
-                  'sender_trust':'SPIRE trust needs reconciliation before a new run. Owned refresh occurs only while idle; TLS verification remains required.',
+                  'sender_trust':'Historical certificate-bound delegation warning; consult the original installation records.',
                   'operator_login':'Operator cluster authentication needs renewal before another run. The app will not start with insufficient credential lifetime.',
                   'cluster_unavailable':'Cluster access is unavailable. The coordinator is checking again.',
                   'catalog_expiring':'The discovery credential needs renewal before another run.',
@@ -419,7 +419,7 @@ def jira_context(evidence: dict) -> str:
     else:
         result += '<p>No issues were returned by this completed read.</p>'
     result += '<details><summary>Read scope and limits</summary><p>' + text(evidence.get('jira_query', '')) + '</p>'
-    result += '<p>Certificate-bound MCP read · bounded results · issue text is untrusted data · no mutation tool offered to the model.</p></details></section>'
+    result += '<p>Protected delegated MCP read · bounded results · issue text is untrusted data · no mutation tool offered to the model.</p></details></section>'
     return result
 
 
@@ -529,7 +529,7 @@ def run_page(record: dict, csrf: str, context: dict, job: dict | None, coordinat
     routing = {key: evidence[key] for key in ('gateway_backend_services', 'tool_schemas', 'live_run_identity_check',
         'actual_arguments_and_approval_check', 'scoped_adapter_service_token_delivery') if key in evidence}
     security = ('<h2>Security context</h2><p class="muted small">Coordinator evidence: ' + text(observed_at) + '</p><section class="security-item"><h3><span class="dot good"></span>User identity</h3><p>' + text(run['user_role']) + ' · Authenticated at run creation</p></section>'
-                '<section class="security-item"><h3>' + identity + 'Workload identity</h3><p>' + ('Verified native certificate-bound read' if evidence.get('native_bound_read') else 'Registered workload · Runtime verification pending')
+                '<section class="security-item"><h3>' + identity + 'Workload identity</h3><p>' + ('Verified native protected delegated read' if evidence.get('native_bound_read') else 'Registered workload · Runtime verification pending')
                 + '</p><p class="identity">' + text(run['workload']) + '</p></section>'
                 '<section class="security-item"><h3>OpenShell</h3><p>Approved ' + text(run['workload_role']) + ' workload</p><details><summary>View policy & settings evidence</summary><p>'
                 + ('Agent socket-denial checks observed for this run.' if evidence.get('egress_denied') else 'Live socket-denial evidence has not been reported for this run.')
@@ -554,7 +554,7 @@ def run_page(record: dict, csrf: str, context: dict, job: dict | None, coordinat
 def evidence_view(proofs: list[tuple[dict, dict | None]]) -> str:
     """Curate control evidence separately from the owner-scoped run history."""
     controls = (
-        ('Certificate-bound access', 'native_bound_read', 'A successful native protected read verifies certificate use for the run.', 'security-context'),
+        ('Protected delegated access', 'native_bound_read', 'A successful native protected read verifies the delegated user, workload and run.', 'security-context'),
         ('Sandbox isolation', 'egress_denied', 'Agent socket-denial checks were observed. Trusted runtime traffic has explicit exceptions.', 'security-context'),
         ('Model inference', 'model_inference', 'The actual workload received an accepted model response. This does not establish factual correctness.', 'architecture'),
         ('Exact backend outcome', 'backend_fields_match_approval', 'Independent issue fields matched the approved payload.', 'decision-audit'),
@@ -611,7 +611,7 @@ STAGE_COPY = {
     'configuring_gateway': ('Preparing protected access', 'Create the run-scoped issuer and gateway configuration using existing owned components.', 'Preparation is active; no user action is needed.'),
     'waiting_gateway': ('Waiting for gateway readiness', 'Wait for the cluster to discover tools and verify the protected TLS route.', 'Cluster reconciliation can take time. The current observation remains visible below.'),
     'attaching_credentials': ('Attaching scoped credentials', 'Attach the run-bound exchange provider to this exact sandbox.', 'The agent receives scoped access through the trusted runtime.'),
-    'verifying_native_read': ('Verifying identity and transport', 'Perform a real certificate-bound MCP read before running the assessment.', 'Wait for the protected read result.'),
+    'verifying_native_read': ('Verifying identity and transport', 'Perform a real protected MCP read before running the assessment.', 'Wait for the protected read result.'),
     'retrying_identity': ('Retrying the identity check', 'The read-only connection ended before verification. A bounded transport retry is in progress.', 'No approval or Jira write is being retried.'),
     'identity_verified': ('Identity verified', 'The native protected read passed for this user and workload.', 'The coordinator is preparing the assessment.'),
     'discovering_tools': ('Inspecting available tools', 'Observe the actual gateway registration, schemas and protected adapter routing.', 'No Jira create has been attempted.'),
@@ -621,7 +621,7 @@ STAGE_COPY = {
     'model_inference': ('Generating the proposal with the model', 'The actual OpenShift workload is requesting Approved chat model inference over synthetic text.', 'Model output must be reviewed before approval.'),
     'agent_reasoning': ('Agent choosing its next step', 'The model is reviewing the task and the approved read capability.', 'Only a permitted Jira read or an unapproved draft can be returned.'),
     'checking_project_boundary': ('Checking the project boundary', 'The dedicated synthetic probe requests TEST using this OPS run. The gateway must decide independently.', 'No other-project data may be returned. Normal model queries remain restricted to OPS.'),
-    'project_boundary_verified': ('Outside-project request blocked', 'The actual certificate-bound gateway returned HTTP 403 project permission. No TEST data was returned.', 'The agent receives this denial as tool feedback and continues with authorized OPS observations.'),
+    'project_boundary_verified': ('Outside-project request blocked', 'The actual protected gateway returned HTTP 403 project permission. No TEST data was returned.', 'The agent receives this denial as tool feedback and continues with authorized OPS observations.'),
     'agent_read_requested': ('Agent requesting Jira context', 'The agent selected a bounded project query. The protected gateway must independently authorize it.', 'Wait for the actual read result; a request alone is not an allow decision.'),
     'agent_query_rejected': ('Query rejected before execution', 'Local validation rejected unsupported query syntax. No backend request was sent.', 'The agent receives validation feedback within its original turn limit and deadline. Permissions remain unchanged.'),
     'agent_read_complete': ('Jira context retrieved', 'A real governed read returned the bounded project context shown below.', 'The agent will use these observations to prepare its draft.'),

@@ -59,7 +59,7 @@ def permissions(profile, catalog_name):
         if role == 'coordinator':
             reads += [
                 {'apiGroups': [''], 'resources': ['configmaps'],
-                 'resourceNames': ['fixture-service-ca', 'fixture-console-sender-trust', 'fixture-step4-retired-runs'], 'verbs': ['get']},
+                 'resourceNames': ['fixture-service-ca', 'fixture-step4-retired-runs'], 'verbs': ['get']},
                 {'apiGroups': [''], 'resources': ['secrets'],
                  'resourceNames': ['fixture-adapter-catalog-trust-v1', catalog_name,
                                    'fixture-step4-read-route', 'fixture-step4-read-route-ca'], 'verbs': ['get']},
@@ -79,8 +79,6 @@ def permissions(profile, catalog_name):
                 {'apiGroups': ['mcp.kuadrant.io'], 'resources': ['mcpserverregistrations'], 'verbs': ['get']},
                 {'apiGroups': ['networking.k8s.io'], 'resources': ['networkpolicies'], 'verbs': ['get']},
             ]
-            bind(profile.identity_namespace, 'public-trust', [{'apiGroups': [''], 'resources': ['configmaps'],
-                'resourceNames': ['spire-bundle'], 'verbs': ['get']}])
         bind(profile.core_namespace, 'observe', reads)
         for namespace in (profile.triage_namespace, profile.reader_namespace):
             rules = [{'apiGroups': [''], 'resources': ['pods', 'persistentvolumeclaims'], 'verbs': ['get', 'list']},

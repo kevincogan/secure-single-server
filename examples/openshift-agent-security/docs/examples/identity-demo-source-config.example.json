@@ -14,11 +14,12 @@
     "cluster_name": "evaluation-cluster",
     "storage_class": "approved-storage"
   },
-  "certificate_management": {"mode": "legacy"},
+  "certificate_management": {
+    "mode": "legacy"
+  },
   "artifacts_file": "/absolute/private/demo/artifacts.json",
   "public_trust": {
     "service_ca": "/absolute/private/demo/service-ca.pem",
-    "spire_ca": "/absolute/private/demo/spire-ca.pem",
     "upstream_ca_bundle": "/absolute/private/demo/upstream-ca.pem"
   },
   "kubernetes_api_cidrs": [

@@ -61,11 +61,9 @@ def test_diagnostic_failure_cannot_mask_failure_or_block_cleanup(monkeypatch):
 
 
 
-def test_sender_false_flags_do_not_claim_timeout_and_fixed_causes_survive():
-    result = diag.categories('Pilot sender HTTP failure: timeout=false request=true\n'
-        'Pilot sender grant rejected: final_exchange_failed\n'
-        'Pilot sender TLS failure: category=peer_alert\n'
-        'Pilot sender IO failure: kind=InvalidData')
+def test_false_flags_do_not_claim_timeout_and_current_causes_survive():
+    result = diag.categories('Token exchange failed: timeout=false request=true\n'
+        'TLS failure: invalid certificate\n')
     assert result['timeout'] == 0 and result['exchange_failed'] == 1
-    assert result['certificate_rejected'] == 1 and result['sender_io_failure'] == 1
-    assert result['sender_request_failure'] == 1
+    assert result['certificate_rejected'] == 1
+    assert not any(name.startswith('sender_') for name in result)

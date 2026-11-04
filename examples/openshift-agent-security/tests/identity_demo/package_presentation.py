@@ -79,7 +79,7 @@ def build(allow_dir: Path, deny_dir: Path, jira: Path, tui: Path | None = None) 
         'Authenticated demonstration role: analyst',
         'Actual attested workload: ' + association['workload'],
         'Trusted run: ' + association['run_id'],
-        'The protected call uses the accepted certificate-bound native transport.',
+        'The protected call uses the reviewed native protected transport.',
         'The agent cannot select another user, workload or run by adding headers.']), 15))
     # Four 30-second pages provide a dedicated two-minute gateway introduction.
     sections.append(page('MCP Gateway: one place to manage tool access', bullets([

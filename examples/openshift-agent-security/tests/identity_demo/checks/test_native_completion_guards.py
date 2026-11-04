@@ -14,7 +14,7 @@ import pytest
 
 import native_backend as backend
 import native_run_lifecycle as lifecycle
-import native_sender_acceptance as sender
+import native_delegation_acceptance as sender
 import probe_native_exchange as native
 import native_audit
 from run_binding import ReadRun
@@ -78,7 +78,7 @@ def test_conditional_cleanup_retries_only_matching_owned_state(tmp_path, monkeyp
 
 def test_native_jwt_output_requires_one_exact_svid(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """SPIRE's multi-response JSON is normalized without broad identity selection."""
-    probe = sender.SenderAcceptance.__new__(sender.SenderAcceptance)
+    probe = sender.DelegationAcceptance.__new__(sender.DelegationAcceptance)
     probe.args = argparse.Namespace(kubeconfig="private", label="test")
     probe.directory, probe.count = tmp_path, 0
     value = [{"svids": [{"spiffe_id": native.WORKLOAD, "svid": "synthetic.assertion.only"}]}, {"bundles": {}}]
@@ -93,12 +93,12 @@ def test_native_jwt_output_requires_one_exact_svid(tmp_path, monkeypatch: pytest
 
 def test_viewer_tool_denial_uses_a_real_broker_session(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A missing-session 400 must never stand in for the actual tool's 403."""
-    probe = sender.SenderAcceptance.__new__(sender.SenderAcceptance)
+    probe = sender.DelegationAcceptance.__new__(sender.DelegationAcceptance)
     probe.args = argparse.Namespace(label="viewer")
     probe.directory = tmp_path
     calls = []
 
-    def request(port: int, host: str, path: str, body: bytes, certificate: sender.Certificate | None,
+    def request(port: int, host: str, path: str, body: bytes,
                 headers: dict[str, str], response_headers: dict[str, str] | None = None) -> tuple[int, bytes]:
         payload = json.loads(body)
         calls.append((payload, dict(headers)))
@@ -112,27 +112,27 @@ def test_viewer_tool_denial_uses_a_real_broker_session(tmp_path, monkeypatch: py
         return (202, b'') if payload["method"] == "notifications/initialized" else (403, b'{}')
 
     monkeypatch.setattr(probe, "request", request)
-    assert probe.gateway("viewer", "synthetic-token", None, tool_call=True)["http_status"] == 403
+    assert probe.gateway("viewer", "synthetic-token", tool_call=True)["http_status"] == 403
     assert [call[0]["method"] for call in calls] == [
         "initialize", "notifications/initialized", "tools/call"]
 
 
 def test_viewer_tool_denial_refuses_failed_session_setup(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Protocol errors stop the diagnostic before any permission claim."""
-    probe = sender.SenderAcceptance.__new__(sender.SenderAcceptance)
+    probe = sender.DelegationAcceptance.__new__(sender.DelegationAcceptance)
     probe.args, probe.directory = argparse.Namespace(label="viewer"), tmp_path
     monkeypatch.setattr(probe, "request", lambda *a, **kw: (400, b'{}'))
     with pytest.raises(ValueError, match="Real broker initialization required"):
-        probe.gateway("viewer", "synthetic-token", None, tool_call=True)
+        probe.gateway("viewer", "synthetic-token", tool_call=True)
 
 
 def test_viewer_cannot_replace_user_in_existing_session(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The tool uses the substituted credential even on an analyst's session."""
-    probe = sender.SenderAcceptance.__new__(sender.SenderAcceptance)
+    probe = sender.DelegationAcceptance.__new__(sender.DelegationAcceptance)
     probe.args, probe.directory = argparse.Namespace(label="viewer"), tmp_path
     calls = []
 
-    def request(port: int, host: str, path: str, body: bytes, certificate: sender.Certificate | None,
+    def request(port: int, host: str, path: str, body: bytes,
                 headers: dict[str, str]) -> tuple[int, bytes]:
         calls.append(json.loads(body)["method"])
         assert headers["Authorization"] == "Bearer viewer-token"
@@ -140,7 +140,7 @@ def test_viewer_cannot_replace_user_in_existing_session(tmp_path, monkeypatch: p
         return 403, b'{}'
 
     monkeypatch.setattr(probe, "request", request)
-    assert probe.gateway("viewer", "viewer-token", None, tool_call=True, session_headers={
+    assert probe.gateway("viewer", "viewer-token", tool_call=True, session_headers={
         "Mcp-Session-Id": "analyst-session", "MCP-Protocol-Version": "2025-11-25"})["http_status"] == 403
     assert calls == ["tools/call"]
 
@@ -160,7 +160,7 @@ def test_broker_session_header_refuses_ambiguity_and_injection(values: list[str]
 
 def test_sender_http_requests_each_use_fresh_tunnel_without_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     """A failed streaming connection is never retained across HTTP operations."""
-    probe = sender.SenderAcceptance.__new__(sender.SenderAcceptance)
+    probe = sender.DelegationAcceptance.__new__(sender.DelegationAcceptance)
     tunnels, requests = [], []
 
     def tunnel(service: str, port: int, remote: int) -> nullcontext:
@@ -174,10 +174,10 @@ def test_sender_http_requests_each_use_fresh_tunnel_without_retries(monkeypatch:
     monkeypatch.setattr(probe, "tunnel", tunnel)
     monkeypatch.setattr(probe, "_request_once", request)
     for _ in range(2):
-        assert probe.request(19444, sender.HOST, "/mcp", b'{}', None, {}) == (403, b'{}')
+        assert probe.request(19444, sender.HOST, "/mcp", b'{}', {}) == (403, b'{}')
     assert len(tunnels) == len(requests) == 2
     with pytest.raises(ValueError, match="Exact owned"):
-        probe.request(19444, "another-host", "/mcp", b'{}', None, {})
+        probe.request(19444, "another-host", "/mcp", b'{}', {})
     assert len(tunnels) == 2
 
     def fail(*args: object) -> tuple[int, bytes]:
@@ -186,7 +186,7 @@ def test_sender_http_requests_each_use_fresh_tunnel_without_retries(monkeypatch:
 
     monkeypatch.setattr(probe, "_request_once", fail)
     with pytest.raises(ConnectionRefusedError):
-        probe.request(19444, sender.HOST, "/mcp", b'{}', None, {})
+        probe.request(19444, sender.HOST, "/mcp", b'{}', {})
     assert len(tunnels) == len(requests) == 3
 
 
@@ -239,7 +239,7 @@ def test_native_commands_refresh_only_owned_tunnel_without_operation_retries(tmp
 def test_expired_native_credential_requires_release_denial_not_readiness(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A negative credential is proved through gRPC, without a Ready observer."""
     replies = iter([(0, b'positive'), (9, b''), (7, b'')])
-    monkeypatch.setattr(lifecycle, "SenderAcceptance", lambda *a: type("Sender", (), {
+    monkeypatch.setattr(lifecycle, "DelegationAcceptance", lambda *a: type("Sender", (), {
         "intermediate": lambda self: next(replies)})())
     monkeypatch.setattr(native, "wait_authorizer", lambda *a: None)
     spec = {"rules": {"authorization": {}}}
@@ -265,19 +265,19 @@ def test_expired_native_credential_requires_release_denial_not_readiness(tmp_pat
                                  "response_message_present": False, "passed": True}
 
 
-@pytest.mark.parametrize("change", [None, "leaf", "user", "token", "request", "private_only"])
+@pytest.mark.parametrize("change", [None, "transport", "user", "token", "request", "private_only"])
 def test_audit_requires_actual_tls_binding_and_safe_fields(change: str | None) -> None:
     """Private forwarded headers or leaked credentials cannot replace TLS proof."""
     run = ReadRun("run", "https://issuer.test/realms/demo", "analyst", native.WORKLOAD,
                   "https://mcp.test/mcp", 100, 300)
     digest = bytes(range(32))
     record = {"event": "step4-private-read", "status": 200, "request": "correlation",
-              "peer_hash": digest.hex(), "verified": {
+              "tls_version": "TLSv1.3", "verified": {
                   "run": "run", "user": "analyst", "workload": native.WORKLOAD,
                   "expiry": 200, "policy": "step4-protected-read",
-                  "cnf": base64.urlsafe_b64encode(digest).decode().rstrip("=")}}
-    if change == "leaf":
-        record["peer_hash"] = "00" * 32
+                  "delegation": "short-lived-bearer"}}
+    if change == "transport":
+        record["tls_version"] = "TLSv1.0"
     elif change == "user":
         record["verified"]["user"] = "different-user"
     elif change == "token":
@@ -285,7 +285,7 @@ def test_audit_requires_actual_tls_binding_and_safe_fields(change: str | None) -
     elif change == "request":
         record.pop("request")
     elif change == "private_only":
-        record["peer_hash"] = None
+        record["tls_version"] = None
     if change is None:
         assert native_audit.assess(json.dumps(record), run)["passed"]
     else:

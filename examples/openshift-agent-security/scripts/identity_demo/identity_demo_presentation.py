@@ -145,13 +145,11 @@ def additions_for(plan: dict, snapshot: dict) -> dict[str, int]:
 def verify_batch(args: argparse.Namespace, control: Control, snapshot: dict) -> dict:
     """Prove current sandbox/registration readiness, gateways, trust and pool bounds before sealing."""
     from execution_context import validate_context
-    from identity_demo_sender_trust import current
     from probe_gateway_credential_route import owned_gateway_deployment
     profile = active_profile()
     _, credentials, _ = guard(args)
     batch = snapshot['batch']
     require(batch and batch['filled'] and not snapshot['preparation_pending'], 'Complete idle batch required')
-    require(current(args), 'Current approved SPIRE trust copies required')
     gateway = read(args, 'gateways.gateway.networking.k8s.io', 'fixture-mcp', profile.core_namespace)
     owned(gateway)
     require(any(c['type'] == 'Programmed' and c['status'] == 'True'

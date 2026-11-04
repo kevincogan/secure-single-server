@@ -30,6 +30,8 @@ def inputs(args: argparse.Namespace) -> tuple[dict, DeploymentProfile, dict]:
         raise ValueError("Exact native build receipt hash required")
     receipt = read_json(path)
     profile = DeploymentProfile.from_dict(read_json(private_file(args.installation_profile)))
+    if args.expected_server != profile.expected_server:
+        raise ValueError("Exact approved publication server required")
     lock = read_json(RECIPES / "inputs.lock.json")
     if (receipt.get("applied") is not True or receipt.get("offline_compilation_passed") is not True
             or receipt.get("native_build_contract") != profile.native_build_contract

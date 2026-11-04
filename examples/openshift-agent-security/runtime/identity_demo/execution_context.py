@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
+import time
 from typing import Callable
 from uuid import UUID
 from deployment_profile import active_profile, LEGACY
@@ -64,17 +65,29 @@ def context_of(args: object) -> ExecutionContext:
     return getattr(args, "execution_context", None) or legacy_context()
 
 
-def resolve_context(path: str, read: Callable[..., dict], *, contract: dict | None = None) -> ExecutionContext:
+def resolve_context(path: str, read: Callable[..., dict], *, contract: dict | None = None,
+                    wait_timeout: int = 0) -> ExecutionContext:
     """Validate a private fresh context against native ownership and registration."""
+    from identity_demo_controller_identity import ControllerRegistrationPending
+    if type(wait_timeout) is not int or not 0 <= wait_timeout <= 60:
+        raise ValueError("Bounded context readiness timeout required")
     location = Path(path)
-    if (
-        location.is_symlink()
-        or location.stat().st_mode & 0o077
-        or in_source_checkout(location)
-    ):
-        raise ValueError("Private owner-supplied context required")
-    value = json.loads(location.read_text())
-    return validate_context(value, read, contract=contract)
+    original = None
+    end = time.monotonic() + wait_timeout
+    while True:
+        if (location.is_symlink() or location.stat().st_mode & 0o077
+                or in_source_checkout(location)):
+            raise ValueError("Private owner-supplied context required")
+        content = location.read_bytes()
+        if original is not None and content != original:
+            raise ValueError("Execution context changed during readiness observation")
+        original = content
+        try:
+            return validate_context(json.loads(content), read, contract=contract)
+        except ControllerRegistrationPending:
+            if time.monotonic() >= end:
+                raise
+            time.sleep(min(1, max(0, end - time.monotonic())))
 
 
 def context_identity(value: dict) -> ExecutionContext:

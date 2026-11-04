@@ -55,14 +55,11 @@ UI = PREFIX + "-ui"
 EXPERIMENT = "native-step4-read"
 
 
-def provider_token_endpoint(issuer: str, bound_sender: bool) -> str:
-    """Use the exact compiled sender destination, including DNS and token path."""
-    if not bound_sender:
+def provider_token_endpoint(issuer: str, protected_listener: bool) -> str:
+    """Use the exact configured token destination, including DNS and token path."""
+    if not protected_listener:
         return issuer + '/protocol/openid-connect/token'
-    if active_profile() == LEGACY:
-        # Preserve the historical accepted sender's short service DNS contract.
-        return 'https://fixture-keycloak-upstream.demo-core.svc:8443/realms/identity-demo/protocol/openid-connect/token'
-    return active_profile().native_build_contract['OPENSHELL_DEMO_TOKEN_ENDPOINT']
+    return 'https://' + active_profile().service_host('fixture-keycloak-upstream') + ':8443/realms/identity-demo/protocol/openid-connect/token'
 
 
 def private_write(path: Path, value: Any) -> None:
@@ -194,6 +191,19 @@ class NativeTunnelStartupError(RuntimeError):
 
 class ProviderAttachmentConflict(RuntimeError):
     """Represent the native CLI's explicit pre-save, safe-to-retry CAS conflict."""
+
+
+def loopback_ready(process, port, *, failure):
+    """Observe a fresh tunnel only; this helper cannot dispatch or replay a command."""
+    for _ in range(100):
+        if process.poll() is not None:
+            raise failure
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                return True
+        except OSError:
+            time.sleep(0.1)
+    return False
 
 
 def provider_attachment_conflict(words: list[str], stderr: str) -> bool:
@@ -458,26 +468,13 @@ def native_session(args: argparse.Namespace, credentials: dict, *, initialize_pr
                 stdout=log,
                 stderr=log,
             )
-            for _ in range(100):
-                if tunnel.poll() is not None:
-                    raise RuntimeError("Owned native tunnel reconnect failed")
-                try:
-                    with socket.create_connection(("127.0.0.1", management_port), timeout=0.2):
-                        return
-                except OSError:
-                    time.sleep(0.1)
-            raise TimeoutError("Owned native tunnel reconnect timed out")
+            if not loopback_ready(tunnel, management_port,
+                    failure=RuntimeError("Owned native tunnel reconnect failed")):
+                raise TimeoutError("Owned native tunnel reconnect timed out")
 
         try:
-            for _ in range(100):
-                if tunnel.poll() is not None:
-                    raise NativeTunnelStartupError("Own native tunnel failed before command dispatch")
-                try:
-                    with socket.create_connection(("127.0.0.1", management_port), timeout=0.2):
-                        break
-                except OSError:
-                    time.sleep(0.1)
-            else:
+            if not loopback_ready(tunnel, management_port,
+                    failure=NativeTunnelStartupError("Own native tunnel failed before command dispatch")):
                 # No native command has been dispatched. Replace only our own
                 # failed tunnel once; never replay a CLI operation or a write.
                 try:
@@ -644,31 +641,31 @@ def run(args: argparse.Namespace) -> dict:
             scope = ["-n", namespace] if namespace else []
             return kube(args, "get", kind, name, *scope, "-o", "json")
 
-        args.execution_context = resolve_context(args.context_file, read_context)
+        args.execution_context = resolve_context(args.context_file, read_context, wait_timeout=60)
     flow = getattr(args, "permission_flow", None)
     if getattr(args, "enable_create", False) and flow is None:
         raise ValueError("Real create acceptance requires the authenticated permission flow")
     if flow is not None and any(
         getattr(args, name, False)
         for name in (
-            "check_sender_rejection", "check_renewal", "check_key_rollover",
+            "check_delegation_controls", "check_renewal", "check_key_rollover",
             "check_backend_rotation", "retain_run_retirement",
         )
     ):
         raise ValueError("Use a dedicated driver acceptance flow; Step 4 probe flags cannot be silently skipped")
     if flow is not None and (
-        not getattr(args, "bound_sender_listener", False)
+        not getattr(args, "protected_listener", False)
         or args.investigate_substitution
         or not getattr(args, "context_file", None)
         or not getattr(args, "protected_backend_catalog_credential_file", None)
     ):
         raise ValueError(
-            "Permission flow requires the native bound listener and fresh execution context"
+            "Permission flow requires the protected TLS listener and fresh execution context"
         )
     context = context_of(args)
     extra_contexts = []
     for path in getattr(args, "concurrent_context_files", []):
-        extra_contexts.append(resolve_context(path, read_context))
+        extra_contexts.append(resolve_context(path, read_context, wait_timeout=60))
     if extra_contexts and (flow is None or len(extra_contexts) > 3):
         raise ValueError("Concurrent contexts require a bounded authenticated driver flow")
     if len({c.workload for c in [context, *extra_contexts]}) != 1 + len(extra_contexts):
@@ -683,12 +680,12 @@ def run(args: argparse.Namespace) -> dict:
         raise ValueError(
             "Denial regression requires the controlled substitution diagnostic"
         )
-    bound_sender = getattr(args, "bound_sender_listener", False)
-    if bound_sender and not (
+    protected_listener = getattr(args, "protected_listener", False)
+    if protected_listener and not (
         args.upstream_development_issuer and args.check_run_binding
     ):
         raise ValueError(
-            "Bound probe requires the pinned issuer and mandatory run enforcement"
+            "Protected probe requires the pinned issuer and mandatory run enforcement"
         )
     protected_backend = getattr(args, "protected_backend_catalog_credential_file", None)
     if protected_backend:
@@ -702,18 +699,18 @@ def run(args: argparse.Namespace) -> dict:
             or catalog["expires_at"] <= time.time() + 600
         ):
             raise ValueError("Refresh catalog-only credential before allocating a run")
-    if protected_backend and not bound_sender:
+    if protected_backend and not protected_listener:
         raise ValueError(
-            "Combined backend acceptance requires native sender and run enforcement"
+            "Combined backend acceptance requires delegated identity and run enforcement"
         )
     if (
-        getattr(args, "check_sender_rejection", False)
+        getattr(args, "check_delegation_controls", False)
         or getattr(args, "retain_run_retirement", False)
         or getattr(args, "check_key_rollover", False)
         or getattr(args, "check_backend_rotation", False)
     ) and not protected_backend:
         raise ValueError(
-            "Complete sender/lifecycle checks require the protected native backend"
+            "Complete delegation/lifecycle checks require the protected native backend"
         )
     from native_run_lifecycle import require_unused_identity
 
@@ -725,7 +722,7 @@ def run(args: argparse.Namespace) -> dict:
 
         tool = "step56_jira_readJiraProject" if flow is not None else TOOL
         backend = NativeBackend(args)
-    frontend_policy = "fixture-mcp-bound" if bound_sender else "fixture-mcp-auth"
+    frontend_policy = "fixture-mcp-bound" if protected_listener else "fixture-mcp-auth"
     args.namespace = NAMESPACE
     if args.expected_server != SERVER or Path(args.label).name != args.label:
         raise ValueError("Exact lab and simple evidence label required")
@@ -766,8 +763,8 @@ def run(args: argparse.Namespace) -> dict:
         verify_gateway(lambda kind, name, ns=None: kube(args, 'get', kind, name,
             *(['-n', ns] if ns else []), '-o', 'json'))
     resource = credentials["gateway_url"]
-    if bound_sender:
-        from sender_listener import HOST, NAME, RESOURCE
+    if protected_listener:
+        from protected_listener import HOST, NAME, RESOURCE
 
         resource = RESOURCE
         route = kube(args, "-n", NAMESPACE, "get", "httproute", NAME, "-o", "json")
@@ -885,7 +882,7 @@ def run(args: argparse.Namespace) -> dict:
                         "header_name": "Authorization",
                         "token_grant": {
                             "grant_type": "token_exchange",
-                            "token_endpoint": provider_token_endpoint(components.ISSUER, bound_sender),
+                            "token_endpoint": provider_token_endpoint(components.ISSUER, protected_listener),
                             "audience": resource,
                             "jwt_svid_audience": components.ISSUER,
                             "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-spiffe",
@@ -987,10 +984,6 @@ def run(args: argparse.Namespace) -> dict:
                         # realm's longer human-login lifetime. Run expiry is
                         # still enforced separately by the trusted gateway.
                         client["attributes"]["access.token.lifespan"] = "30"
-                        if bound_sender:
-                            client["attributes"][
-                                "tls.client.certificate.bound.access.tokens"
-                            ] = "true"
                 if name == GATEWAY:
                     for peer in extra_contexts:
                         client["protocolMappers"].append({
@@ -1181,9 +1174,9 @@ def run(args: argparse.Namespace) -> dict:
                 checked(
                     "gateway_uses_expected_original_issuer",
                     spec["rules"]["authentication"]["keycloak"]["jwt"]["issuerUrl"]
-                    == (components.ISSUER if bound_sender else original_issuer),
+                    == (components.ISSUER if protected_listener else original_issuer),
                 )
-                if bound_sender:
+                if protected_listener:
                     # Preserve the deny-until-validation baseline and install only
                     # the strict temporary signature/audience/run/certificate rule.
                     spec["rules"] = {
@@ -1202,8 +1195,8 @@ def run(args: argparse.Namespace) -> dict:
                 if flow is not None:
                     # The owned direct AuthConfig performs the live driver lookup.
                     # Generated Kuadrant configs cannot resolve Secrets in our namespace.
-                    # Retain independent exact JWT/run/certificate proof at this boundary.
-                    auth = run_authorization([protected_run, *getattr(flow, "peer_bindings", [])], require_sender_binding=True)
+                    # Retain independent exact JWT/run proof at this boundary.
+                    auth = run_authorization([protected_run, *getattr(flow, "peer_bindings", [])])
                     # Reads are permitted for both demo user roles; create permission
                     # remains a live exact-action decision at the receiving boundary.
                     auth["opa"]["rego"] = auth["opa"]["rego"].replace(
@@ -1215,7 +1208,7 @@ def run(args: argparse.Namespace) -> dict:
                     authorization = spec["rules"]["authorization"]
                     if (
                         getattr(args, "upstream_development_issuer", False)
-                        and not bound_sender
+                        and not protected_listener
                     ):
                         issuer_patterns = authorization["issuer"]["patternMatching"][
                             "patterns"
@@ -1259,7 +1252,7 @@ def run(args: argparse.Namespace) -> dict:
                         # Isolated component diagnostic only. G6 remains false until
                         # the native certificate path and gateway enforcement pass.
                         authorization["native-step4-run"] = run_authorization(
-                            [protected_run], require_sender_binding=bound_sender
+                            [protected_run]
                         )
                 patch = [
                     {
@@ -1329,7 +1322,7 @@ def run(args: argparse.Namespace) -> dict:
                         "has(auth.identity.iss) && auth.identity.iss == "
                         + json.dumps(components.ISSUER)
                     )
-                    if bound_sender:
+                    if protected_listener:
                         audience_patterns = rules["authorization"]["audience"][
                             "patternMatching"
                         ]["patterns"]
@@ -1450,7 +1443,7 @@ def run(args: argparse.Namespace) -> dict:
                 result["permission_flow"] = flow.accept(execute, resource, context)
                 checked("live_permission_gate", result["permission_flow"]["passed"])
                 result["native_exchange_proven"] = True
-                result["sender_bound_native_read_proven"] = True
+                result["native_delegated_read_proven"] = True
                 result["downstream_contract_proven"] = True
             else:
                 if backend is not None:
@@ -1473,18 +1466,15 @@ def run(args: argparse.Namespace) -> dict:
                     "intermediate_claims_inspected": False,
                     "raw_tokens_withheld": True,
                 }
-                if getattr(args, "check_sender_rejection", False):
-                    from native_sender_acceptance import SenderAcceptance
+                if getattr(args, "check_delegation_controls", False):
+                    from native_delegation_acceptance import DelegationAcceptance
 
-                    result["sender_rejection"] = SenderAcceptance(
+                    result["delegation_controls"] = DelegationAcceptance(
                         args, {**human, "access_token": login["access_token"]}
                     ).run()
-                    result["sender_constraint_proven"] = (
-                        result["sender_rejection"]["passed"] is True
-                    )
-                    result["copied_token_rejection_proven"] = result[
-                        "sender_constraint_proven"
-                    ]
+                    result["sender_constraint_proven"] = False
+                    result["copied_token_rejection_proven"] = False
+                    result["delegation_model"] = "short-lived-bearer"
                 if args.check_renewal:
                     print(
                         json.dumps(
@@ -1516,7 +1506,7 @@ def run(args: argparse.Namespace) -> dict:
                         renewed.get("read_passed") is True,
                     )
                     result["renewal_limit"] = (
-                        "Successful read after the configured 30-second final lifetime; certificate renewal and bound-token rotation remain unproven."
+                        "Successful read after the configured 30-second final lifetime; SPIRE identity renewal remains unproven."
                     )
                 if getattr(args, "check_key_rollover", False):
                     from native_key_rollover import check as rollover_check
@@ -1543,7 +1533,7 @@ def run(args: argparse.Namespace) -> dict:
                         changed_spec = json.loads(json.dumps(policy_changed_spec))
                         changed_spec["rules"]["authorization"]["native-step4-run"] = (
                             run_authorization(
-                                [changed], require_sender_binding=bound_sender
+                                [changed]
                             )
                         )
                         current = kube(
@@ -1627,7 +1617,7 @@ def run(args: argparse.Namespace) -> dict:
                     changed_spec = json.loads(json.dumps(policy_changed_spec))
                     changed_spec["rules"]["authorization"]["native-step4-run"] = (
                         run_authorization(
-                            [protected_run], require_sender_binding=bound_sender
+                            [protected_run]
                         )
                     )
                     patch = [
@@ -1677,16 +1667,15 @@ def run(args: argparse.Namespace) -> dict:
                     and other_claims.get("realm_access", {}).get("roles") == ["viewer"],
                 )
                 if backend is not None:
-                    from native_sender_acceptance import SenderAcceptance
+                    from native_delegation_acceptance import DelegationAcceptance
 
                     analyst_args = argparse.Namespace(
                         **{**vars(args), "label": args.label + "-analyst-session"}
                     )
-                    analyst_sender = SenderAcceptance(analyst_args, human)
-                    viewer_leaf = analyst_sender.certificate("session")
-                    analyst_token, _ = analyst_sender.final(viewer_leaf)
+                    analyst_sender = DelegationAcceptance(analyst_args, human)
+                    analyst_token, _ = analyst_sender.final()
                     analyst_session = analyst_sender.initialize_session(
-                        "analyst_for_viewer_test", analyst_token, viewer_leaf
+                        "analyst_for_viewer_test", analyst_token
                     )
                 execute(
                     [
@@ -1703,17 +1692,16 @@ def run(args: argparse.Namespace) -> dict:
                 # Negative credentials need not become Ready. Verify the effective
                 # signed viewer grant first, then require an actual gateway denial.
                 if backend is not None:
-                    from native_sender_acceptance import SenderAcceptance
+                    from native_delegation_acceptance import DelegationAcceptance
 
                     viewer_args = argparse.Namespace(
                         **{**vars(args), "label": args.label + "-viewer"}
                     )
-                    viewer_sender = SenderAcceptance(viewer_args, other_claims)
-                    viewer_token, _ = viewer_sender.final(viewer_leaf)
+                    viewer_sender = DelegationAcceptance(viewer_args, other_claims)
+                    viewer_token, _ = viewer_sender.final()
                     tool_denial = viewer_sender.gateway(
                         "viewer_actual_tool_call",
                         viewer_token,
-                        viewer_leaf,
                         tool_call=True,
                         session_headers=analyst_session,
                     )
@@ -1747,7 +1735,7 @@ def run(args: argparse.Namespace) -> dict:
                     and denied["events"][0]["http_status"] in (401, 403),
                 )
                 result["native_exchange_proven"] = True
-                result["sender_bound_native_read_proven"] = bound_sender
+                result["native_delegated_read_proven"] = protected_listener
                 result["downstream_contract_proven"] = bool(protected_backend)
                 result.setdefault("copied_token_rejection_proven", False)
                 if getattr(args, "retain_run_retirement", False):
@@ -2104,7 +2092,7 @@ def main() -> None:
     )
     parser.add_argument("--check-renewal", action="store_true")
     parser.add_argument(
-        "--check-sender-rejection",
+        "--check-delegation-controls",
         action="store_true",
         help="Exercise actual native SVID leaf renewal and copied-token controls through owned loopback tunnels",
     )
@@ -2129,13 +2117,13 @@ def main() -> None:
         help="Use only the owned pinned upstream issuer; temporarily switch and restore the owned frontend policy",
     )
     parser.add_argument(
-        "--bound-sender-listener",
+        "--protected-listener",
         action="store_true",
-        help="Use only the owned internal mTLS listener; requires strict run checks and pinned upstream issuer",
+        help="Use only the owned internal HTTPS listener; requires strict run checks and pinned upstream issuer",
     )
     parser.add_argument(
         "--protected-backend-catalog-credential-file",
-        help="Add scoped-service-token protected adapter delivery to the native bound read; private catalog credential required",
+        help="Add scoped-service-token protected adapter delivery to the protected delegated read; private catalog credential required",
     )
     parser.add_argument('--reuse-management-session', action='store_true',
                         help='Reuse only a verified owned tunnel and a still-valid operator session')

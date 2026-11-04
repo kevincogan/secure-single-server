@@ -40,10 +40,10 @@ def main() -> None:
     args.output_dir.mkdir(mode=0o700)
     args.namespace = native.NAMESPACE
     args.protected_backend_catalog_credential_file = args.catalog_credential_file
-    for name in ("investigate_substitution", "require_substitution_denial", "check_sender_rejection",
+    for name in ("investigate_substitution", "require_substitution_denial", "check_delegation_controls",
                  "retain_run_retirement", "check_key_rollover", "check_backend_rotation", "check_renewal"):
         setattr(args, name, False)
-    for name in ("upstream_development_issuer", "check_run_binding", "bound_sender_listener",
+    for name in ("upstream_development_issuer", "check_run_binding", "protected_listener",
                  "diagnose_native_grant"):
         setattr(args, name, True)
     if args.check_boundary and not args.spire_agent_cli:

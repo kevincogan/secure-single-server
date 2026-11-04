@@ -94,7 +94,7 @@ class BoundaryFlow(PermissionFlow):
                 identity = self.command("exec", name, "-n", namespace, "-c", "supervisor", "--", "/tmp/step56-spire-agent", "api", "fetch", "x509",
                     "-socketPath", "/spiffe-workload-api/spire-agent.sock", "-timeout", "8s", "-output", "json")
                 assert identity.returncode != 0 and b"no identity" in identity.stderr.lower()
-                program = '''import json,socket,ssl
+                program = '''import http.client,json,socket,ssl
 CA=CA_VALUE
 cases=[]
 for label,host,port,wanted in [('issuer_positive','fixture-keycloak-upstream.demo-core.svc.cluster.local',8443,True),('bound_frontend_positive','fixture-mcp-bound.demo-core.svc.cluster.local',443,True),('private_gateway','fixture-mcp-openshift-ai-inference.demo-core.svc.cluster.local',8080,False),('private_broker','mcp-gateway.demo-core.svc.cluster.local',8080,False),('protected_adapter','fixture-protected-adapter.demo-core.svc.cluster.local',8443,False),('direct_jira','fixture-jira.demo-core.svc.cluster.local',8080,False),('cluster_api','kubernetes.default.svc.cluster.local',443,False),('public_ip','1.1.1.1',443,False)]:
@@ -103,13 +103,14 @@ for label,host,port,wanted in [('issuer_positive','fixture-keycloak-upstream.dem
   with socket.create_connection((address,port),timeout=2):connected=True
  except OSError:connected=False
  cases.append({'case':label,'connected':connected,'passed':connected==wanted,'required':label not in ('cluster_api','public_ip')})
-denied=False
+connection=http.client.HTTPSConnection('fixture-mcp-bound.demo-core.svc.cluster.local',timeout=3,
+ context=ssl.create_default_context(cadata=CA))
 try:
- with socket.create_connection(('fixture-mcp-bound.demo-core.svc.cluster.local',443),timeout=3) as raw:
-  with ssl.create_default_context(cadata=CA).wrap_socket(raw,server_hostname='fixture-mcp-bound.demo-core.svc.cluster.local') as tls:
-   tls.sendall(b'GET /mcp HTTP/1.1\\r\\nHost: fixture-mcp-bound.demo-core.svc.cluster.local\\r\\nConnection: close\\r\\n\\r\\n');tls.recv(4096)
-except ssl.SSLError as error:denied='CERTIFICATE_REQUIRED' in str(error).upper()
-cases.append({'case':'no_client_certificate','tls_certificate_required':denied,'passed':denied,'required':True})
+ connection.request('GET','/mcp',headers={'Accept':'text/event-stream'})
+ status=connection.getresponse().status
+finally:
+ connection.close()
+cases.append({'case':'missing_bearer_token','http_status':status,'passed':status in (401,403),'required':True})
 print(json.dumps({'cases':cases,'all_required_passed':all(c['passed'] for c in cases if c['required'])}))'''.replace(
                     'demo-core.svc.cluster.local', active_profile().core_namespace + '.svc.cluster.local'
                 ).replace("CA_VALUE", repr(ca))

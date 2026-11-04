@@ -50,8 +50,6 @@ def run(args):
     if args.console_runtime_stage in ('status','automatic-enable','automatic-disable'):
         from cluster_console_operator import run as operate
         return operate(args, profile)
-    if args.console_runtime_stage == 'trust-observation':
-        return trust_observation(args, profile)
     if args.console_runtime_stage == 'configure':
         return configure(args, profile)
     if args.console_runtime_stage == 'workloads':
@@ -391,7 +389,6 @@ def workloads(args, profile):
                 raise ValueError('Bounded private inference key required')
             files.update({'catalog-credential.json': setup.private_file(args.console_catalog_credential).read_bytes(),
                 'gateway.receipt.json': setup.private_file(args.runtime_gateway_receipt).read_bytes(),
-                'sender-trust.receipt.json': setup.private_file(args.console_trust_observation_receipt).read_bytes(),
                 'inference.json': json.dumps(inference).encode(), 'inference.key': key.read_bytes()})
         # Exercise the same bootstrap schema before sending credentials to API.
         from identity_demo_cluster_bootstrap import prepare
@@ -443,133 +440,3 @@ def workloads(args, profile):
     return {'applied': args.apply, 'created': created_records, 'runtime': 'cluster',
             'runtime_workloads_activated': args.apply, 'functional_acceptance_passed': False,
             'installer_or_human_credentials_included': False}
-
-
-def trust_observation(args, profile, previous=None):
-    """Capture public trust evidence with installer access, not runtime key access."""
-    import base64
-    import hashlib
-    import json
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.serialization import pkcs12
-    from cluster_console_resources import resource
-    from identity_demo_sender_trust import certificates, current
-    from identity_demo_execution_setup import inspect_state
-    args.namespace = profile.core_namespace
-    managed_ca = None
-    if getattr(args, 'managed_certificate_config', None):
-        from certificate_operations import configure
-        configure(args, profile)
-    if getattr(args, 'certificate_management', {}).get('mode') == 'managed':
-        from managed_certificates import validate_contract, SPIRE_TRUST
-        from cluster_console_operator import receipt
-        validate_contract(args.certificate_management, args.certificate_authority_pem)
-        ledger = receipt(args.ledger, args.console_ledger_sha256)
-        records = [v for v in ledger.get('created', []) if v['kind'] == 'Secret'
-            and v.get('namespace') == profile.core_namespace and v['metadata']['name'] == SPIRE_TRUST]
-        managed_ca = setup.kube(args, 'get', 'secret', SPIRE_TRUST, '-n', profile.core_namespace, '-o', 'json')
-        setup.owned(managed_ca, profile)
-        if (ledger.get('installation_profile') != profile.to_dict() or len(records) != 1
-                or records[0]['metadata']['uid'] != managed_ca['metadata']['uid']
-                or managed_ca.get('type') != 'Opaque' or set(managed_ca.get('data', {})) != {'ca.crt'}):
-            raise ValueError('Exact installer-created separate SPIRE trust required')
-        args.public_trust_ca_uid = managed_ca['metadata']['uid']
-    if not inspect_state(args)['rollback_quiescent'] or not current(args):
-        raise ValueError('Idle candidate and currently aligned issuer/listener trust required')
-    def read(kind, name, namespace=profile.core_namespace):
-        return setup.kube(args, 'get', kind, name, '-n', namespace, '-o', 'json')
-    trust = read('secret','fixture-keycloak-upstream-client-trust')
-    listener = read('secret','fixture-mcp-bound-mutual')
-    issuer = read('deployment','fixture-keycloak-upstream')
-    for obj in (trust, listener, issuer): setup.owned(obj,profile)
-    # Bind all three reads to the original application creation identities.
-    ledger_path = setup.private_file(args.ledger)
-    if setup.sha(ledger_path) != args.console_ledger_sha256:
-        raise ValueError('Exact application creation ledger hash required')
-    ledger = read_json(ledger_path)
-    if ledger.get('installation_profile') != profile.to_dict():
-        raise ValueError('Same application creation ledger required')
-    for obj in (trust,listener,issuer):
-        records = [v for v in ledger['created'] if v['kind']==obj['kind']
-                   and v['metadata']['name']==obj['metadata']['name'] and v.get('namespace')==profile.core_namespace]
-        if managed_ca is not None and obj is listener and not records:
-            from certificate_operations import recorded_secret
-            recorded_secret(args, profile, ledger, listener)
-            continue
-        if len(records)!=1 or records[0]['metadata']['uid']!=obj['metadata']['uid']:
-            raise ValueError('Exact original trust/issuer identity required')
-    public = read('configmap','spire-bundle', profile.identity_namespace)
-    store = pkcs12.load_pkcs12(base64.b64decode(trust['data']['truststore.p12'], validate=True),
-                              base64.b64decode(trust['data']['password'], validate=True))
-    if store.key is not None or store.cert is not None:
-        raise ValueError('Issuer client truststore must contain public CA certificates only')
-    fingerprint = lambda cert: cert.fingerprint(hashes.SHA256()).hex()
-    observed = {'schema_version':1,'profile':profile.to_dict(),
-        'spire_fingerprints':sorted(fingerprint(v) for v in certificates(public['data']['bundle.crt'])),
-        'issuer_fingerprints':sorted(fingerprint(v.certificate) for v in store.additional_certs),
-        'listener_fingerprints':sorted(fingerprint(v) for v in certificates(base64.b64decode(
-            (managed_ca or listener)['data']['ca.crt'],validate=True).decode())),
-        'issuer_uid':issuer['metadata']['uid'],
-        'issuer_annotation':issuer['spec']['template'].get('metadata',{}).get('annotations',{}).get('demo-identity-trust-sha256'),
-        'issuer_trust_volumes':[v for v in issuer['spec']['template']['spec']['volumes']
-                                if v.get('secret',{}).get('secretName')=='fixture-keycloak-upstream-client-trust'],
-        'issuer_trust_uid':trust['metadata']['uid'],'listener_uid':listener['metadata']['uid'],
-        'live_secret_contents_inspected_at_install_only':True}
-    if managed_ca is not None:
-        observed['listener_ca_uid'] = managed_ca['metadata']['uid']
-    if len(observed['issuer_trust_volumes']) != 1 or not observed['spire_fingerprints'] or not (observed['spire_fingerprints']==observed['issuer_fingerprints']==observed['listener_fingerprints']):
-        raise ValueError('Current public trust copies differ')
-    prior_automatic = bool(previous and json.loads(previous['data']['observation.json']).get('automatic_public_refresh'))
-    if getattr(args,'enable_public_trust_refresh',False) or prior_automatic:
-        from identity_demo_public_trust import CA_SECRET
-        client_ca=read('secret',CA_SECRET)
-        setup.owned(client_ca,profile)
-        expected_uid = getattr(args,'public_trust_ca_uid',None)
-        if prior_automatic:
-            expected_uid=json.loads(previous['data']['observation.json'])['listener_ca_uid']
-        if not expected_uid or client_ca['metadata']['uid']!=expected_uid or set(client_ca.get('data',{}))!={'ca.crt'}:
-            raise ValueError('Exact newly recorded public listener CA required')
-        env=issuer['spec']['template']['spec']['containers'][0]['env']
-        if [v for v in env if v['name']=='KC_HTTPS_CERTIFICATES_RELOAD_PERIOD'] != [{'name':'KC_HTTPS_CERTIFICATES_RELOAD_PERIOD','value':'60s'}]:
-            raise ValueError('Issuer automatic HTTPS reload must be configured')
-        observed.update(automatic_public_refresh=True,listener_ca_uid=expected_uid,
-            bundle_uid=public['metadata']['uid'],bundle_owners=public['metadata']['ownerReferences'])
-    payload = json.dumps(observed,sort_keys=True)
-    obj = resource(profile,'v1','ConfigMap','fixture-console-sender-trust',profile.core_namespace,
-                   immutable=True,data={'observation.json':payload})
-    live = setup.kube(args,'get','configmap',obj['metadata']['name'],'-n',profile.core_namespace,'--ignore-not-found','-o','json')
-    if previous is None and live:
-        raise ValueError('Public trust observation collision; review prior receipt')
-    if previous is not None:
-        setup.owned(live,profile)
-        if (live['metadata']['uid'] != previous['metadata']['uid'] or setup.fingerprint(live) != setup.fingerprint(previous)
-                or live.get('immutable') is not True):
-            raise ValueError('Recorded immutable trust observation changed')
-        # Existing immutable data cannot be updated. Review admission under a
-        # distinct temporary name; no review object is actually created.
-        from copy import deepcopy
-        review = deepcopy(obj)
-        review['metadata']['name'] += '-review'
-    else:
-        review = obj
-    setup.kube(args,'create','--dry-run=server','-f','-','-o','json',value=review)
-    setup.write(args.output_dir/'sender-trust-observation.plan.json',obj)
-    if args.apply:
-        namespaces(args,profile)
-        if previous is not None:
-            setup.write(args.output_dir/'sender-trust-observation.before.json',live)
-            setup.write(args.output_dir/'sender-trust-observation-delete.pending.json',
-                        {'uid':live['metadata']['uid'],'name':live['metadata']['name']})
-            setup.kube(args,'delete','--raw','/api/v1/namespaces/'+profile.core_namespace+'/configmaps/'+obj['metadata']['name'],
-                '-f','-',value={'apiVersion':'v1','kind':'DeleteOptions','preconditions':{
-                    'uid':live['metadata']['uid'],'resourceVersion':live['metadata']['resourceVersion']}})
-            if setup.kube(args,'get','configmap',obj['metadata']['name'],'-n',profile.core_namespace,'--ignore-not-found','-o','json'):
-                raise ValueError('Old public observation still exists; inspect before creating')
-        setup.write(args.output_dir/'sender-trust-observation.pending.json',obj)
-        made = setup.kube(args,'create','-f','-','-o','json',value=obj)
-        reference = {'uid':made['metadata']['uid'],'observation_sha256':hashlib.sha256(payload.encode()).hexdigest()}
-        if observed.get('automatic_public_refresh') is True:
-            reference['automatic_public_refresh'] = True
-        setup.write(args.output_dir/'sender-trust.receipt.json',reference)
-    return {'applied':args.apply,'stage':'trust-observation','runtime_serving_key_access_required':False,
-            'live_native_protected_path_still_required':True}

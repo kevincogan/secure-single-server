@@ -8,12 +8,15 @@ They are installed by the administrator, never the coordinator or preparer.
 from __future__ import annotations
 
 import os
-import time
 
 from deployment_profile import active_profile
 from deployment_artifacts import IMAGE_REFERENCE, configured_native_image
 
 CLASS = "zero-trust-workload-identity-manager-spire"
+
+
+class ControllerRegistrationPending(ValueError):
+    """Exact policy is valid but its read-only controller counts are incomplete."""
 
 
 def enabled() -> bool:
@@ -101,12 +104,13 @@ def verify_policy(desired, read, *, require_status=True):
         raise ValueError("Installer-owned exact controller policy required")
     if require_status:
         stats = actual.get("status", {}).get("stats", {})
+        if any(stats.get(k, 0) for k in
+               ("podEntryRenderFailures", "entryFailures", "entriesMasked")):
+            raise ValueError("Controller registration reported failures or masked entries")
         if (stats.get("namespacesSelected") != 1
                 or stats.get("podsSelected", 0) < 1
-                or stats.get('entriesToSet') != stats.get('podsSelected')
-                or any(stats.get(k, 0) for k in
-                       ("podEntryRenderFailures", "entryFailures", "entriesMasked"))):
-            raise ValueError("Controller registration reconciliation is not ready")
+                or stats.get('entriesToSet') != stats.get('podsSelected')):
+            raise ControllerRegistrationPending("Controller registration reconciliation is not ready")
     return actual
 
 
@@ -129,14 +133,3 @@ def verify_gateway(read):
                        for v in pod['metadata'].get('ownerReferences', []))):
         raise ValueError('Exact ready gateway Pod/controller association required')
     return result
-
-
-def wait_ready(context, read, timeout: int = 60) -> dict:
-    end = time.monotonic() + timeout
-    while True:
-        try:
-            return verify(context, read)
-        except ValueError:
-            if time.monotonic() >= end:
-                raise
-            time.sleep(1)

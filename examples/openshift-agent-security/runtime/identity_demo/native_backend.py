@@ -619,7 +619,7 @@ class NativeBackend:
             if not self.persistent or not self.action_driver or self.ca is None:
                 raise ValueError('Cluster runtime requires the prepared persistent gateway')
             from identity_demo_gateway_observation import current,GatewayDiscoveryPending
-            deadline,attempt = time.monotonic()+30,0
+            deadline,attempt = time.monotonic()+90,0
             while True:
                 try:
                     checks = current(self.args,self.ca)

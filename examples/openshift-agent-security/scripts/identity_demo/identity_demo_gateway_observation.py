@@ -42,7 +42,7 @@ def authorizer_current(args, spec):
     """Observe our exact policy; shared generated configs are controller-owned.
 
     This is reconciliation evidence, not a substitute for installer inspection
-    or the subsequent real certificate-bound protected request.
+    or the subsequent real authenticated protected request.
     """
     import probe_broker_discovery as shared
     from identity_demo_runtime_cli import private_path

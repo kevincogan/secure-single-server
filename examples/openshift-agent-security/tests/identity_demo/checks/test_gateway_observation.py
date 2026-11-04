@@ -52,7 +52,20 @@ def test_cluster_discovery_wait_remains_bounded_and_never_assumes_success(tmp_pa
     monkeypatch.setattr(backend.time,'monotonic',lambda:now[0])
     monkeypatch.setattr(backend.time,'sleep',lambda duration:now.__setitem__(0,now[0]+duration))
     with pytest.raises(observation.GatewayDiscoveryPending):probe.ready()
-    assert now[0]==30 and len(calls)==16
+    assert now[0]==90 and len(calls)==46
+
+
+def test_slow_catalog_reconcile_recovers_without_a_second_execution(tmp_path,monkeypatch):
+    probe=cluster_probe(tmp_path,monkeypatch);now=[0.0];calls=[]
+    def current(*args):
+        calls.append('read')
+        if now[0]<40:raise observation.GatewayDiscoveryPending({'status':{}})
+        return {'actual-security-checks':True}
+    monkeypatch.setattr(observation,'current',current)
+    monkeypatch.setattr(backend.time,'monotonic',lambda:now[0])
+    monkeypatch.setattr(backend.time,'sleep',lambda duration:now.__setitem__(0,now[0]+duration))
+    assert probe.ready()=={'actual-security-checks':True}
+    assert now[0]==40 and len(calls)==21
 
 
 def snapshot(ca: str = "public-fixture-ca") -> dict:

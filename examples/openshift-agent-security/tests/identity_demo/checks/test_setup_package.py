@@ -816,7 +816,7 @@ def test_realm_export_preserves_roles_and_skips_bearer_only_secrets(monkeypatch:
     assert not any('/clients/bearer/' in path for path in calls)
 
 
-@pytest.mark.parametrize('unsafe', [None, 'wrong-owner', 'wrong-type', 'other-reference', 'changed-config'])
+@pytest.mark.parametrize('unsafe', [None, 'wrong-owner', 'wrong-type', 'other-reference', 'foreign-annotation', 'changed-config'])
 def test_resume_verifies_generated_pull_secret_additions(monkeypatch: pytest.MonkeyPatch, unsafe: str | None) -> None:
     """Only a registry credential owned by the exact ServiceAccount may differ."""
     desired = obj('ServiceAccount', 'fixture-test', automountServiceAccountToken=False)
@@ -824,6 +824,7 @@ def test_resume_verifies_generated_pull_secret_additions(monkeypatch: pytest.Mon
     current['metadata']['uid'] = 'account-uid'
     current['secrets'] = [{'name': 'fixture-test-dockercfg-abcde'}]
     current['imagePullSecrets'] = deepcopy(current['secrets'])
+    current['metadata']['annotations'] = {'openshift.io/internal-registry-pull-secret-ref':'fixture-test-dockercfg-abcde'}
     secret = {'type': 'kubernetes.io/dockercfg', 'metadata': {'ownerReferences': [
         {'kind': 'ServiceAccount', 'name': 'fixture-test', 'uid': 'account-uid'}]}}
     if unsafe == 'wrong-owner':
@@ -832,10 +833,12 @@ def test_resume_verifies_generated_pull_secret_additions(monkeypatch: pytest.Mon
         secret['type'] = 'Opaque'
     elif unsafe == 'other-reference':
         current['secrets'][0]['name'] = 'unrelated-credential'
+    elif unsafe == 'foreign-annotation':
+        current['metadata']['annotations']['openshift.io/internal-registry-pull-secret-ref'] = 'unrelated-credential'
     elif unsafe == 'changed-config':
         current['automountServiceAccountToken'] = True
     monkeypatch.setattr(setup, 'kube', lambda *a, **kw: secret)
-    if unsafe in ('wrong-owner', 'wrong-type', 'other-reference'):
+    if unsafe in ('wrong-owner', 'wrong-type', 'other-reference', 'foreign-annotation'):
         with pytest.raises(ValueError):
             setup.recorded_configuration_matches(None, current, desired, setup.fingerprint(desired))
     else:

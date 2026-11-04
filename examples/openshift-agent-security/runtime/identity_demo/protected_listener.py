@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Render the bounded internal mTLS listener on the existing owned gateway.
+"""Render the protected internal TLS listener on the existing owned gateway.
 
-Rendering is not live sender-binding evidence. Serving certificates come from
-the service-CA controller; client trust contains public SPIRE roots only.
+Rendering is not live authorization evidence. Ordinary serving certificates
+remain separate from SPIRE workload attestation and credential renewal.
 """
 
 from __future__ import annotations
@@ -31,12 +31,11 @@ def owned_resource(api: str, kind: str, name: str = NAME) -> dict:
 
 
 def listener() -> dict:
-    """Require chain-validated client authentication; no optional TLS mode."""
+    """Require encrypted, server-authenticated transport for delegated grants."""
     return {"name": "bound", "protocol": "HTTPS", "port": PORT,
             "hostname": HOST, "allowedRoutes": {"namespaces": {"from": "Same"}},
             "tls": {"mode": "Terminate", "certificateRefs": [{
-                "group": "", "kind": "Secret", "name": NAME + "-mutual"}],
-                "options": {"gateway.istio.io/tls-terminate-mode": "MUTUAL"}}}
+                "group": "", "kind": "Secret", "name": NAME + "-mutual"}]}}
 
 
 def gateway_patch(current: dict) -> list[dict]:
@@ -76,6 +75,5 @@ def resources() -> list[dict]:
             "patch": {"operation": "MERGE", "value": {
                 "name": "envoy.filters.network.http_connection_manager", "typed_config": {
                     "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-                    "forward_client_cert_details": "SANITIZE_SET",
-                    "set_current_client_cert_details": {"subject": True, "uri": True}}}}}]}
+                    "forward_client_cert_details": "SANITIZE"}}}}]}
     return [service, route, xfcc]

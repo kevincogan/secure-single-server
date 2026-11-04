@@ -10,7 +10,7 @@ import secrets
 import time
 
 from cryptography.fernet import Fernet, InvalidToken
-from identity_demo_run_store import Denied, strict_json
+from agent_security_contracts import Denied, strict_json
 
 
 class LoginState:

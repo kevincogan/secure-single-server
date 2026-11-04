@@ -107,7 +107,7 @@ def prepare(args: argparse.Namespace) -> tuple[dict, dict]:
     builder.mkdir(mode=0o700)
     for name in ("Builder.Containerfile", "build-native.sh"):
         shutil.copyfile(RECIPES / name, builder / name)
-    environment = {**profile.native_build_contract, "CARGO_BUILD_JOBS": "2",
+    environment = {"CARGO_BUILD_JOBS": "2",
                    "OPENSHELL_DEMO_CARGO_LOCK_SHA256": lock["cargo_lock_sha256"]}
     env_path = args.output_dir / "native-build.env"
     with env_path.open("x") as stream:

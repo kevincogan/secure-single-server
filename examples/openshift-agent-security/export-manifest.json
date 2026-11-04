@@ -12,7 +12,7 @@
     },
     {
       "path": "GETTING-STARTED.md",
-      "sha256": "7d51b54ec784040661be2451cadfed66dca68344f93503c3546688193eaaea0d"
+      "sha256": "2f4f38f4cebb3e257019aa631d6bfbfaf55f4c59b6aae0dd2be3fe8533945f49"
     },
     {
       "path": "LICENSE",
@@ -24,7 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "7708acb74143be7a1903fb260e30d38c14106ea7caaa74a63701ff1307829a13"
+      "sha256": "3ba29537a762dec0c1b6690259b462ff65981152c70c36d19d4df8a04b7b5ec5"
     },
     {
       "path": "config/demo-contract.example.json",
@@ -36,7 +36,7 @@
     },
     {
       "path": "config/runtime-sources.json",
-      "sha256": "022d990694006652fe907db0e32adc0348bb54c95b966dec42d5935ffeb90f68"
+      "sha256": "0dfc51bc07eb0eba222df58c8e08f7f1cdadd04d2449e28b4506317d33279afb"
     },
     {
       "path": "docs/examples/identity-demo-certificates.example.json",
@@ -56,7 +56,7 @@
     },
     {
       "path": "docs/examples/identity-demo-installer.example.yaml",
-      "sha256": "3d0529d07ae878125d610ba21750c95433452ea51934be8014a313254adb2eb2"
+      "sha256": "acadb0984956226304cf8dd27f99894f1909c79029a23888f9a6c065b3f0c601"
     },
     {
       "path": "docs/examples/identity-demo-presentation.example.json",
@@ -68,7 +68,7 @@
     },
     {
       "path": "docs/examples/identity-demo-source-config.example.json",
-      "sha256": "5fe27dd6f67d61a4d3c130b3d40ec11339499f6cb26567ad1e787ab1952252c2"
+      "sha256": "38b65c152b6b022381fabd6f7c9946d670c6b48603bb8acc00a9b40f8a3ea417"
     },
     {
       "path": "docs/examples/identity-demo-unused-retirement.example.json",
@@ -80,31 +80,103 @@
     },
     {
       "path": "docs/identity-demo-customer-quickstart.md",
-      "sha256": "f64f7c969c6c36fa4b894e91e4442c04e0adbbcbec8c076d43c9f0e378ba6faf"
+      "sha256": "4b6b2ded7174ea118fec76f5de57ba3820e3cc93a16ca692251cee0f1e33f0a1"
     },
     {
       "path": "docs/identity-demo-reference.md",
-      "sha256": "314297ec0bfb3d9332f7005f15d46a11e55fbdeff51e366e8ecfc956c1e45fdb"
+      "sha256": "bb1d94bfbf8f8461b695c3edd7d5ba5c6d5bc5eb575f8e8f0db812dfc21fb92e"
     },
     {
       "path": "docs/security-runtime.md",
-      "sha256": "bd1823bb3cdc8fd3e16ef2650c06f302182997e8641e37ddc5e19068119ac26c"
+      "sha256": "79c6b7db9e7670a55c2eadf156b0725c3de98fb0a483b65c765aa809b8197a78"
     },
     {
       "path": "docs/verification.json",
-      "sha256": "710257b0c44e839376178fbbc4efbe62019a19141fa46e095374b78cf0c656e8"
+      "sha256": "54dd1307a1deee723c1f659b32c17545e76b8d010955d46d43c8df1a32b62a2a"
+    },
+    {
+      "path": "examples/adapter_conformance.py",
+      "sha256": "ce60e08de330f5b06bdcd1a0a598b46b4ccf81a794df84829d76f0795b452d48"
+    },
+    {
+      "path": "examples/artifact-metadata-agent/README.md",
+      "sha256": "bed64ef2afa43ced8405234f7e5d69e607074c8f7d7f42d5c02f350b35f02e1f"
+    },
+    {
+      "path": "examples/artifact-metadata-agent/acceptance.py",
+      "sha256": "1357b816a467914156b85b9ec1fb5e6e131e619fee8ef4f05a68d75f28bc5526"
+    },
+    {
+      "path": "examples/artifact-metadata-agent/agent.py",
+      "sha256": "ab1a327bad3f4e8e9536fa850be8edf59f14de4243a547aec1ca7c55305e5f2b"
+    },
+    {
+      "path": "examples/artifact-metadata-agent/backend.py",
+      "sha256": "1118b67b2f16a460582627bed079a3af023a093ba5a43eace4743a2a7fed420e"
+    },
+    {
+      "path": "examples/artifact-metadata-agent/contract.py",
+      "sha256": "b5d978e8cce997df1bbd66d383b4ba0f561229c7c053bda39b00cec88d346be0"
+    },
+    {
+      "path": "examples/artifact-metadata-agent/host.py",
+      "sha256": "b7b0dde6defe58817c32b9289537b73f4667327254bab8c7cb682ab922c5c516"
+    },
+    {
+      "path": "examples/document-agent/Containerfile",
+      "sha256": "accc35bb0ff130a06f06d25cd4c7425cdb7655265c53f87d5412f9dd7718f99a"
     },
     {
       "path": "examples/document-agent/README.md",
-      "sha256": "d8d1bf3eff91f037e246ee2ce70538309ec05f560915b47817ea8b757f411854"
+      "sha256": "bffcc0f64d2b48c2284c1c2c0f26440edf239d27b8ecb75436658ef20b6f4cc0"
     },
     {
       "path": "examples/document-agent/agent.py",
       "sha256": "5839ee4143a229de268992eadefb89f5e4ddffe3db9f5c7c34d566366285a7e8"
     },
     {
+      "path": "examples/document-agent/backend.py",
+      "sha256": "5bd3f2be2caffd3c013a998590bb3c1ee9bca475ca742563ae869275572c136b"
+    },
+    {
+      "path": "examples/document-agent/contract.py",
+      "sha256": "cc5498eca942a9a653c0296045e6a359c64349aa2af6d61f7f375083570fef35"
+    },
+    {
+      "path": "examples/document-agent/delegation_controls.py",
+      "sha256": "8d1e80f6f868347f8a8ff39e3d51c6df492accfebb138e866957f44077039c0e"
+    },
+    {
+      "path": "examples/document-agent/deployment.py",
+      "sha256": "93cfaf7808397ca68fecc48b1642c71d13036f4f25b038f904d335d779825c2f"
+    },
+    {
       "path": "examples/document-agent/host.py",
-      "sha256": "143a4dda88f1e54681b630562433d2f82d35df93b4b510c69d5a46d4c6d24075"
+      "sha256": "fd43614676dd12ba77aaa538d08992c5823d33665d561a36677973121c0b0656"
+    },
+    {
+      "path": "examples/document-agent/isolation_probe.py",
+      "sha256": "ab87e5849b0641f701915701b035942db81ccb64e6b77480c2dc213605d3e7b9"
+    },
+    {
+      "path": "examples/document-agent/issuer.py",
+      "sha256": "7ae2e43f432d988ee2dc377112dc155d7ecdd76b02441fd088fb13010ff1ae86"
+    },
+    {
+      "path": "examples/document-agent/live_agent.py",
+      "sha256": "921e19a5666a858345740c09704c5f0e7f35d90ce53d8e33b3151667754c8435"
+    },
+    {
+      "path": "examples/document-agent/proof.py",
+      "sha256": "7838fc749aecd52f9087ea9ec33d52fa8ad8d62408d070f8b4647fde33d4028c"
+    },
+    {
+      "path": "examples/document-agent/qualification.py",
+      "sha256": "c84b68f36783f88fa2458645c366e8f39d37444ebed2065847b23c6d7da5689f"
+    },
+    {
+      "path": "examples/document-agent/service.py",
+      "sha256": "fda4d3b55845da362f80188faaaddf52fb6eff549f57e48b067c710eea98bc2a"
     },
     {
       "path": "infra/identity-demo/artifacts.reference.json",
@@ -144,7 +216,7 @@
     },
     {
       "path": "infra/identity-demo/templates/application.json",
-      "sha256": "b66269a250188a7d25d93854fbd713c54b76eab73df64e2c54263d6e9e435ad7"
+      "sha256": "06319d40f5a00f102bc8e3a862dfc7ece8b39d657327e1286c67665aec6797cd"
     },
     {
       "path": "infra/identity-demo/templates/exchange-realm.json",
@@ -168,7 +240,7 @@
     },
     {
       "path": "infra/openshell/native-build/README.md",
-      "sha256": "ea696c3219e6f3cdf3ce98f6b792e1ba56b23b781e5ff1b8d2711ef2a51969ec"
+      "sha256": "3e423c6c6372125e78b178527f331246aff1474b87d91644188ff786a0fe8935"
     },
     {
       "path": "infra/openshell/native-build/build-native.sh",
@@ -180,7 +252,7 @@
     },
     {
       "path": "infra/openshell/native-build/inputs.lock.json",
-      "sha256": "59fcd0dd8e0775c2a43f302509c807d9c8a7b9982903eb8293b1c61bc24701b4"
+      "sha256": "49b2b6ff82cb094c3ee296ecdbc6c06c8973fe7d04f237a84117c801d9f7b391"
     },
     {
       "path": "infra/openshell/patches/.gitattributes",
@@ -188,27 +260,19 @@
     },
     {
       "path": "infra/openshell/patches/README.md",
-      "sha256": "985f7091c169ba051f217821b9020904a782f5cdf24fa4712e3bc089637822ec"
+      "sha256": "a1e8f49746e14be17d7487a1d13007a2899d569a23f02e790641e13aacdee81b"
     },
     {
       "path": "infra/openshell/patches/v0.1.3-bounded-oauth-response.patch",
-      "sha256": "0758e2c604d20d009f6afb31fb3a880feb2fc48b32b73bf4d2d382d7d63e0c06"
-    },
-    {
-      "path": "infra/openshell/patches/v0.1.3-pilot-sender-transport.patch",
-      "sha256": "0a8dbaae04d1f0cc18eec1529418c917bda719b995edd5ff27227d536c83af64"
+      "sha256": "cd2b4722365ec11d9670eca715a963ac9ab606b828759657b6352a647aa66ef7"
     },
     {
       "path": "infra/openshell/patches/v0.1.3-sandbox-subject-comparison.patch",
       "sha256": "404034b59bf7ff75e279f276020407857f37dbd170a0f6039156cbf5cc4012d3"
     },
     {
-      "path": "infra/openshell/patches/v0.1.3-sender-installation-domain.patch",
-      "sha256": "d4f618bd91076a2c684d7ec4da452ea266ea2e4311044aa7044da3d964a30eb7"
-    },
-    {
-      "path": "infra/openshell/patches/v0.1.3-sender-x509-feature.patch",
-      "sha256": "fcb7727b308560cf29d64277ca254336fcff792521dd4bdf4f87aa523017ed63"
+      "path": "pyproject.toml",
+      "sha256": "0e6f97e8fc7c76d80fccb4dee977bc5377da84ade19c60f60de4fbdbc9f57e11"
     },
     {
       "path": "pytest.ini",
@@ -216,11 +280,15 @@
     },
     {
       "path": "runtime/agent_security.py",
-      "sha256": "4dd2759b7ebcb4e812071a7f38169382f2f240145995287737ca11282819fbaf"
+      "sha256": "127fbee9f505bdaed5fd16a905c35e9099ad799c387c708285842c7dc5dc0bf2"
     },
     {
       "path": "runtime/agent_security_contracts.py",
       "sha256": "ab8af0691621132ad8a1fedfed9840f1e839495cf447b3e6992dda5be2600463"
+    },
+    {
+      "path": "runtime/agent_security_runtime/__init__.py",
+      "sha256": "adc15790eed0ae4befa36730b1356502348b279fcedfc8690f94312b46cc2bfb"
     },
     {
       "path": "runtime/agent_security_service.py",
@@ -248,11 +316,11 @@
     },
     {
       "path": "runtime/identity_demo/agent_runtime.py",
-      "sha256": "a6a58cc531dcb69acfb793a7155a8ca1100419e8d8275dc6c4bac5708fec307a"
+      "sha256": "c5eeb510c2efede9d9eed8443ace4da8978bf0b8dbd047d4a28898f846b31358"
     },
     {
       "path": "runtime/identity_demo/boundary_flow.py",
-      "sha256": "e6bf65fb6372ed6f0947470fd1244819862b2a1a48fbb5c013da102243a1ddc9"
+      "sha256": "7874c3b4c21fdbee186d5d927aa59044fd4ab74dca6bb55c8374a704b51e5d1c"
     },
     {
       "path": "runtime/identity_demo/concurrency_flow.py",
@@ -268,15 +336,15 @@
     },
     {
       "path": "runtime/identity_demo/dependency_flow.py",
-      "sha256": "e6eb60b0b1b8b24e04a5491152525a25b52a08afb2da4a7548f9ae595fa4361e"
+      "sha256": "6abd63b4213fef1b1efbdc1ab7ede353ce92f22b4f91db0a54dbd6a915d80652"
     },
     {
       "path": "runtime/identity_demo/execution_context.py",
-      "sha256": "36e7fd193299860550cc271060af7870fceaf3cee1fca788f529740018089375"
+      "sha256": "d2a0cdf56f4bb8a1575bc201d16a9d6387de33dc5f5882fc061db2c35aa445da"
     },
     {
       "path": "runtime/identity_demo/gateway_credential_route.py",
-      "sha256": "ca32aa63058a37605dde026bbaa0fd0cb0c714bce9f26fe3e49ff580ba167f38"
+      "sha256": "6ea7a5efee44a08b93ca026611dcfca2f27657a35661f626f19860c781c0c1b9"
     },
     {
       "path": "runtime/identity_demo/gateway_evidence_flow.py",
@@ -288,7 +356,7 @@
     },
     {
       "path": "runtime/identity_demo/gateway_renderer.py",
-      "sha256": "6cd6ea7e7dc1db7af33e8a621cda50560e6334328d336e344c55d2800213df63"
+      "sha256": "68b811738fd52f2ba018acd905095beb4d000b07f29988d731d61a75ea28dd3b"
     },
     {
       "path": "runtime/identity_demo/jira_ui_preview.py",
@@ -296,11 +364,11 @@
     },
     {
       "path": "runtime/identity_demo/key_rotation_flow.py",
-      "sha256": "35fb424d3417be05b76d5c07c5728651b798641ff39616b59ef56005a73fc536"
+      "sha256": "febd04386b47582dfa75d7535452608a168e2345ad38379e2c0ea2eba8b7884f"
     },
     {
       "path": "runtime/identity_demo/lifecycle_flow.py",
-      "sha256": "699ac010c4c9d71208df2fd9e5fd115b396de2e467472ee1242a5f15d540ee31"
+      "sha256": "a2ec7f7958c97b154b86cd0eedb3a549e03cba5925f7079c0d7109fddb9374fb"
     },
     {
       "path": "runtime/identity_demo/model_execution.py",
@@ -308,23 +376,27 @@
     },
     {
       "path": "runtime/identity_demo/native_audit.py",
-      "sha256": "38c44297ce0863824b3f16ec9c926cb0e572f868a1478f67ba5512c266189380"
+      "sha256": "b0cff81538cc7afc6738735a628c87933bac94285dd41ec83c48444777e5845f"
     },
     {
       "path": "runtime/identity_demo/native_backend.py",
-      "sha256": "eb457f878240fb7e18998cdc8760304d2f3bf0fa7f616ced632c7496b764889e"
+      "sha256": "8820692a69399ed26ca8be828146d1ee4ed0007eaaa363aac9b2fb137be89d2d"
     },
     {
       "path": "runtime/identity_demo/native_backend_rotation.py",
       "sha256": "c99c92ca1210106641bc437e627423fe5141e4155fb6d0b8b740633c7938d76e"
     },
     {
+      "path": "runtime/identity_demo/native_delegation_acceptance.py",
+      "sha256": "2ee9dbcac2f0b21f1fd55eefdaca72b6d9f6e4fbd6f6d1c1958df6c06df51e9a"
+    },
+    {
       "path": "runtime/identity_demo/native_grant_diagnostic.py",
-      "sha256": "77e2e595ae59082c57f7dc5aa2354408d66d635f4dacbcfcb90dbd439293bc11"
+      "sha256": "7b9e9526a3451371454c55b2f39a40842d4d5adf9161a488bfad408275c23ea3"
     },
     {
       "path": "runtime/identity_demo/native_key_rollover.py",
-      "sha256": "a4cff46e1d2f05a89562dad8d50451d317249a4f2b7a322a6de8918c36631cdf"
+      "sha256": "0376c349bb8b58d4bef0ed8dc1921c4706ed26f77d6b46fc948af71c94401a52"
     },
     {
       "path": "runtime/identity_demo/native_parallel.py",
@@ -332,7 +404,7 @@
     },
     {
       "path": "runtime/identity_demo/native_read_diagnostics.py",
-      "sha256": "8502647772eff0abdefc5b1c470af132943e1b85c266a638c3ba4cf1a9d4f921"
+      "sha256": "09c71f5c8c247ae4bd3bf857bba62ed542cf728410dd9bc50a80fe4c52d733d9"
     },
     {
       "path": "runtime/identity_demo/native_read_retry.py",
@@ -340,15 +412,11 @@
     },
     {
       "path": "runtime/identity_demo/native_renewal_flow.py",
-      "sha256": "d24c6dafd172d05c892698ade50ea39d40bad7ef81c4dfcb832bf72b2de8b4d9"
+      "sha256": "d31a88b4b35ebae09ac847dcf975f71b7281fae8f83566515c651ad836b8ec63"
     },
     {
       "path": "runtime/identity_demo/native_run_lifecycle.py",
-      "sha256": "094fb871a11bd64948e33150b9321a0f93887fee2a7813a44e526c54a17a4203"
-    },
-    {
-      "path": "runtime/identity_demo/native_sender_acceptance.py",
-      "sha256": "64bee18550ab6335ec05d84df5fe1ceea8c2930115ebdae931c19a0f8df6cbb0"
+      "sha256": "d26b66e5d83af7a12c5597337dad2c5c82273cb1879f703b434857eab3e80b26"
     },
     {
       "path": "runtime/identity_demo/native_subject_boundary.py",
@@ -380,7 +448,7 @@
     },
     {
       "path": "runtime/identity_demo/probe_native_exchange.py",
-      "sha256": "32ccc0f2e450c87d6da63dbb6e521d1d0a5b236fce36d0395100c11b5a242550"
+      "sha256": "1b65bc68ca8ce5e26abd4ba7f1f458eb4ddfde2e634dff2b86cda3ae7673abe4"
     },
     {
       "path": "runtime/identity_demo/probe_native_identity.py",
@@ -399,8 +467,12 @@
       "sha256": "c804f716d9cc778271733471e5668f58ca8e1811733dc4a0002efe8217ee81dc"
     },
     {
+      "path": "runtime/identity_demo/protected_listener.py",
+      "sha256": "281fb60f21a0ad338206d2da1bdb8cd81895912356f911b0f82c3553d2880047"
+    },
+    {
       "path": "runtime/identity_demo/read_security_flow.py",
-      "sha256": "d3c1c4fd2ba6f4d064d74d267f091f61061c72091d2cda10a47876cfb3583ce1"
+      "sha256": "c7316ebefd6bdd4364498ba68d9b7674a8feaf5c3ff807dda6ca0a6ab33eb049"
     },
     {
       "path": "runtime/identity_demo/recovery_flow.py",
@@ -412,11 +484,7 @@
     },
     {
       "path": "runtime/identity_demo/run_binding.py",
-      "sha256": "c7fa054788309397765dc027009a9b6a4ca315e59e72ecb7c15ad15ddce7a69b"
-    },
-    {
-      "path": "runtime/identity_demo/sender_listener.py",
-      "sha256": "ce3a42c00be2774a0fc0400c4a9a67b3195e9e60a7cb94e45589d767760b25d9"
+      "sha256": "4c56872abfd70ce24aa2c61d7dd00a9529e42710fd4c8aaa26910b010b0ce6b0"
     },
     {
       "path": "runtime/identity_demo/service_request_core.py",
@@ -468,11 +536,11 @@
     },
     {
       "path": "scripts/identity_demo/README.md",
-      "sha256": "242548301460131bf2ea0b0e62641c7687c07eb2485b22fd81c2dc1d84821696"
+      "sha256": "bb490ba02ed2ebb17e50d246de176a103f5d63d98eabd382ca82357364b7e7e6"
     },
     {
       "path": "scripts/identity_demo/certificate_operations.py",
-      "sha256": "8b832d7e6d426f79c10625e47b8fee94b1872bdc9e4bbac30ba3b176b800d2f5"
+      "sha256": "b3be4d96eb3bd774e336d869baf200ab4ddb72afe337d14dd55360a7aa380e4b"
     },
     {
       "path": "scripts/identity_demo/cluster_console_build.py",
@@ -488,19 +556,15 @@
     },
     {
       "path": "scripts/identity_demo/cluster_console_install.py",
-      "sha256": "9dc0e6d9f1a932b36c16cc0ede4292f75fdc04612dc13929660229a43734b9d2"
+      "sha256": "71f9885cfdf93f6797f9d5d1dae556e931a1ae17682e4f04030022ee447f4e9b"
     },
     {
       "path": "scripts/identity_demo/cluster_console_operator.py",
-      "sha256": "beba6f664ac56329f0f63d7abbdec4ccfcc80e0bd096161844083ffc1e41db2a"
+      "sha256": "2ff0683711b75c46a63e12bdc81f8e028b348ba1f804da22dcd22fca74c3180a"
     },
     {
       "path": "scripts/identity_demo/cluster_console_plan.py",
       "sha256": "41ebce0185a19fda6dfc6353b7ad5f7872152ec3cc550fa89d2f5a3a383c115b"
-    },
-    {
-      "path": "scripts/identity_demo/cluster_console_public_trust.py",
-      "sha256": "84127202f792641bea64bc5071c6cd0a57ce211a06c4952289e80a279cd1149b"
     },
     {
       "path": "scripts/identity_demo/cluster_console_realm.py",
@@ -508,27 +572,23 @@
     },
     {
       "path": "scripts/identity_demo/cluster_console_resources.py",
-      "sha256": "7223c193d44eafa5c19d530b6617cab0607608e0612d109b6d854c47c87b8f24"
-    },
-    {
-      "path": "scripts/identity_demo/cluster_console_trust.py",
-      "sha256": "1f669c33dc29496596233b241239f63b7c07ec8a561af99afedb074fa43274bb"
+      "sha256": "4d2a2f9e481d7a2f205a04211b24cf6f44c00b5d23bdf1bc7f9a1b58e6a54af3"
     },
     {
       "path": "scripts/identity_demo/cluster_console_update.py",
-      "sha256": "8a931b31240043bf0e40f0ba817f5df4962799fb76bb84b3159b0d2297530f4a"
+      "sha256": "1e18690c91a0cf126437f9de16dd0a6dde4277bd3aa969c15ec75d8398564f98"
     },
     {
       "path": "scripts/identity_demo/cluster_install_launch.sh",
-      "sha256": "dc18493232a2e61befe74fccf51d7c56432f7c28f073959e015810e36b8547ae"
+      "sha256": "5415fc6b8d6355fa1a1836c40202c7156292826136d578487de1f8e5f6c08121"
     },
     {
       "path": "scripts/identity_demo/cluster_installer_application.py",
-      "sha256": "2d5b2b615a9e7f85e38def9d0e889e83530d5b50aa8dc60ed993f5abb0c758ab"
+      "sha256": "c852d86b99c3db6fc648bc9da7250b4d7ee66f457e757598bfcdb504ea0b7c8a"
     },
     {
       "path": "scripts/identity_demo/cluster_installer_prerequisites.py",
-      "sha256": "a2619d204ab86297783e6ed8ea9f6d4164a25f89b10c84fb4ab077605a7ce3ce"
+      "sha256": "ed3d0608c60045a07e38cf3177bca98ff8b170ede4e8e0906cece199fbdd5b27"
     },
     {
       "path": "scripts/identity_demo/cluster_installer_receipts.py",
@@ -536,11 +596,11 @@
     },
     {
       "path": "scripts/identity_demo/cluster_installer_resources.py",
-      "sha256": "ccc46a597ccfdbc18c4eee4ed0f6184749ea1e5779c660e3de3491e69c83274f"
+      "sha256": "c0aba5423131e2294d96ab9d354b506c8f9ef4ccc22329c6fe8dee2968db1ab3"
     },
     {
       "path": "scripts/identity_demo/cluster_installer_session.py",
-      "sha256": "7c095a9c3a2216451030b0b1346a34832f14b5c813f84d357be315531ea3ca14"
+      "sha256": "55ac6bcef928108facb0c87232fe3ef6d8d99eb6a99bd19d9b0ef5c5e5345d36"
     },
     {
       "path": "scripts/identity_demo/cluster_runtime_delivery.py",
@@ -548,7 +608,7 @@
     },
     {
       "path": "scripts/identity_demo/connected_install.py",
-      "sha256": "85b93692ff9b709b9cb089f6a6a26108781b25da726c89a3a047273adca53e13"
+      "sha256": "8d250defbf0728beaead9db099ec6147b7c6511f61b60aeffdb9a13909f116b2"
     },
     {
       "path": "scripts/identity_demo/console_runtime_build.py",
@@ -564,7 +624,7 @@
     },
     {
       "path": "scripts/identity_demo/deployment_profile.py",
-      "sha256": "926f291dd54849ed1a4bbe85a2808638b389b9a470cd76d8884039679e4f2f36"
+      "sha256": "e2d73a97422fcaf5bfe83cd58f1b6b4478b5a69ea61964a0bfa9908bdc8c53cf"
     },
     {
       "path": "scripts/identity_demo/diagnostic_build.py",
@@ -572,7 +632,7 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_action_policy.py",
-      "sha256": "59b66035f8e7fc6419a8836948ead83b340b92bfabc8751034a003407ef08d11"
+      "sha256": "040f151027884ee91cab2366ee98e873f94bf88c61bd78986daba9fabf5d1b3b"
     },
     {
       "path": "scripts/identity_demo/identity_demo_adapter.py",
@@ -600,11 +660,11 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_cluster_bootstrap.py",
-      "sha256": "81a5f9effe6d33dc5af822f188e500fefd3e644f1f3458b2c68485712265b735"
+      "sha256": "fb8cfaf165e5e5d0005919080e715f4f62cbcd60f13365b7c312b26a18439e75"
     },
     {
       "path": "scripts/identity_demo/identity_demo_cluster_build.py",
-      "sha256": "5cc35a755f36c1b2ce2cac40189a547b272712a7d6b1496e993a7ab75ad2c1a1"
+      "sha256": "7f784020411bf856de52da6fbd632d03998178ab0426da0b6374845eea0301ab"
     },
     {
       "path": "scripts/identity_demo/identity_demo_connector.py",
@@ -612,7 +672,7 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_console.py",
-      "sha256": "77eb7c2d5f848891439d325cca9850146ea70dbe5429be50384ffa327e620b4d"
+      "sha256": "cb931ae4480fa39c780ad239b0f79e7f5550d9238a29a64626c93e7b1f2725f5"
     },
     {
       "path": "scripts/identity_demo/identity_demo_console_preparer.py",
@@ -624,11 +684,11 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_console_visuals.py",
-      "sha256": "3a2382ebb1b274b79a2dfd593a23249d9e39f5a443eb166ea647254358e24d8d"
+      "sha256": "60ce4433e22321cddf765580d59ca5ccba47d009b7e6df356709480f0d9166cc"
     },
     {
       "path": "scripts/identity_demo/identity_demo_console_worker.py",
-      "sha256": "ffd1e851cd86651fb44c0c616169e569936d7d85c79ba9fadb6d70e1b3edf8dc"
+      "sha256": "0aff4b04ae5d9816e0da5e1641b12501e5508c47a01c835efef847ab23786abc"
     },
     {
       "path": "scripts/identity_demo/identity_demo_control_transport.py",
@@ -636,7 +696,7 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_controller_identity.py",
-      "sha256": "dde2a23434c6d28e560e19a798138cda556f9f062d860e82edd3c52fdd760f87"
+      "sha256": "232818ef9c2d0d431f6a3cceec5242680433586a90c7fe646adda4011e5b2fa9"
     },
     {
       "path": "scripts/identity_demo/identity_demo_discovery_registration.py",
@@ -644,11 +704,11 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_driver.py",
-      "sha256": "19a7f49e073e5f63ef10c22aba3cee7a3d11b54113b75191b0d56fd230b6e4c7"
+      "sha256": "74ec6f5bc42f29b3f9cd76190aac8f28090f75774d731f06f86f0aaa4f058d1a"
     },
     {
       "path": "scripts/identity_demo/identity_demo_execution_setup.py",
-      "sha256": "966b063582077db37f133c04c8a273864177cba5c74863236095eda3fa84f483"
+      "sha256": "e1b0e8b018ab871db833b54ddd8629202916cfd946b7aa7c0ef14a800364bc50"
     },
     {
       "path": "scripts/identity_demo/identity_demo_fixture_http.py",
@@ -656,11 +716,11 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_gateway_observation.py",
-      "sha256": "4b7a7cb31cab72f075b9c6788e19c837ad75e2987a607fef26715509bfc72f85"
+      "sha256": "4493a6f587941db2151db47061869e864c8ef309c98d409bf7c160bb52682660"
     },
     {
       "path": "scripts/identity_demo/identity_demo_gateway_persistence.py",
-      "sha256": "6de16cc80bc3bc4c6614d9bafb0eaea5966782f8ef6e79599fa70056ad3db3c4"
+      "sha256": "cb6f7f05a4b11d2afa9e9c0bced5d2ec3f50aa730c7d72037a996ebebebc4f08"
     },
     {
       "path": "scripts/identity_demo/identity_demo_issue_view.py",
@@ -688,7 +748,7 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_login_state.py",
-      "sha256": "1f1c2e5772bb716f1b8c1a6347c29896e6084051d222cd3ed43db4a7e6e5ddd0"
+      "sha256": "f016a0466345aa049e7a06efc6dc000a8a9c2c07b4e0e337a21fdc0861d88237"
     },
     {
       "path": "scripts/identity_demo/identity_demo_management_session.py",
@@ -699,24 +759,24 @@
       "sha256": "741c6ebd733485944fdd85d9d4d4357792780814a613914abba0e1e9dbaddd25"
     },
     {
+      "path": "scripts/identity_demo/identity_demo_oidc.py",
+      "sha256": "cf73e9f2a71b403539baea350c9202844eb2035dedd22d2a56ca488183e08156"
+    },
+    {
       "path": "scripts/identity_demo/identity_demo_operator_access.py",
       "sha256": "e1758e1ba7d11e6deead1385dca481835769aa58056006b39f7b80f3afca6601"
     },
     {
       "path": "scripts/identity_demo/identity_demo_pool_profiles.py",
-      "sha256": "9e8250a06a51b7e3f8a4b0293b86091e13034d7536596873f8685c760771cdf6"
+      "sha256": "185d9016d07eeb4fae6b509a0eb0b5e2d3e4064b47fd2a89409dbb03d60288b5"
     },
     {
       "path": "scripts/identity_demo/identity_demo_presentation.py",
-      "sha256": "cd016370211dff3def4241cde49338902a47e1585ce59ced81848e8bae14703b"
+      "sha256": "11bd3641a3777b1260f9ef27c57e6b3d77df2b9c438b250a522024744cc898f9"
     },
     {
       "path": "scripts/identity_demo/identity_demo_private_state.py",
       "sha256": "8b195e4d43c1a22dd64050ddc06ff53cf780d397c27286fa67eed610ffc03579"
-    },
-    {
-      "path": "scripts/identity_demo/identity_demo_public_trust.py",
-      "sha256": "279acd024803d458964161e8775688913a7d65c147bc625358c3b32e1d61ace6"
     },
     {
       "path": "scripts/identity_demo/identity_demo_realm_access.py",
@@ -739,12 +799,8 @@
       "sha256": "23c6cac9241f3cf56df463f6bb992e55e847e837ed56725a854e5dc7b4a4320d"
     },
     {
-      "path": "scripts/identity_demo/identity_demo_sender_trust.py",
-      "sha256": "7b802535f105449e33bb4e9fed47796ec322afeb17b3d9fce58b6d787ff14857"
-    },
-    {
       "path": "scripts/identity_demo/identity_demo_setup.py",
-      "sha256": "298ed0281ea163d0bbf81d91df2c1c5a703cf9d0ddb7e90d1a513acf24125ead"
+      "sha256": "00e5c50ca07f7ed15d740449b858f1c153ad760464294e89799534c2b1153baa"
     },
     {
       "path": "scripts/identity_demo/identity_demo_spire_network.py",
@@ -752,11 +808,11 @@
     },
     {
       "path": "scripts/identity_demo/identity_demo_spire_registration.py",
-      "sha256": "f40cc98237926873e569c672b9409dcfabe46986b11f14f99a1ce5139c6a0b15"
+      "sha256": "ec14ff1afa46f92435cade5845ddfde13401ca07ac853bb9a8aad5a9c32e3488"
     },
     {
       "path": "scripts/identity_demo/identity_demo_step4_isolation.py",
-      "sha256": "d11273a206fffd5ff0b6ee464183b64263fd67af834189b7ed6b892ad0325597"
+      "sha256": "c5e0969dda0900045229fc12d13959302cb9d92eddcb93ac18185d5190483971"
     },
     {
       "path": "scripts/identity_demo/identity_demo_warm_pool.py",
@@ -780,15 +836,15 @@
     },
     {
       "path": "scripts/identity_demo/managed_certificates.py",
-      "sha256": "63b45a0ead3113c1e5790630f2f276e132e65eba2aa641c6f0b2960663f6ad08"
+      "sha256": "80a6df31e76957d648605747376234e6535037e5d4100d735b762adb8ceb5871"
     },
     {
       "path": "scripts/identity_demo/native_build.py",
-      "sha256": "6874c2b9e8749830d768ba57e5e90c339ca4e9983a205b49d8d3c87500aac6bb"
+      "sha256": "f61648e64c6322a056e7162b688894610c43ab49cf16ae0e3e97112ecf8f2174"
     },
     {
       "path": "scripts/identity_demo/native_publication.py",
-      "sha256": "b4948beacaa21972e481eea996ac0fd567b3c233a00af11771df60deaf7daec8"
+      "sha256": "dc52accabec4e87e346dc63c4f73e7a06e8ef00ec21c1ba52a25074e2b9095b9"
     },
     {
       "path": "scripts/identity_demo/runtime_delivery.py",
@@ -800,7 +856,7 @@
     },
     {
       "path": "scripts/identity_demo/source_render.py",
-      "sha256": "dbfaafda3c993292867d2cb04bdfabb9b9d3c22571d54aa2bfc9a7ec427766bc"
+      "sha256": "cfe6131ac7b88526a3f0319a4ba600242694d72c309a2e84c593c1fc461b7ad5"
     },
     {
       "path": "scripts/identity_demo/unused_context_retirement.py",
@@ -808,7 +864,7 @@
     },
     {
       "path": "scripts/install.sh",
-      "sha256": "79398e3a35e243c3b85b925ea6df22ba1169cf75dbf30b1812636b8e84d4e64f"
+      "sha256": "938ea4ceea51d6acd04d556558b9e38df154961c5ec2bf729e40e455c70cb9ba"
     },
     {
       "path": "scripts/verify-source.py",
@@ -860,7 +916,7 @@
     },
     {
       "path": "tests/identity_demo/browser_permission_flow.py",
-      "sha256": "96903a4d0bedb910cc9bb0a2ed4c4d604ba85176d4f60ee4ee0b4854fbaa341b"
+      "sha256": "d0e2da69a2c4e335a67bce0e010de2f65d9fd677df7ce16880bee2bd23439c54"
     },
     {
       "path": "tests/identity_demo/capture_openshell_tui.py",
@@ -877,6 +933,10 @@
     {
       "path": "tests/identity_demo/checks/test_adapter.py",
       "sha256": "dd1dde28876c6c9c8b74d34ea6347bb18784cd74b94a7c4de14d095c33b1fd62"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_adapter_conformance.py",
+      "sha256": "fe84810dfefc15ef53b871d2c0d1ad2dbd0243177a61b4bf7d129a209b3b77e2"
     },
     {
       "path": "tests/identity_demo/checks/test_adapter_discovery.py",
@@ -896,7 +956,11 @@
     },
     {
       "path": "tests/identity_demo/checks/test_administrator_handoff.py",
-      "sha256": "2db27d0206d15623ed136576c8a1045bb98f6073752d7e7fc91d268b9f151144"
+      "sha256": "1e505b11720b6a8593f945ab173e84cf2f38f6c536e756902ed2bb6b639a6c10"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_agent_credential_probe.py",
+      "sha256": "f38b95107d8b9817b9fbed03b6933311e972bcfa96cb5c6bbe8733c18a9c0450"
     },
     {
       "path": "tests/identity_demo/checks/test_agent_egress.py",
@@ -904,7 +968,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_agent_runtime.py",
-      "sha256": "c56515223cea9590b29a62c57f2ffae9c4d8666ea1b58683b04639b65cf027ee"
+      "sha256": "2044f360c57fbeb62a4610fd89f4abdee4be3594b9f94326410c8eb41a7d9151"
     },
     {
       "path": "tests/identity_demo/checks/test_authorizer_readiness.py",
@@ -936,7 +1000,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_catalog_rotation_recovery.py",
-      "sha256": "019e833934015ec8c2e14f64b19747651a47b7907549f56ca8241340409b9dca"
+      "sha256": "7b83a539df917bbd0917d604c64bcc3c0110517442ef84f70584d2fc99218a69"
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_authorizer_readiness.py",
@@ -944,7 +1008,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_bootstrap.py",
-      "sha256": "ecb8efb79910f0653897d7da3fc45d0c8debb8fd9b145dbcf034e1297afd12bd"
+      "sha256": "5954b27271c7015dbf9a1032469cf2404c5944b8a61a18b6571b63b5f38d178c"
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_console_build.py",
@@ -976,7 +1040,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_installer_application.py",
-      "sha256": "703692f04d7a3dac21fdeac3f06b8057391b56600bd013afb3af8b4cc876ef73"
+      "sha256": "8f74fe1553a8a1c63147c13867e0df76b5c541c3cd4e4a0bab592bf08da087c2"
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_installer_receipts.py",
@@ -984,19 +1048,15 @@
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_installer_session.py",
-      "sha256": "ee8d13f71141596b4a2d4a91a20a32f85d138cb9fe2877067fefe14995364b0a"
+      "sha256": "f60b43453c96643c22fbbe57069728624bdc8cbae0c6620445ea66757f0a3940"
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_native_build.py",
-      "sha256": "be7182e24a589245de33d66a15bd7f1998be3e73a44d3dc88f1871bd40b3f703"
+      "sha256": "f7f075fb69c0bc3e1154eaa9499f9774ad030840246e29ac654e9d57c03f37aa"
     },
     {
       "path": "tests/identity_demo/checks/test_cluster_security_boundaries.py",
       "sha256": "9672f6647d46c94885e051d76c83840e128d16d38fc9065114fb68e49a135be0"
-    },
-    {
-      "path": "tests/identity_demo/checks/test_cluster_trust_maintenance.py",
-      "sha256": "064e35f44c5da1a09b4b107fb7eddbb2b586001af5cddd6b1ab424a510302b30"
     },
     {
       "path": "tests/identity_demo/checks/test_components.py",
@@ -1008,7 +1068,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_connected_install.py",
-      "sha256": "19fc7918177c14e8105b8cbecf6cec7b321646cd530312a1097c67110c694366"
+      "sha256": "c666a4b63d4bd593d042f8d052e42756c88ac7acf89a4bfd93a150cf115fda6d"
     },
     {
       "path": "tests/identity_demo/checks/test_connector_contract.py",
@@ -1016,7 +1076,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_console.py",
-      "sha256": "47e9ca66f7471df0354fc86eea4bd1e1ae4cbe04a5506d020cad13187ffcff48"
+      "sha256": "0cfb2e20fb2200a1c18546994dc8c270743e42ad0a739be335c0847d20aa101a"
     },
     {
       "path": "tests/identity_demo/checks/test_console_atomic_admission.py",
@@ -1032,15 +1092,23 @@
     },
     {
       "path": "tests/identity_demo/checks/test_console_visuals.py",
-      "sha256": "e44eb4c22a6dbda9fc15e68242b953fea30db5aa93542a05c1f1183ea74178f7"
+      "sha256": "8da7e90dc3cf59cbd92f6c9e70eb0705f64435ee24b586d0c29c5ba9baf20824"
     },
     {
       "path": "tests/identity_demo/checks/test_console_worker.py",
-      "sha256": "7bad394248331fa2364590b5abdae83089509f3da7d2dbd8d6b54f4962c4eac1"
+      "sha256": "2bcd5dcc26e75dca4c1238f57545b7079a032e7ecd61908821fed7817537eae7"
     },
     {
       "path": "tests/identity_demo/checks/test_controller_identity.py",
-      "sha256": "821948804ca36e71fe09eff6e2b7b27a1f98be6b81e5403c92f0c718f6e823d3"
+      "sha256": "b0a5bf781c57deed7d982481f6d9a601f3f1344a96fd920f8cf3ff08ba9dc31b"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_delegation_controls.py",
+      "sha256": "ac99a49b180e0af91903d4f25a3526addae1f4db6520c743af6ab8160c95606e"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_delegation_tls_trust.py",
+      "sha256": "88913f797032251fe2e9119ad8d3d4c6144380f2e91a5c5314cb194bd20957e8"
     },
     {
       "path": "tests/identity_demo/checks/test_dependency_flow.py",
@@ -1056,15 +1124,43 @@
     },
     {
       "path": "tests/identity_demo/checks/test_deployment_profile.py",
-      "sha256": "a072c408ffdb77a8ba1fb69dcb8b21e200bb81dfaefa0c2f5aec99225fa9ac0c"
+      "sha256": "b72cb057e28967e7550fe02a192e39c2811e01958066a573e522c3b7d90b60f6"
     },
     {
       "path": "tests/identity_demo/checks/test_diagnostic_build.py",
       "sha256": "8234fff7c442ac2a9df3a01e5e91cf2b4fa635841becdfb1e3e8db8ee07ad177"
     },
     {
+      "path": "tests/identity_demo/checks/test_document_agent.py",
+      "sha256": "48891a6a046274842632e73536b001b191d8f3c3d51feee4a3ce1981a6c1d007"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_document_backend.py",
+      "sha256": "ff27a52ef22176d422a2ac63ac811b738e6468f1345ff9c25414adbe37074d7d"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_document_deployment.py",
+      "sha256": "4f3beb0578bdc9b58e6b0d0a11a4eeeba0e71e34f7e60684163abcc67264a1a4"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_document_host.py",
+      "sha256": "38c147d3939d180888977e177e0b117b6f87c487b64ebd68e97f1f2eb3990590"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_document_issuer.py",
+      "sha256": "e89b3ed6e25ebe2b6bf95b59e2ca3b568964351ed52c0b5a86f2f5f568019a16"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_document_proof_ownership.py",
+      "sha256": "40e056cf12a6e213f5504e900dcc1594d07158764d1d906097248f4710f4dc25"
+    },
+    {
+      "path": "tests/identity_demo/checks/test_document_qualification.py",
+      "sha256": "ab62e72afb4d1b63f4884534197725c780dd5aec26ab03b2524b09f5c6d44c4e"
+    },
+    {
       "path": "tests/identity_demo/checks/test_driver.py",
-      "sha256": "b05484912cb5d347ae0a20bd7993b667dbbcb0d9871927b75fb58aae12b4aedd"
+      "sha256": "84824d222e6c53c80ed30ce3f778b1efe0a2999553da3923560c79cf5e193d22"
     },
     {
       "path": "tests/identity_demo/checks/test_driver_check_selection.py",
@@ -1072,7 +1168,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_driver_keys.py",
-      "sha256": "11b981f6b1e5d00ef7ebf62f9e077e5f0b9ce5165fdd2f9528c5dc7a74c8bbc8"
+      "sha256": "8d7629f9ca3f1a5231cbd222ae96686f1025e9aeb828ac8c6c26456724ee959e"
     },
     {
       "path": "tests/identity_demo/checks/test_driver_workflows.py",
@@ -1092,7 +1188,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_execution_setup.py",
-      "sha256": "1fdcc91474e498e9ead8abdd00ee448380ef53f7d018f7202d2c7a82b9c2fba9"
+      "sha256": "742cd545f0cec1d501a4d13580228726a9629d20dfbe8227bce019a7ac93964a"
     },
     {
       "path": "tests/identity_demo/checks/test_gateway.py",
@@ -1100,7 +1196,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_gateway_credential_route.py",
-      "sha256": "c61df32c1079aaaf6d13a868ac9f9d59ace5a08e744187bce47007ba67aba85c"
+      "sha256": "d0f8964e846c868c27ed4327d07ccc523f70c2287c3d297704eae050412e7391"
     },
     {
       "path": "tests/identity_demo/checks/test_gateway_oauth.py",
@@ -1108,7 +1204,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_gateway_observation.py",
-      "sha256": "e0305500250be521dca35dbd8aaf5344147a28af229e1fda4b15b504ec765071"
+      "sha256": "97edbc63c8ecbe1f0d84228ed17586473b71ac00903b5cff7a14e91a99a015a9"
     },
     {
       "path": "tests/identity_demo/checks/test_gateway_overview.py",
@@ -1116,7 +1212,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_gateway_renderer_pure.py",
-      "sha256": "85bea789165677208b1ba5f824ca4b32295239ab6ddab3db2eb9e2ff7328ca27"
+      "sha256": "9057a53544238dda7f62017fb833fa203b84bb914342dbc928ace5f149615934"
     },
     {
       "path": "tests/identity_demo/checks/test_gateway_response_parsing.py",
@@ -1140,7 +1236,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_installer_prerequisites.py",
-      "sha256": "4e09d2ee1dc9037207489e653b0f2952d6fde34cee8398d8855c75ad26b69dc5"
+      "sha256": "e306c829a31d2ef2176ef0860d9fa5332cbb577655629a528d9a3a82d7129fb2"
     },
     {
       "path": "tests/identity_demo/checks/test_jira_action_adapter.py",
@@ -1160,7 +1256,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_managed_certificates.py",
-      "sha256": "9dd8de6aa231a07f3c634de4b5875191cb8e8cb36aff2fb73710812668c1f8da"
+      "sha256": "8bfdf504b6157da1805711880582b4fb44cf0ba2b6ea0bafb27a04331e582b69"
     },
     {
       "path": "tests/identity_demo/checks/test_management_session.py",
@@ -1168,15 +1264,15 @@
     },
     {
       "path": "tests/identity_demo/checks/test_native_build.py",
-      "sha256": "44db77c729d48b4e30c2fd0c3371ee7762e37397a063b19d962fb87ec961542f"
+      "sha256": "33b67b391846f24aac1ffd9d3cb3291f6a521fe886eaf463efecaff06356d6dc"
     },
     {
       "path": "tests/identity_demo/checks/test_native_completion_guards.py",
-      "sha256": "c9ce63ae324b47126f309fa1dfc682aea96520d6167c1209fbc63905312bdb2c"
+      "sha256": "1c95d76022e478bfdcb911606e96b180260182d61b5e28097fa425a91820f952"
     },
     {
       "path": "tests/identity_demo/checks/test_native_grant_diagnostic.py",
-      "sha256": "4b62e5777be58de4013539c1f8656da6a25ba6d4e986877edb67e48a78974123"
+      "sha256": "f181e72e5ce058317075f7a1fbdc10e6ef373bef4d3a9435bf74c562ff0c9776"
     },
     {
       "path": "tests/identity_demo/checks/test_native_parallel.py",
@@ -1188,11 +1284,11 @@
     },
     {
       "path": "tests/identity_demo/checks/test_native_publication.py",
-      "sha256": "bf6535f3f0bb03a556f6a7b74b2ed815fa2067705fdb1d08e05c9497964bf2af"
+      "sha256": "90d885486f34995b2e1fb7bf2485e37960f8dfaba429d638ce27823f0c461f3e"
     },
     {
       "path": "tests/identity_demo/checks/test_native_read_diagnostics.py",
-      "sha256": "255f07c0c1bce0e028a24d7ec5cd6152d91f6e38658e693a421f7dc19cd58cf5"
+      "sha256": "2bfcefe631f34389acea7dd0964de13045cb8cb219140f2b9ed130390df9c74b"
     },
     {
       "path": "tests/identity_demo/checks/test_native_read_retry.py",
@@ -1200,15 +1296,11 @@
     },
     {
       "path": "tests/identity_demo/checks/test_native_renewal_flow.py",
-      "sha256": "bfe89803c169255e41c68f4002936a7d236a2c5c09fc12a9b8dbe59fa3fa593d"
+      "sha256": "7a59f25f7c9125085608978422070bb38d6d13cf31255578d8270c4886c907e0"
     },
     {
       "path": "tests/identity_demo/checks/test_native_safe_result.py",
-      "sha256": "d45064f340ea14ce452d9f959b615e33454bfe28a0ee265b73b74cdecff572c1"
-    },
-    {
-      "path": "tests/identity_demo/checks/test_native_sender_trust.py",
-      "sha256": "648af5da1306a7bc0a3f2a110d6fcdcaa2532cc089852a6716d0f4ff31bd6af6"
+      "sha256": "23ff658eff64a74c3536282b73f22d1db112a5cdbef8319bcfa5d587999634ca"
     },
     {
       "path": "tests/identity_demo/checks/test_native_subject_boundary.py",
@@ -1240,15 +1332,15 @@
     },
     {
       "path": "tests/identity_demo/checks/test_pool_profiles.py",
-      "sha256": "06fd5f6011533ce88e261f97cbcff622593234163bb22a6963f5518f67b0cba1"
+      "sha256": "fc0d3a14c8584ccebb7702221f7d2b98fdba376e7ada854aa8b93b44791f2cf4"
     },
     {
       "path": "tests/identity_demo/checks/test_pool_retention_and_gateway.py",
-      "sha256": "8fa60dc2404c11ac5269237f15b7dabb90e3a56d46e2fba004a3d1e7fe7b1dc8"
+      "sha256": "db15e014a525bcb1b33097e0a8592633c02b5c8d178e0626aeb9e80db69f5462"
     },
     {
       "path": "tests/identity_demo/checks/test_presentation.py",
-      "sha256": "b7f4e321f9f874ebd897c2bbb5691582e69097fe3b6dcd2f60f5a1697c266eb8"
+      "sha256": "b9585306b2b5745b5606c99334ae6d1707e1f555770337748540398e23ae16b4"
     },
     {
       "path": "tests/identity_demo/checks/test_private_authorizer_host.py",
@@ -1263,16 +1355,16 @@
       "sha256": "edc4fd3f8356961b6fe7e32d496069261be09381b0e6770597ede5f2cc6e346a"
     },
     {
+      "path": "tests/identity_demo/checks/test_protected_listener.py",
+      "sha256": "f56e49f4877e8d7280d1d0b495656afae61060f6a6dd31a4f537a7a0dc7bafe1"
+    },
+    {
       "path": "tests/identity_demo/checks/test_public_admission.py",
       "sha256": "9d8e08786bd3d2cbc9bf4c7daa40dcdb2654714a2813dc2e7a31851bb596e815"
     },
     {
-      "path": "tests/identity_demo/checks/test_public_trust.py",
-      "sha256": "3d2da155edb9b230b9d504579fc6ebde2035aff13b840c129ba5b16f4bdd13f1"
-    },
-    {
       "path": "tests/identity_demo/checks/test_read_security_flow.py",
-      "sha256": "b6ac38812a09e3c6be6658b1011c6046a082d0403162528c142778929a63ba7f"
+      "sha256": "65d35af3feb64ab488d1be3714c8b7c093788204f409e21f98d306d4e3f23abf"
     },
     {
       "path": "tests/identity_demo/checks/test_realm_common.py",
@@ -1300,7 +1392,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_run_binding.py",
-      "sha256": "ce0833678fe579a413b667b7773c6ee1e89553cafd3340665bcbfb889fd5b193"
+      "sha256": "aecb6f1ad7e0481a052a67f91678d635d7bb9f30699432aa185e25ee84237ad3"
     },
     {
       "path": "tests/identity_demo/checks/test_run_store.py",
@@ -1327,18 +1419,6 @@
       "sha256": "b4e5cc4824bc0a313c59bba64c3295b5a2195cdf4b064f0592e5a8aae495ae02"
     },
     {
-      "path": "tests/identity_demo/checks/test_sender_listener.py",
-      "sha256": "867cf5c7a2c680095e52cc06c2d0f48a0bf67bd6c3667ea4ad9e6ae3d9c11936"
-    },
-    {
-      "path": "tests/identity_demo/checks/test_sender_trust.py",
-      "sha256": "99669ca77125802c7031cae60211aab2ff9b1dde72cadf95fb09c75a392c39fc"
-    },
-    {
-      "path": "tests/identity_demo/checks/test_sender_trust_reconciliation.py",
-      "sha256": "37287bb8ae773e398ecd935117ba018352dbc9bca2c609d012b165605ee69bd1"
-    },
-    {
       "path": "tests/identity_demo/checks/test_service_request_flow.py",
       "sha256": "1d454c332654a450d2c8cea085a4849e033a0461a5d1901cc0818812fd43fe62"
     },
@@ -1348,11 +1428,11 @@
     },
     {
       "path": "tests/identity_demo/checks/test_setup_package.py",
-      "sha256": "39f507bb997426d37b646d75549fb763cd29da858712ca4be6b975226c3ead4f"
+      "sha256": "c578162d24e8321c70db68d0ada79c82c3d48f39fa1ddda2a5ebf6e9f3e77ea2"
     },
     {
       "path": "tests/identity_demo/checks/test_source_render.py",
-      "sha256": "a384480cb289ba009ccbd4c57ded218a290f4e8ef09ded1ea50d7edf323eabf0"
+      "sha256": "20652a5524442093fbf1bb4f643bc5eb2f589254c25ecaa019a17d73e36fd276"
     },
     {
       "path": "tests/identity_demo/checks/test_spire_kubelet_reconcile.py",
@@ -1384,7 +1464,7 @@
     },
     {
       "path": "tests/identity_demo/checks/test_user_sessions.py",
-      "sha256": "00a69b2b578134139a13b898c6d6d90948b708b67ed152565d139e463f34061a"
+      "sha256": "e4e0cb462ec35673bc19f02488b14dfd8186f501434d615b104f51ad1b90e4cd"
     },
     {
       "path": "tests/identity_demo/checks/test_worker_lease.py",
@@ -1396,7 +1476,7 @@
     },
     {
       "path": "tests/identity_demo/console_browser_flow.py",
-      "sha256": "760d187450bc21937f3368d682ff7bb7a74dac724c143ebedba5317cde7c29b3"
+      "sha256": "67c3a1595f310bbdda765c79a87e994af3a2d53be03cb40d94141209bb0f7532"
     },
     {
       "path": "tests/identity_demo/enmaas_flow.py",
@@ -1404,7 +1484,7 @@
     },
     {
       "path": "tests/identity_demo/package_presentation.py",
-      "sha256": "01f203eea7ecec09769063ad12fceb331d6bfc4a28c0ecba4d197c5239809f06"
+      "sha256": "f042b38e01e9b387cfaa53d2795a6af2975144d4710bb6e9a9c060325484d76a"
     },
     {
       "path": "tests/identity_demo/probe_gateway_denials.py",
@@ -1416,7 +1496,7 @@
     },
     {
       "path": "tests/identity_demo/rehearse_walkthrough.py",
-      "sha256": "6865227ae9bc5a4593e7304500865a930bd336938e98e988359d3919be5e7923"
+      "sha256": "9af48e2463a50f8152e8e5655e4b977ccd24f6af61d2d10fe60aecc33b7a431e"
     },
     {
       "path": "tests/identity_demo/requirements-lock.txt",
@@ -1452,7 +1532,7 @@
     },
     {
       "path": "workloads/agents/service-request-demo/src/agent_loop.py",
-      "sha256": "c9ca415d7db461b881e590d19d6187a82b5e32864ae1819ec49bc0d0f6099a68"
+      "sha256": "2ce29a140959f7b75871c92a7abbfe591b12ebc735897282180b754fd76761e0"
     },
     {
       "path": "workloads/agents/service-request-demo/src/client.py",
@@ -1468,7 +1548,7 @@
     },
     {
       "path": "workloads/agents/service-request-demo/tests/test_agent_loop.py",
-      "sha256": "8431662fdc15f030145a1e07b365ba21afd00e2033f65fa079bfb077dc5a5795"
+      "sha256": "7817c45e47abce4817fef31b8a395c3398288f305cad2c589cbbe3a29aad1482"
     },
     {
       "path": "workloads/agents/service-request-demo/tests/test_client.py",

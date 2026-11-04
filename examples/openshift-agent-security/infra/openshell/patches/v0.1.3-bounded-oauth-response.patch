@@ -1,4 +1,3 @@
-diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oauth.rs
 --- a/crates/openshell-core/src/oauth.rs
 +++ b/crates/openshell-core/src/oauth.rs
 @@ -17,8 +17,6 @@
@@ -18,10 +17,10 @@ diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oaut
  }
  
  async fn post_oauth_token_request(
-@@ -96,23 +93,36 @@
-             }
-             error
-         })
+@@ -69,23 +66,36 @@
+         .form(&form_params)
+         .send()
+         .await
 -        .into_diagnostic()
 -        .wrap_err_with(|| format!("failed to POST to token endpoint {token_endpoint}"))?;
 -
@@ -71,7 +70,7 @@ diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oaut
      validate_access_token(&raw.access_token)?;
      Ok(OAuthTokenResponse {
          access_token: raw.access_token,
-@@ -290,40 +300,21 @@
+@@ -263,40 +273,21 @@
      let Ok(error_response) = serde_json::from_str::<OAuthErrorResponse>(body) else {
          return format!("token grant failed with status {status}");
      };
@@ -127,7 +126,7 @@ diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oaut
  }
  
  #[cfg(test)]
-@@ -547,7 +538,7 @@
+@@ -520,7 +511,7 @@
  
          assert_eq!(
              err.to_string(),
@@ -136,7 +135,7 @@ diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oaut
          );
      }
  
-@@ -764,7 +755,7 @@
+@@ -737,7 +728,7 @@
          );
          assert_eq!(
              message,
@@ -145,7 +144,7 @@ diff --git a/crates/openshell-core/src/oauth.rs b/crates/openshell-core/src/oaut
          );
      }
  
-@@ -781,14 +772,26 @@
+@@ -754,14 +745,26 @@
      }
  
      #[test]
