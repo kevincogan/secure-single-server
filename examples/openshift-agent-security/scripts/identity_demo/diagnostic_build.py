@@ -18,7 +18,7 @@ TOOLS = Path(__file__).resolve().parents[2] / "runtime/identity_demo/tools"
 
 def diagnostic_build(args: argparse.Namespace) -> dict:
     """Prepare pinned public inputs; optionally compile and validate offline."""
-    from identity_demo_setup import write
+    from openshift_security.artifacts import write_json_receipt as write
 
     lock = read_json(TOOLS / "inputs.lock.json")
     archive = Path(args.spire_archive).expanduser()

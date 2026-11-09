@@ -131,3 +131,7 @@ not deployed to the cluster and is not required to keep the demo running.
 For reviewed reuse, follow [onboarding another use case](docs/identity-demo-reference.md#onboard-another-use-case).
 The automated document fixture exercises shared run, approval, permission, audit
 and recovery code without Jira fields or JQL. It does not certify a new backend.
+
+The operator requirements also pin Ruff. `make check` checks undefined Python
+names before source/inventory validation; activate the operator interpreter or
+set `RUFF=/absolute/path/to/ruff` when it is outside your PATH.

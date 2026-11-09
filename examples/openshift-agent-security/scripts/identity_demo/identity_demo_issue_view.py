@@ -13,7 +13,7 @@ from deployment_profile import active_profile
 
 def fetch_issue(base: str, ca: str, ticket: str, key: str) -> dict:
     """Read one verified fixture issue over hostname-verified TLS, without redirects."""
-    from identity_demo_driver import NoIssuerRedirect
+    from openshift_security.oidc import NoIssuerRedirect
     expected = 'https://' + active_profile().service_host('fixture-protected-adapter') + ':8443'
     if base != expected or not re.fullmatch(r'(?:TEST|OPS|SERVICE)-[1-9][0-9]*', key):
         raise ValueError('Exact fixture destination and verified issue key required')

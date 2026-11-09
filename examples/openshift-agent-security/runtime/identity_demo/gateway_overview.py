@@ -18,7 +18,8 @@ from identity_demo_runtime_cli import private_path
 
 from identity_demo_runtime import guard
 from deployment_profile import active_profile
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 
 
 def project_schemas(tools):
@@ -123,7 +124,7 @@ asyncio.run(run())'''
         "exec", "-i", "deployment/fixture-protected-adapter", "-c", "adapter-https", "--",
         "python", "-c", program], input=json.dumps({"token": credential["token"]}),
         capture_output=True, text=True, timeout=30)
-    native.private_write(args.output_dir / (args.label + ".gateway-catalog.private.json"), {
+    write_evidence(args.output_dir / (args.label + ".gateway-catalog.private.json"), {
         "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
     if result.returncode:
         raise RuntimeError("Published schema capture failed; details withheld")

@@ -175,8 +175,10 @@ bash scripts/install.sh install \
   --output-dir "$DEMO_PRIVATE/install-01"
 ```
 
-Expected: build authority is retired, a separate scoped application Job installs
-the services, and workers acquire their own durable leases. **Fresh setup also
+Expected: build authority is retired and a separate scoped application Job
+creates the services with their final console configuration. The installer
+verifies the original object receipts before workers acquire their durable
+leases. **Fresh setup also
 creates three synthetic seed issues in OPS and three in SERVICE** as agent input.
 Set the optional top-level `fixture_seed_mode: none` in the embedded installation
 configuration to create projects without seed issues. The default is `synthetic`.

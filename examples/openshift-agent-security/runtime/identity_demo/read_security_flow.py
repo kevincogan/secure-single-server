@@ -15,7 +15,7 @@ import time
 from identity_demo_action_policy import DRIVER
 from native_delegation_acceptance import DelegationAcceptance
 from permission_flow import PermissionFlow
-import probe_native_exchange as native
+from openshift_security.artifacts import write_evidence
 from protected_listener import HOST
 
 
@@ -111,7 +111,7 @@ class ReadSecurityFlow(PermissionFlow):
                   "backend_before": before, "backend_after": self.backend_count(),
                   "writes_exercised": False, "keycloak_role_propagation_proven": False,
                   "concurrency_proven": False, "steps5_and6_complete": False}
-        native.private_write(
+        write_evidence(
             self.args.output_dir / (self.args.label + ".read-security.summary.json"), result
         )
         return result

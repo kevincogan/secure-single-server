@@ -12,7 +12,8 @@ from pathlib import Path
 import sys
 import time
 
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from native_read_retry import transient_read_failure
 from provider_contract import MODEL, sources as provider_sources
 
@@ -217,7 +218,7 @@ except AgentFailure as error:
                 "reason": "project_permission",
                 "boundary": "protected_delegation_gateway",
             }
-            native.private_write(
+            write_evidence(
                 flow.args.output_dir / (flow.args.label + ".scope-probe.summary.json"),
                 {
                     **scope_feedback,
@@ -341,7 +342,7 @@ except AgentFailure as error:
         raise AgentRuntimeFailure(str(error)) from None
     except RuntimeError:
         raise AgentRuntimeFailure("agent_transport_failed") from None
-    native.private_write(
+    write_evidence(
         flow.args.output_dir / (flow.args.label + ".agent.summary.json"),
         {
             **result,

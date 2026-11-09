@@ -15,7 +15,8 @@ from identity_demo_action_policy import DRIVER
 from native_delegation_acceptance import DelegationAcceptance
 from permission_flow import PermissionFlow
 from recovery_flow import RecoveryFlow
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from protected_listener import HOST
 
 
@@ -113,7 +114,7 @@ print(json.dumps({'run_expires':r['expires'],'approval_expires':a['approval_expi
         assert "analyst" in claims["realm_access"]["roles"]
         sessions = sender.initialize_session("role-check", original)
         roles = RoleChange(self.issuer_admin, self.user)
-        native.private_write(self.args.output_dir / "role-mappings-before.private.json", roles.before)
+        write_evidence(self.args.output_dir / "role-mappings-before.private.json", roles.before)
         original, claims = sender.final()
         propagation = None
         try:
@@ -140,7 +141,7 @@ print(json.dumps({'run_expires':r['expires'],'approval_expires':a['approval_expi
             assert propagation is not None, "Role loss not observed in fresh final grants within the probe window"
         finally:
             roles.restore()
-            native.private_write(self.args.output_dir / "role-restoration.summary.json", {"original_mappings_restored": True})
+            write_evidence(self.args.output_dir / "role-restoration.summary.json", {"original_mappings_restored": True})
         restored, restored_claims = sender.final()
         assert "analyst" in restored_claims["realm_access"]["roles"]
         assert sender.gateway("after_role_restoration", restored)["http_status"] == 200
@@ -183,5 +184,5 @@ print(json.dumps({'run_expires':r['expires'],'approval_expires':a['approval_expi
             "approval_and_run_share_original_deadline": True,
             "independent_approval_expiry_proven": False,
             "backend_before": before, "backend_after": self.backend_count(), "steps5_and6_complete": False}
-        native.private_write(self.args.output_dir / (self.args.label + ".lifecycle.summary.json"), summary)
+        write_evidence(self.args.output_dir / (self.args.label + ".lifecycle.summary.json"), summary)
         return summary

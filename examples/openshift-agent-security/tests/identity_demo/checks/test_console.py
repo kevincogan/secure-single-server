@@ -10,43 +10,24 @@ from uuid import uuid4
 import pytest
 from starlette.testclient import TestClient
 
-from checks.test_driver import setup
 from identity_demo_console_store import safe_evidence
 from identity_demo_driver import COOKIE, Driver
 from identity_demo_run_store import Denied
-from identity_demo_console_worker import AttachedFlow
+from identity_demo_console_worker import ConsoleRunSession
+from permission_flow import PermissionFlow
+
+from checks.support.driver import setup
+
+from checks.support.console import configured, operator, submit, claim
 
 
-def configured(tmp_path: Path) -> tuple:
-    previous, _, _, _ = setup(tmp_path)
-    context = dict(previous.config.contexts[0])
-    context['sandbox_id'] = str(uuid4())
-    context['console_prepared'] = True
-    context['workload'] = 'spiffe://agents.example.test/openshell/sandbox/' + context['sandbox_id']
-    driver = Driver(replace(previous.config, contexts=(context,), coordinator_enabled=True), previous.verify)
-    driver.sessions = previous.sessions
-    driver.sessions['opaque']['claims']['exp'] = int(time.time()) + 600
-    client = TestClient(driver.app, base_url=driver.config.origin)
-    client.cookies.set(COOKIE, 'opaque')
-    return driver, client, context
 
 
-def operator(driver: Driver) -> dict:
-    return {'Authorization': 'Bearer ' + driver.config.operator_secret}
 
 
-def submit(driver: Driver, client: TestClient) -> object:
-    return client.post('/submit', headers={'Origin': driver.config.origin},
-        data={'csrf': 'csrf-fixture', 'role': 'triage', 'cve': 'CVE-2099-0001'}, follow_redirects=False)
 
 
-def claim(driver: Driver, client: TestClient) -> tuple:
-    worker = uuid4().hex
-    assert client.post('/internal/operator/console/heartbeat', headers=operator(driver), json={'worker': worker}).status_code == 200
-    response = submit(driver, client)
-    assert response.status_code == 303
-    job = client.post('/internal/operator/console/next', headers=operator(driver), json={'worker': worker}).json()['job']
-    return worker, job
+
 
 
 def test_console_renders_reference_sections_and_preserves_browser_security(tmp_path: Path) -> None:
@@ -217,7 +198,7 @@ def test_sign_out_requires_csrf_and_does_not_impersonate_another_user(tmp_path: 
 
 def test_worker_waits_for_actual_approval_and_rejects_tampering() -> None:
     proposal = {'action_id': 'a', 'digest': 'd', 'arguments': {'summary': 'Synthetic'}}
-    flow = object.__new__(AttachedFlow)
+    flow = object.__new__(PermissionFlow)
     flow.run_id, flow.user, flow.proposal = 'run', 'user', proposal
     from types import SimpleNamespace
     import threading
@@ -225,8 +206,9 @@ def test_worker_waits_for_actual_approval_and_rejects_tampering() -> None:
     record = {'run': {'active': True, 'expires': int(time.time()) + 30}, 'actions': [
         {'id': 'a', 'digest': 'd', 'payload': json.dumps(proposal['arguments']),
          'state': 'approved', 'approver': 'user', 'approval_expires': int(time.time()) + 20}]}
-    flow.control = SimpleNamespace(update=lambda *a: calls.append(a), request=lambda _: record,
+    control = SimpleNamespace(update=lambda *a: calls.append(a), request=lambda _: record,
         lost=threading.Event(), stopping=threading.Event())
+    flow.run_session = ConsoleRunSession(control, {})
     flow.approve_proposal({})
     assert calls[0][1] == 'awaiting_approval'
     record['actions'][0]['digest'] = 'changed'
@@ -237,11 +219,12 @@ def test_worker_waits_for_actual_approval_and_rejects_tampering() -> None:
 def test_worker_cannot_approve_cancelled_run() -> None:
     from types import SimpleNamespace
     import threading
-    flow = object.__new__(AttachedFlow)
+    flow = object.__new__(PermissionFlow)
     flow.run_id = 'run'
-    flow.control = SimpleNamespace(update=lambda *a: None,
+    control = SimpleNamespace(update=lambda *a: None,
         request=lambda _: {'run': {'active': False, 'expires': int(time.time()) + 30}},
         lost=threading.Event(), stopping=threading.Event())
+    flow.run_session = ConsoleRunSession(control, {})
     with pytest.raises(RuntimeError, match='cancelled'):
         flow.approve_proposal({})
 

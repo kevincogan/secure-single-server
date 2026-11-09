@@ -25,6 +25,11 @@ import uuid
 
 from identity_demo_lab import LABELS
 from deployment_profile import DeploymentProfile, LEGACY, in_source_checkout
+from openshift_security.artifacts import (
+    require_private_file,
+    sha256_file as sha,
+    write_json_receipt as write,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVER = "https://api.cluster.example.test:443"
@@ -62,29 +67,8 @@ def in_checkout(path: Path) -> bool:
     return in_source_checkout(path, ROOT)
 
 
-def sha(path: Path) -> str:
-    """Hash a file without loading binaries/media into memory."""
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
 def private_file(value: str) -> Path:
-    """Require a real private file outside Git; canonicalize macOS /tmp alias."""
-    raw = Path(value).expanduser()
-    if raw.is_symlink() or not raw.is_absolute():
-        raise ValueError("Absolute non-symlink private file required")
-    path = raw.resolve()
-    if in_checkout(path) or not path.is_file() or path.stat().st_mode & 0o077:
-        raise ValueError("Private file outside checkout required")
-    return path
-
-
-def write(path: Path, value: object) -> None:
-    """Create a private exclusive artifact; never overwrite a receipt."""
-    with path.open("x") as stream:
-        os.chmod(path, 0o600)
-        json.dump(value, stream, indent=2)
-        stream.write("\n")
+    return require_private_file(value, source_root=ROOT)
 
 
 def kube(args: argparse.Namespace, *words: str, value: dict | list | None = None) -> dict:
@@ -881,9 +865,17 @@ def verify(args: argparse.Namespace, objects: list[dict]) -> dict:
         owned(current, getattr(args, "profile", LEGACY))
         kind = obj["kind"]
         compared = controller_projection(args, current, obj) if kind == "ConfigMap" else current
-        if kind in ("ConfigMap", "Secret") and any(
-                compared.get(field, {}) != obj.get(field, {}) for field in ("data", "binaryData")):
-            failures.append(kind + "/" + obj["metadata"]["name"])
+        if kind in ("ConfigMap", "Secret"):
+            expected_data = obj.get("data", {})
+            if kind == "Secret" and "stringData" in obj:
+                # Admission stores these values in data, overriding the same keys.
+                expected_data = {**expected_data, **{
+                    key: base64.b64encode(value.encode()).decode()
+                    for key, value in obj["stringData"].items()
+                }}
+            if (compared.get("data", {}) != expected_data
+                    or compared.get("binaryData", {}) != obj.get("binaryData", {})):
+                failures.append(kind + "/" + obj["metadata"]["name"])
         # Ready Pods and familiar owner labels do not establish isolation.
         # These namespaced enforcement fields have no controller reconciliation
         # allowance: extra grants or broadened egress must fail verification.
@@ -1271,7 +1263,10 @@ def main() -> None:
     parser.add_argument("--publication-plan", help="Exact prior binary-build publication plan for status/cleanup")
     parser.add_argument("--publication-plan-sha256", help="Explicit expected publication plan hash")
     parser.add_argument("--artifacts-file", help="Existing five-role private artifact lock for publication output")
-    parser.add_argument("--pool-mode", choices=("legacy", "profiles"), default="legacy", help="Explicit opt-in to profile capacity; never reinterpret legacy contexts")
+    parser.add_argument("--pool-mode", choices=("profiles",), default="profiles",
+                        help="Use the profile scheduler after verified migration")
+    parser.add_argument("--retired-context-file", action="append", default=[],
+                        help="Exact closed legacy context to verify when pausing scheduling")
     parser.add_argument("--pool-profile-configuration", help="Private reviewed profile configuration; omit for supported Jira defaults")
     parser.add_argument("--native-build-directory", help="Original private cluster native build output for explicit completion")
     parser.add_argument("--administrator-receipt", help="Original exact created prerequisite objects from administrator preparation")
@@ -1282,6 +1277,8 @@ def main() -> None:
     parser.add_argument("--readiness-timeout", type=int, default=600)
     parser.add_argument("--engine", choices=("docker", "podman"), default="podman")
     parser.add_argument("--state-file", help="Existing private generated keys; omit only for a fresh render")
+    parser.add_argument("--render-console", action="store_true",
+                        help="Render the final private console configuration before application creation")
     parser.add_argument("--resume-installation", help="Previous connected-install output; only a failed read-only discovery-plan checkpoint is resumable")
     parser.add_argument("--inference-config", help="Optional private model configuration to validate and retain by path for console handoff")
     parser.add_argument("--credentials-file")
@@ -1359,7 +1356,7 @@ def main() -> None:
             from source_render import read_json, render
             config = private_file(args.installation_config)
             state = read_json(private_file(args.state_file)) if args.state_file else None
-            bundle, state, credentials = render(config, state)
+            bundle, state, credentials = render(config, state, final_console=args.render_console)
             validate(bundle)
             write(out / "installation-state.private.json", state)
             write(out / "fixture-credentials.private.json", credentials)

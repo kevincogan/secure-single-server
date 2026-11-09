@@ -25,7 +25,8 @@ from uuid import uuid4
 from identity_demo_console_worker import Control
 from identity_demo_execution_setup import provision, read, require, retire
 from identity_demo_runtime_cli import private_path
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from execution_context import ExecutionContext, resolve_context
 
 
@@ -43,7 +44,7 @@ def retire_previous(args: argparse.Namespace, value: dict) -> dict:
     """Retire only the exact closed identity and obsolete registration; retain its PVCs."""
     context = ExecutionContext(**{f.name: value[f.name] for f in fields(ExecutionContext)})
     context_file = args.output_dir / 'previous-context.private.json'
-    native.private_write(context_file, asdict(context))
+    write_evidence(context_file, asdict(context))
     args.context_file = [str(context_file)]
     if value.get('_disposable_receipt'):
         args.disposable_workspace_receipt = value['_disposable_receipt']
@@ -85,108 +86,120 @@ def prepare_one(args: argparse.Namespace, control: Control, owner: str, reservat
     directory.mkdir(mode=0o700, exist_ok=True)
     checkpoint = directory / 'checkpoint.private.json'
     finish = {'owner': owner, 'id': reservation['id']}
+    target = reservation['target']
+    operation = target.get('operation')
+    profile_id = (target.get('previous', {}).get('profile_id') if operation == 'retire'
+                  else target.get('profile_id'))
+    require(target.get('automatic') is True and profile_id
+            and operation in ('prepare', 'verify', 'retire'),
+            'Legacy reservation requires recovery with its original release')
+
+    verifying = target.get('operation') == 'verify'
     if checkpoint.exists():
         saved = json.loads(private_path(str(checkpoint)).read_text())
         if saved.get('phase') == 'ready_to_commit':
             # This endpoint is idempotent for the identical receipt and mapping.
             control.request('prepare/finish', {**finish, 'context': saved['context'], 'receipt_sha256': saved['receipt_sha256']})
             return {'resumed_commit': True}
-        receipt = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+        receipt = (saved['receipt_sha256'] if saved.get('phase') == 'verification_failed'
+                   else hashlib.sha256(checkpoint.read_bytes()).hexdigest())
         control.request('prepare/finish', {**finish, 'context': None, 'receipt_sha256': receipt})
+        if verifying:
+            return {'blocked': True, 'verification_failed': True}
         return {'blocked': True, 'ambiguous_mutation_not_replayed': True}
-    target = reservation['target']
     started = time.monotonic()
     if getattr(args, 'operator_access_check', False):
         from identity_demo_operator_access import ensure_access
         ensure_access(args)  # No mutation/checkpoint yet: a failed login may safely be checked again.
     capacity = None
-    if target.get('batch_id') or (target.get('automatic') and target.get('operation') == 'prepare'):
-        require(target['previous'] is None, 'Presentation batching is additive only')
-        from identity_demo_presentation import check_capacity
+    if target['operation'] == 'prepare':
+        require(target['previous'] is None, 'Profile preparation is additive only')
+        from identity_demo_capacity import check_capacity
         try:
             capacity = check_capacity(args, 1, {target['role']: 1})
         except Exception:
             raise PreparationCapacityUnavailable('Read-only capacity check unavailable; no mutation attempted') from None
     preflight_done = time.monotonic()
-    record(checkpoint, {'phase': 'mutation_pending', 'reservation': reservation})
+    record(checkpoint, {'phase': 'verification_pending' if verifying else 'mutation_pending', 'reservation': reservation})
     try:
         request = argparse.Namespace(**vars(args))
         request.apply = True
-        request.isolated_preparation = bool(target.get('automatic'))
+        request.isolated_preparation = True
         request.action = 'provision'
         request.role = target['role']
-        if target.get('profile_id'):
+        if operation != 'retire':
             request.pool_profile = target['profile']
         request.namespace = native.NAMESPACE
         request.label = 'console-preparation'
         retirement = directory / 'retirement'
         retirement.mkdir(mode=0o700)
         request.output_dir = retirement
-        if target.get('operation') == 'verify':
+        if verifying:
             previous = target['previous']
             context_file = directory/'verify-context.private.json'
-            native.private_write(context_file,{f.name:previous[f.name] for f in fields(ExecutionContext)})
-            context = resolve_context(str(context_file),lambda k,n,ns=None:read(request,k,n,ns),contract=target['profile'])
-            request.execution_context = context
+            write_evidence(context_file,{f.name:previous[f.name] for f in fields(ExecutionContext)})
             _, credentials, _ = __import__('identity_demo_runtime').guard(request)
-            with native.native_session(request,credentials) as execute:
-                observed = loaded_policy(execute, context)
+            for attempt in range(2):
+                context = resolve_context(str(context_file),lambda k,n,ns=None:read(request,k,n,ns),contract=target['profile'])
+                request.execution_context = context
+                request.output_dir = directory / f'verification-{attempt + 1}'
+                request.output_dir.mkdir(mode=0o700)
+                try:
+                    with native.native_session(request, credentials) as execute:
+                        observed = loaded_policy(execute, context)
+                    break
+                except native.NativeTunnelStartupError:
+                    if attempt:
+                        raise
+                    write_evidence(directory/'verification-retry.private.json', {'reason': 'native_tunnel_startup'})
             require(observed.get('hash') == previous['native_policy_hash'] and observed.get('status') == 'loaded'
                     and observed.get('version') == observed.get('active_version'),'Prepared policy changed or is not loaded')
             path=directory/'verification.receipt.private.json'
-            native.private_write(path,{'workload':context.workload,'policy_hash':observed['hash'],'verified':True})
+            write_evidence(path,{'workload':context.workload,'policy_hash':observed['hash'],'verified':True,
+                                       'tunnel_retried': bool(attempt)})
             receipt=hashlib.sha256(path.read_bytes()).hexdigest()
             record(checkpoint,{'phase':'ready_to_commit','context':previous,'receipt_sha256':receipt})
             control.request('prepare/finish',{**finish,'context':previous,'receipt_sha256':receipt})
             return {'verified':True,'profile_id':target['profile_id']}
-        if target.get('automatic') and target.get('operation') == 'retire':
+        if target['operation'] == 'retire':
             previous = dict(target['previous'])
             if target.get('disposable'):
                 previous['_disposable_receipt'] = str(args.output_dir / target['item_id'] / 'provision/disposable-workspaces.private.json')
                 previous['_reservation'] = target['item_id']
             retired = retire_previous(request, previous)
             path = directory / 'retirement.receipt.private.json'
-            native.private_write(path, retired)
+            write_evidence(path, retired)
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             record(checkpoint, {'phase': 'ready_to_commit', 'context': target['previous'], 'receipt_sha256': digest})
             control.request('prepare/finish', {**finish, 'context': target['previous'], 'receipt_sha256': digest})
             return {'retired': True, **retired}
-        if target.get('batch_id') or target.get('automatic'):
-            retired = {'retirement_requested': False, 'workspace_data_retained': True}
-        else:
-            retired = retire_previous(request, target['previous'])
-        retired_at = time.monotonic()
         output = directory / 'provision'
         output.mkdir(mode=0o700)
         request.output_dir = output
         request.suffix = target['suffix']
         observed = provision(request)
-        context = resolve_context(str(output / 'context.private.json'), lambda k, n, ns=None: read(request, k, n, ns), **({'contract': target['profile']} if target.get('profile_id') else {}))
-        if target.get('automatic'):
-            from identity_demo_workspace_retention import capture
-            capture(request, context, reservation['id'], read)
+        context = resolve_context(str(output / 'context.private.json'),
+            lambda k, n, ns=None: read(request, k, n, ns), contract=target['profile'])
+        from identity_demo_workspace_retention import capture
+        capture(request, context, reservation['id'], read)
         value = {**asdict(context), 'workload': context.workload, 'console_prepared': True}
-        if target.get('profile_id'):
-            _, credentials, _ = __import__('identity_demo_runtime').guard(request)
-            verification = argparse.Namespace(**vars(request))
-            verification.execution_context = context
-            verification.output_dir = directory / 'loaded-policy'
-            verification.output_dir.mkdir(mode=0o700)
-            with native.native_session(verification, credentials) as execute:
-                policy = loaded_policy(execute, context)
-            require(policy.get('status')=='loaded' and policy.get('version')==policy.get('active_version')
-                    and isinstance(policy.get('hash'),str) and len(policy['hash'])==64,'Loaded prepared policy required')
-            value.update(profile_id=target['profile_id'],profile_fingerprint=target['profile_fingerprint'],native_policy_hash=policy['hash'])
-        else:
-            value.update(workflow=target['workflow'],project=target['project'])
-        receipt = {'reservation': reservation['id'], 'retirement': retired, 'provision': observed,
+        _, credentials, _ = __import__('identity_demo_runtime').guard(request)
+        verification = argparse.Namespace(**vars(request))
+        verification.execution_context = context
+        verification.output_dir = directory / 'loaded-policy'
+        verification.output_dir.mkdir(mode=0o700)
+        with native.native_session(verification, credentials) as execute:
+            policy = loaded_policy(execute, context)
+        require(policy.get('status')=='loaded' and policy.get('version')==policy.get('active_version')
+                and isinstance(policy.get('hash'),str) and len(policy['hash'])==64,'Loaded prepared policy required')
+        value.update(profile_id=target['profile_id'],profile_fingerprint=target['profile_fingerprint'],native_policy_hash=policy['hash'])
+        receipt = {'reservation': reservation['id'], 'provision': observed,
                    'capacity_before': capacity,
                    'context': value, 'coordinator_stopped': False,
                    'timings_seconds': {'preflight_and_capacity': round(preflight_done - started, 3),
-                                       'retirement': 0 if target.get('batch_id') else round(retired_at - preflight_done, 3),
-                                       'provision_and_verification': round(time.monotonic() - retired_at, 3),
+                                       'provision_and_verification': round(time.monotonic() - preflight_done, 3),
                                        'total': round(time.monotonic() - started, 3)}}
-        native.private_write(directory / 'preparation.receipt.private.json', receipt)
+        write_evidence(directory / 'preparation.receipt.private.json', receipt)
         digest = hashlib.sha256((directory / 'preparation.receipt.private.json').read_bytes()).hexdigest()
         record(checkpoint, {'phase': 'ready_to_commit', 'context': value, 'receipt_sha256': digest})
         control.request('prepare/finish', {**finish, 'context': value, 'receipt_sha256': digest})
@@ -196,43 +209,17 @@ def prepare_one(args: argparse.Namespace, control: Control, owner: str, reservat
         # context/receipt for idempotent confirmation, never recreate the sandbox.
         if json.loads(checkpoint.read_text()).get('phase') == 'ready_to_commit':
             raise
-        failure = {'failure': 'preparation_failed', 'traceback': traceback.format_exc()}
-        native.private_write(directory / ('failure-' + uuid4().hex + '.private.json'), failure)
-        control.request('prepare/finish', {**finish, 'context': None,
-                        'receipt_sha256': hashlib.sha256(json.dumps(failure, sort_keys=True).encode()).hexdigest()})
+        failure = {'failure': 'verification_failed' if verifying else 'preparation_failed',
+                   'reservation': reservation['id'], 'traceback': traceback.format_exc()}
+        write_evidence(directory / ('failure-' + uuid4().hex + '.private.json'), failure)
+        receipt = hashlib.sha256(json.dumps(failure, sort_keys=True).encode()).hexdigest()
+        if verifying:
+            record(checkpoint, {'phase': 'verification_failed', 'receipt_sha256': receipt})
+        control.request('prepare/finish', {**finish, 'context': None, 'receipt_sha256': receipt})
+        if verifying:
+            return {'blocked': True, 'verification_failed': True}
         return {'blocked': True, 'ambiguous_mutation_not_replayed': True}
 
-
-
-def verify_browser_batch(args: argparse.Namespace, control: Control) -> dict | None:
-    """Finish a presenter-requested batch with the existing full verifier, never a new provisioner."""
-    snapshot = control.request('pool')
-    batch = snapshot.get('batch')
-    if (not batch or not batch.get('browser_requested') or batch['phase'] != 'preparing'
-            or not batch['filled'] or snapshot['preparation_pending'] or batch.get('verification_state') == 'blocked'):
-        return None
-    from identity_demo_presentation import verify_batch, wait_for_seal_window
-    output = args.output_dir / ('batch-' + batch['id']) / ('verification-' + uuid4().hex)
-    output.mkdir(mode=0o700, parents=True)
-    request = argparse.Namespace(**vars(args))
-    request.output_dir = output
-    control.request('pool', {'action': 'verification-status', 'id': batch['id'], 'status': 'verifying'})
-    try:
-        receipt = verify_batch(request, control, snapshot)
-        path = output / 'readiness.receipt.private.json'
-        native.private_write(path, receipt)
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        wait_for_seal_window(control, snapshot, 120)
-        control.request('pool', {'action': 'seal', 'id': batch['id'], 'receipt_sha256': digest})
-        return {'presentation_ready': True, 'receipt_sha256': digest}
-    except Exception:
-        native.private_write(output / 'verification-failure.private.json',
-                             {'failure': 'verification_failed', 'traceback': traceback.format_exc(), 'provisioning_replayed': False})
-        latest = control.request('pool')
-        if latest.get('batch') and latest['batch']['id'] == batch['id'] and latest['batch']['phase'] == 'holding':
-            return {'presentation_ready': True, 'seal_observation_recovered': True}
-        control.request('pool', {'action': 'verification-status', 'id': batch['id'], 'status': 'blocked'})
-        return {'verification_blocked': True, 'provisioning_replayed': False}
 
 
 def main() -> None:
@@ -262,7 +249,7 @@ def main() -> None:
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     identity = args.output_dir / 'owner.private.json'
     if not identity.exists():
-        native.private_write(identity, {'owner': uuid4().hex})
+        write_evidence(identity, {'owner': uuid4().hex})
     owner = json.loads(private_path(str(identity)).read_text())['owner']
     credentials = json.loads(private_path(args.driver_credentials_file).read_text())
     control = Control(credentials['operator_secret'])
@@ -293,10 +280,6 @@ def main() -> None:
             reservation = control.request('prepare/next', {'owner': owner})['preparation']
             if reservation:
                 print(json.dumps(prepare_one(args, control, owner, reservation)), flush=True)
-            else:
-                verified = verify_browser_batch(args, control)
-                if verified:
-                    print(json.dumps(verified), flush=True)
         except PreparationCapacityUnavailable:
             failed=True
             print(json.dumps({'preparation_waiting_for_capacity': True, 'mutation_attempted': False}), flush=True)

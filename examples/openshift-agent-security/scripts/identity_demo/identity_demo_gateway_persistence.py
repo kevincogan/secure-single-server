@@ -116,7 +116,7 @@ def catalog_before_rotation(args):
 def rotate_catalog(args, previous=None, *, before_mutation=None):
     """Idle only: update one recorded catalog Secret after adapter trust rotation."""
     import probe_broker_discovery as shared
-    from probe_native_exchange import private_write
+    from openshift_security.artifacts import write_evidence as private_write
     receipt = json.loads(Path(private_path(args.gateway_receipt)).read_text())
     expected = [v for v in receipt['created'] if v['kind'] == 'Secret' and v['metadata']['name'].endswith('-catalog')]
     if len(expected) != 1:
@@ -154,7 +154,7 @@ def install(args):
     from run_binding import ReadRun
     from protected_listener import HOST
     from identity_demo_keycloak_upstream import BASE
-    from probe_native_exchange import private_write
+    from openshift_security.artifacts import write_evidence as private_write
     if not inspect_state(args)['rollback_quiescent']:
         raise ValueError('Idle certain installation required')
     _, credentials, _ = guard(args)

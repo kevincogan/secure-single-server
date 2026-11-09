@@ -716,6 +716,27 @@ def test_verify_refuses_stale_generation_and_changed_init_image(tmp_path: Path,
     assert not setup.verify(options, [desired])['ready']
 
 
+@pytest.mark.parametrize("change", [None, "missing", "extra", "changed"])
+def test_verify_checks_api_normalized_secret_string_data(tmp_path, monkeypatch, change):
+    desired = obj("Secret", "fixture-console-role-credentials", type="Opaque",
+                  data={"coordinator_secret": "b2xk", "other": "a2VlcA=="},
+                  stringData={"coordinator_secret": "coordinator", "preparer_secret": "preparer"})
+    current = deepcopy(desired)
+    current.pop("stringData")
+    current["data"] = {
+        "coordinator_secret": "Y29vcmRpbmF0b3I=", "preparer_secret": "cHJlcGFyZXI=", "other": "a2VlcA=="
+    }
+    if change == "missing":
+        current["data"].pop("preparer_secret")
+    elif change == "extra":
+        current["data"]["extra"] = "b2xk"
+    elif change == "changed":
+        current["data"]["coordinator_secret"] = "b2xk"
+    monkeypatch.setattr(setup, "get", lambda *_: current)
+    result = setup.verify(args(tmp_path), [desired])
+    assert result["ready"] == (change is None)
+
+
 @pytest.mark.parametrize("kind", ["Role", "RoleBinding", "NetworkPolicy"])
 def test_verify_checks_actual_rbac_and_network_isolation(tmp_path, monkeypatch, kind) -> None:
     """An owned ready installation with broadened enforcement is not verified."""

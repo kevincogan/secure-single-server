@@ -68,7 +68,7 @@ def test_fresh_install_listener_strips_claimed_peer_headers():
 
 
 def test_public_cli_selects_the_enforced_protected_listener(monkeypatch, capsys):
-    import probe_native_exchange as native
+    import native_exchange as native
     import sys
     arguments = ['probe']
     for name in ('kubeconfig', 'expected-server', 'credentials-file', 'cli', 'cli-config-dir', 'label', 'output-dir'):

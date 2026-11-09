@@ -2,23 +2,15 @@
 """Explicitly enabled component checks; shared HTTP helpers are runtime code."""
 from __future__ import annotations
 import base64
-import hashlib
-from html.parser import HTMLParser
-from http.cookiejar import CookieJar
 import json
-import os
-from pathlib import Path
 import secrets
 import time
-from typing import Any
 import unittest
-from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode, urlparse
-from urllib.request import HTTPCookieProcessor, HTTPRedirectHandler, Request, build_opener
 import jwt
 import pytest
-from deployment_profile import active_profile
-from identity_demo_fixture_http import KEYCLOAK, JIRA, ISSUER, NoRedirect, LoginForm, request, login, verify
+from checks.support.components import fixture_credentials
+from identity_demo_fixture_http import JIRA, ISSUER, request, login, verify
 
 @pytest.mark.integration
 class ComponentTests(unittest.TestCase):
@@ -26,16 +18,7 @@ class ComponentTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        """Load credentials from a private, explicitly supplied fixture file."""
-        filename = os.environ.get("IDENTITY_DEMO_CREDENTIALS_FILE")
-        if not filename:
-            raise unittest.SkipTest("Explicit owned-fixture credentials required")
-        path = Path(filename)
-        if path.stat().st_mode & 0o077:
-            raise RuntimeError("Fixture credential file is not private")
-        cls.credentials = json.loads(path.read_text())
-        if cls.credentials["namespace"] != "demo-core":
-            raise RuntimeError("Unexpected fixture namespace")
+        cls.credentials = fixture_credentials()
 
     def jira_header(self, password: str | None = None) -> dict:
         """Build a fixture-only Basic credential without printing it."""

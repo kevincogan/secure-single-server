@@ -4,7 +4,8 @@ import json
 import sqlite3
 from uuid import uuid4
 import identity_demo_warm_pool as warm
-from checks.test_driver import setup
+
+from checks.support.driver import setup
 
 
 def test_owner_history_remains_readable_while_another_writer_has_transaction(tmp_path):
@@ -20,9 +21,10 @@ def test_owner_history_remains_readable_while_another_writer_has_transaction(tmp
 
 
 def test_retained_pool_tombstones_are_counted_without_deserializing_contexts(tmp_path,monkeypatch):
-    driver,_,_,_=setup(tmp_path)
+    from checks.support.pool_profiles import setup as setup_profiles
+
+    driver, _, _ = setup_profiles(tmp_path)
     with driver.store.transaction() as db:
-        db.execute("INSERT INTO console_pool_settings VALUES (1,1,?,1)", ("a"*64,))
         for _ in range(1000):
             ident=uuid4().hex
             db.execute('INSERT INTO console_pool_items VALUES (?,?,?,?,?,?,?)',

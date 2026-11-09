@@ -14,11 +14,12 @@ from uuid import uuid4
 
 import pytest
 
-from checks.test_unused_context_retirement import idle_installation
 from deployment_profile import active_profile
 from execution_context import ExecutionContext
 import identity_demo_execution_setup as execution
 import unused_context_retirement as unused
+
+from checks.support.unused_context_retirement import idle_installation
 
 
 def arguments(tmp_path):

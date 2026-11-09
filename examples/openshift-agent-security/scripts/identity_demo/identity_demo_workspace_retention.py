@@ -40,7 +40,7 @@ def capture(args, context, reservation, read):
                  {'name': v['metadata']['name'], 'uid': v['metadata']['uid'],
                   'spec_sha256': hashlib.sha256(json.dumps(v['spec'], sort_keys=True).encode()).hexdigest()} for v in values]}
     path = args.output_dir / 'disposable-workspaces.private.json'
-    from probe_native_exchange import private_write
+    from openshift_security.artifacts import write_evidence as private_write
     private_write(path, value)
     return value
 
@@ -58,7 +58,7 @@ def verify(args, context, sandbox, read):
                  'spec_sha256': hashlib.sha256(json.dumps(v['spec'], sort_keys=True).encode()).hexdigest()} for v in values]
     if expected != proof.get('claims'):
         raise ValueError('Disposable workspace identity or specification changed')
-    from probe_native_exchange import kube
+    from native_exchange import kube
     pods = kube(args, 'get', 'pods', '-n', context.namespace, '-o', 'json')['items']
     names = {v['name'] for v in expected}
     for pod in pods:

@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 
 from browser_permission_flow import BrowserPermissionFlow, BrowserBoundaryPermissionFlow
-import probe_native_exchange as native
+import native_exchange as native
 
 
 def main() -> None:

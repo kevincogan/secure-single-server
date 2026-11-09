@@ -2,6 +2,7 @@
 """Server-rendered, credential-free presentation of trusted driver state."""
 
 from __future__ import annotations
+from pathlib import Path
 
 from datetime import datetime, timezone
 import json
@@ -9,6 +10,8 @@ import re
 import time
 
 import identity_demo_console_visuals as visuals
+from identity_demo_admission_policy import (MIN_RUN_SECONDS, ROUTINE_CHECK_FRESH_SECONDS,
+    ROUTINE_CHECK_WAIT_SECONDS, checking_readiness, can_start_during_check)
 
 
 STYLE = visuals.STYLE
@@ -27,7 +30,7 @@ def badge(label: str, kind: str = "") -> str:
     return '<span class="tag ' + kind + '">' + text(label) + '</span>'
 
 
-def shell(content: str, *, user: str = "", active: str = "Workflows", presentation: bool = False, csrf: str = "", live_url: str = "", live_kind: str = "run", session_deadline: int = 0) -> str:
+def shell(content: str, *, user: str = "", active: str = "Workflows", csrf: str = "", live_url: str = "", live_kind: str = "run", session_deadline: int = 0) -> str:
     """Provide one self-contained console without third-party assets or scripts."""
     nav = "".join('<a class="' + ('active' if name == active else '') + '" href="' + href + '">' + name + '</a>'
                   for name, href in (("Overview", "/?view=overview"), ("Workflows", "/"),
@@ -84,9 +87,7 @@ def public_error(reason: str) -> str:
         'approval_binding':'This proposal has changed or has already been handled. Reopen the run to review its recorded state before taking another action.',
         'csrf_origin':'The request could not be verified. Return to the console and submit the action from its own page.',
         'csrf_token':'This page is no longer valid for submission. Reopen the run or sign in again before continuing.',
-        'presentation_presenter':'Only the configured presenter can prepare demo batches.',
-        'presentation_not_idle':'No new batch was started. Wait for the current run, cleanup or operator readiness check to finish.',
-        'presentation_operator_managed':'The operator is already preparing a batch. Wait for that batch to finish.',
+        'presentation_not_idle':'Pool settings cannot change until the current run, cleanup and preparation are complete.',
         'run_expired':'The original run deadline has passed. Sign in again and start a new workflow.'
     }.get(reason, 'Authorization or request validation prevented this operation. Return to workflows to check the current state; do not repeat a write with an uncertain outcome.')
 
@@ -96,24 +97,10 @@ def csrf_field(csrf: str) -> str:
     return '<input type="hidden" name="csrf" value="' + text(csrf) + '">'
 
 
-MIN_RUN_SECONDS = 480
-ROUTINE_CHECK_FRESH_SECONDS = 90
-ROUTINE_CHECK_WAIT_SECONDS = 30
 
 
-def checking_readiness(coordinator: dict) -> bool:
-    """Recognize routine preflight while preserving every admission and recovery gate."""
-    return bool(coordinator.get('online') and coordinator.get('phase') == 'preparing'
-                and not any(coordinator.get(key) for key in
-                            ('ready', 'busy', 'reason', 'uncertain', 'recovery_required', 'preparing_context')))
 
 
-def can_start_during_check(coordinator: dict, *, now: float | None = None) -> bool:
-    """Allow a request during routine preflight only after a recent successful check."""
-    checked_at = coordinator.get('checked_at')
-    current = time.time() if now is None else now
-    return (checking_readiness(coordinator) and type(checked_at) is int and checked_at > 0
-            and 0 <= current - checked_at <= ROUTINE_CHECK_FRESH_SECONDS)
 
 
 def coordinator_label(coordinator: dict) -> str:
@@ -123,7 +110,7 @@ def coordinator_label(coordinator: dict) -> str:
     if coordinator.get('reason') == 'context_preparing':
         return 'Preparing fresh demo sandbox'
     if coordinator.get('reason') == 'presentation_preparing':
-        return 'Preparing presentation batch'
+        return 'Pool migration required'
     if coordinator.get('phase') == 'stopping':
         return 'Coordinator stopped'
     if coordinator.get('reason') == 'recovery_required' or coordinator.get('phase') == 'blocked':
@@ -160,9 +147,9 @@ def readiness_panel(claims: dict, coordinator: dict) -> str:
         if reason == 'context_preparing':
             label = 'Preparing fresh demo sandbox'
         elif reason == 'presentation_preparing':
-            label = 'Preparing presentation batch'
+            label = 'Pool migration required'
         detail = {'context_preparing':'The previous run is safely closed. A new owned sandbox and identity are being prepared automatically. Start will become available when preparation finishes.',
-                  'presentation_preparing':'The planned single-use sandboxes are being prepared serially. Start becomes available after the operator verifies the complete presentation batch.',
+                  'presentation_preparing':'The operator must retire the legacy inventory before activating profile scheduling.',
                   'context_preparation_failed':'Fresh preparation stopped safely. The operator must review its private receipt; no mutation will be replayed automatically.',
                   'identity_network':'A current worker node is missing from the owned SPIRE kubelet-egress rule. The operator must review the guarded network reconciliation command before a new run.',
                   'sender_trust':'Historical certificate-bound delegation warning; consult the original installation records.',
@@ -186,12 +173,10 @@ def missing_context_hint(coordinator: dict) -> str:
         return 'Sandbox replacement is paused until operator recovery completes.'
     if not coordinator.get('online') or coordinator.get('phase') == 'blocked':
         return 'Sandbox preparation is paused until the coordinator is ready.'
-    if coordinator.get('presentation_hold'):
-        return 'This presentation batch has no unused context for the selected workflow. Ask the operator to prepare the next batch.'
     if coordinator.get('automatic_pool') and (coordinator.get('ready') or checking_readiness(coordinator)):
         return 'Preparing your next run. A verified context will become available automatically.'
     if coordinator.get('reason') == 'presentation_preparing':
-        return 'The planned presentation batch is being prepared and verified.'
+        return 'The operator must complete the profile-pool migration before starting a run.'
     if coordinator.get('auto_prepare'):
         return 'A fresh sandbox will be prepared automatically after cleanup. Please wait.'
     return 'A fresh context is needed. Ask the demo operator.'
@@ -239,83 +224,23 @@ def automatic_settings(slots: list[dict], state: dict, *, cluster_jira: bool = F
         '<div class="compare"><strong>' + text(missing) + ' remaining</strong><span>Verified individually before use</span></div>'
         '<div class="compare"><strong>' + text(pool['managed']) + ' / ' + text(pool['limit']) + '</strong><span>Managed capacity, including quarantines</span></div></div>'
         '<div class="table-wrap"><table><thead><tr><th>Workflow</th><th>Workload</th><th>Ready / target</th><th>Availability</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + notice + '<p class="small muted">Preparation and retirement run automatically. You do not need to prepare another batch. An empty workflow waits for its own replacement; other ready workflows stay available.</p>'
+        + notice + '<p class="small muted">Contexts are prepared and retired automatically. Workflows with a ready compatible context stay available.</p>'
         '<div class="actions"><a class="button primary" href="/">Open workflows</a></div></section>'
         '<section class="card"><h2>Completed runs</h2><p>Sandbox scratch is disposable. Your authorized run history, approvals, audit and verified Jira outcomes remain available after cleanup.</p>'
         '<div class="actions"><a class="button" href="/runs">Review runs</a><a class="button" href="/evidence">View evidence</a></div>'
         '<p class="small muted">' + text(jira_detail) + '</p></section>')
 
 
-def settings(csrf: str, slots: list[dict], batch: dict | None, state: dict, presenter: bool, *, cluster_jira: bool = False) -> str:
-    """Show available demos, missing contexts and verified presenter-only preparation."""
-    if state.get('automatic_pool'):
-        return automatic_settings(slots, state, cluster_jira=cluster_jira)
-    target = sum(v['target'] for v in slots)
-    available = sum(min(v['target'], v['available']) for v in slots)
-    missing = max(0, target - available)
-    preparing = bool(batch and batch['phase'] == 'preparing')
-    verification = batch.get('verification_state', '') if batch else ''
-    ready = bool(target and batch and batch['phase'] == 'holding' and not missing)
-    blocked = bool(state.get('recovery_required') or state.get('uncertain') or state.get('phase') == 'blocked')
-    online = state.get('online') and (state.get('auto_prepare') or (preparing and verification == 'verifying'))
-    can_prepare = bool(presenter and target and online and not blocked and not state.get('busy')
-                       and not ready and (not preparing or verification == 'blocked'))
-    label, detail, tone = 'Preparation needed', 'Prepare the missing contexts before your next presentation.', 'wait'
-    if ready:
-        label, detail, tone = 'Ready for your demo', 'Your planned batch is prepared and verified. Open Workflows to begin.', 'good'
-    elif preparing:
-        label = 'Final verification' if not missing else 'Preparing your batch'
-        detail = ('All contexts are prepared. Final readiness and security checks must finish before demos are enabled.' if not missing
-                  else 'Preparing one context at a time. Progress updates here automatically; you can leave this page and return.')
-    elif not missing:
-        label, detail = 'Verification needed', 'All contexts are prepared. Verify the batch before starting your demos.'
-    if verification == 'blocked' and preparing:
-        label, detail, tone = 'Verification paused', 'The readiness check could not complete. Retry verification; completed preparation will not be repeated.', 'bad'
-    if blocked:
-        label, detail, tone = 'Operator review required', 'Preparation is paused until the recorded safety or recovery condition is resolved.', 'bad'
-    elif state.get('busy'):
-        label, detail, tone = 'Demo in progress', 'Wait for the current demo and cleanup to finish before preparing a batch.', 'wait'
-    elif not online and not ready:
-        if preparing and state.get('online'):
-            label, detail, tone = 'Awaiting preparation update', 'Waiting for the next recorded preparation update. Last known counts remain below; demos stay disabled until verification passes.', 'wait'
-        else:
-            label, detail, tone = 'Preparation unavailable', 'The coordinator and preparation service must be online. Ask the demo operator to check them.', 'bad'
-    names = {'cve': 'CVE triage', 'service-request': 'Remediation change request', 'incident-triage': 'Incident triage'}
-    rows = ''
-    for slot in slots:
-        count = min(slot['target'], slot['available'])
-        needed = max(0, slot['target'] - count)
-        rows += ('<tr><td>' + text(names.get(slot['workflow'], slot['workflow'])) + '</td><td>'
-                 + text('Read only' if slot['role'] == 'reader' else 'Triage') + '</td><td>'
-                 + text(count) + ' / ' + text(slot['target']) + '</td><td>'
-                 + badge(str(needed) + ' needed' if needed else 'Prepared', 'wait' if needed else 'good') + '</td></tr>')
-    button_label = ('Retry verification' if verification == 'blocked' else 'All demos prepared' if ready
-                    else 'Prepare next demo batch' if missing else 'Verify demo batch')
-    action = ('<form method="post" action="/settings/prepare">' + csrf_field(csrf)
-              + '<button class="primary"' + ('' if can_prepare else ' disabled') + '>' + button_label + '</button></form>') if presenter else '<p class="muted">Only the configured presenter can prepare a batch.</p>'
-    guidance = ('No preparation is needed now. After using a context, return here when the demo and cleanup have finished.' if ready
-                else 'Click once when you need fresh demos. Only missing contexts are prepared; existing prepared contexts are kept.')
-    if preparing and verification == 'blocked':
-        guidance = 'Ask the operator to review the failed readiness receipt, then retry verification. Existing contexts are kept.'
-    elif preparing:
-        guidance = ('If status does not advance, ask the operator to inspect the current preparation. Do not request another batch.'
-                    if not online else 'No further action is needed while preparation and verification are running.')
-    if not presenter:
-        guidance = 'The presenter prepares new batches. You can follow progress here.'
-    return ('<div class="heading"><div><h1>Settings</h1><p class="muted">Get your next presentation ready.</p></div></div>'
-            '<section class="card"><div class="card-head"><h2>Demo preparation</h2>' + badge(label, tone) + '</div>'
-            '<p role="status">' + text(detail) + '</p>'
-            '<div class="preparation-metrics"><div class="compare"><strong>' + str(available) + ' prepared</strong><span>Fresh, unused contexts</span></div>'
-            '<div class="compare"><strong>' + str(missing) + ' remaining</strong><span>Still need preparation</span></div>'
-            '<div class="compare"><strong>' + str(target) + ' planned demos</strong><span>One context per run</span></div></div>'
-            '<p class="small muted">' + text(guidance) + '</p>'
-            '<progress aria-label="Prepared demo contexts" value="' + str(available) + '" max="' + str(max(1, target)) + '" style="width:100%;height:12px;accent-color:var(--teal)"></progress>'
-            '<div class="table-wrap"><table><thead><tr><th>Workflow</th><th>Access</th><th>Prepared / planned</th><th>Preparation</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-            '<div class="actions">' + action + '<a class="button" href="/">Open workflows</a></div>'
-            '<p class="small muted">Allow around 6–10 minutes if all five need replacing, including final verification. Demos become available after the batch is verified. Used sandbox identities are retired; workspace storage and audit history are retained.</p></section>'
-            '<section class="card"><h2>Environment &amp; boundaries</h2><p>CVE uses a frozen synthetic assessment. Remediation requests and incident triage use the configured chat model over synthetic text.</p>'
-            '<p>Backend credentials remain outside the agent and browser. Approval cannot override user or workload permissions.</p>'
-            '<p>Public inference and trusted operator/supervisor traffic remain explicit dependencies. Disconnected installation and production acceptance are separate gates.</p></section>')
+def settings(state: dict, *, cluster_jira: bool = False) -> str:
+    """Show profile scheduling or the current pause and recovery status."""
+    if pool := state.get('automatic_pool'):
+        return automatic_settings(pool['slots'], state, cluster_jira=cluster_jira)
+    return ('<div class="heading"><h1>Settings</h1></div>'
+        '<section class="card"><h2>Demo preparation</h2><p role="status">'
+        + text(coordinator_label(state)) + '</p>'
+        '<p>Profile scheduling is paused or awaiting operator configuration.</p>'
+        '<div class="actions"><a class="button" href="/">Open workflows</a>'
+        '<a class="button" href="/runs">Review runs</a></div></section>')
 
 
 def home(claims: dict, csrf: str, *, available: bool, service: bool, coordinator: dict,
@@ -730,4 +655,4 @@ def activity_view(events: list[dict], job: dict | None) -> str:
     return '<section class="card"><div class="card-head"><h2>Agent activity</h2><span class="small muted">Observed milestones · no secrets</span></div><p class="small muted">Times and durations come from recorded events. Waiting does not imply completion.</p><ol class="activity-log" aria-label="Observed agent activity">' + (rows or '<li>No agent activity has been recorded yet. Setup and identity checks appear in the security trace below.</li>') + '</ol></section>'
 
 
-LIVE_SCRIPT = '/* SPDX-License-Identifier: Apache-2.0 */\n(() => {\n  \'use strict\';\n  const main = document.querySelector(\'main[data-live-url]\');\n  let clockOffset = 0;\n  const updateSessionClock = () => {\n    const now = (Date.now() + clockOffset) / 1000;\n    document.querySelectorAll(\'[data-session-deadline]\').forEach(el => {\n      const seconds = Math.max(0, Math.ceil(Number(el.dataset.sessionDeadline) - now));\n      el.textContent = seconds ? Math.floor(seconds / 60) + \'m \' + seconds % 60 + \'s remaining\' : \'Sign in again\';\n      const state = el.closest(\'.account-session\')?.querySelector(\'[data-session-state]\');\n      if (state) {\n        state.classList.toggle(\'expired\', !seconds);\n        state.querySelector(\'[data-session-state-label]\').textContent = seconds ? \'Active\' : \'Sign-in needed\';\n      }\n    });\n  };\n  const setSessionDeadline = deadline => {\n    if (!Number.isSafeInteger(deadline) || deadline <= 0) return;\n    document.querySelectorAll(\'[data-session-deadline]\').forEach(el => { el.dataset.sessionDeadline = deadline; });\n    updateSessionClock();\n  };\n  updateSessionClock();\n  setInterval(updateSessionClock, 1000);\n  if (!main) return;\n  const notice = document.getElementById(\'connection-status\');\n  const seenResponses = new Set();\n  let lastProgress = null;\n  let revision = \'\', failures = 0, stopped = false, latestHome = null, lastReadiness = \'\';\n  const setNotice = message => {\n    notice.textContent = message;\n    notice.hidden = !message;\n    main.dataset.connection = message ? \'unavailable\' : \'connected\';\n  };\n  const freeze = () => main.querySelectorAll(\'form button\').forEach(b => { b.disabled = true; });\n  function patch(html) {\n    const root = document.getElementById(\'live-content\');\n    const opened = new Set([...root.querySelectorAll(\'details[open]\')].map(d => d.querySelector(\'summary\')?.textContent));\n    const focused = document.activeElement;\n    const focusForm = focused?.closest(\'form\')?.getAttribute(\'action\');\n    const focusText = focused?.tagName === \'BUTTON\' ? focused.textContent : null;\n    const focusSummary = focused?.tagName === \'SUMMARY\' ? focused.textContent : null;\n    const selectedNode = root.querySelector(\'[data-node][aria-pressed="true"]\')?.dataset.node;\n    const railScroll = root.querySelector(\'.progress-sticky\')?.scrollLeft || 0;\n    const scroll = [window.scrollX, window.scrollY];\n    root.innerHTML = html;\n    const rail = root.querySelector(\'.progress-sticky\');\n    if (rail) rail.scrollLeft = railScroll;\n    if (selectedNode) inspect(selectedNode);\n    updateMotion();\n    showResponses();\n    alignProgress();\n    root.querySelectorAll(\'details\').forEach(d => { d.open = opened.has(d.querySelector(\'summary\')?.textContent); });\n    if (focusForm && focusText) {\n      const b = [...root.querySelectorAll(\'form button\')].find(b => b.closest(\'form\').getAttribute(\'action\') === focusForm && b.textContent === focusText);\n      b?.focus({preventScroll:true});\n    } else if (focused?.dataset.node) {\n      [...root.querySelectorAll(\'[data-node]\')].find(b => b.dataset.node === focused.dataset.node)?.focus({preventScroll:true});\n    } else if (focusSummary) {\n      [...root.querySelectorAll(\'summary\')].find(s => s.textContent === focusSummary)?.focus({preventScroll:true});\n    }\n    window.scrollTo(...scroll);\n  }\n  function showResponses() {\n    main.querySelectorAll(\'[data-response-event]\').forEach(path => {\n      const key = path.dataset.responseEvent;\n      if (seenResponses.has(key)) return;\n      seenResponses.add(key);\n      if (path.dataset.responseRecent === \'true\' && main.dataset.connection !== \'unavailable\') path.classList.add(\'arriving\');\n    });\n  }\n  function alignProgress(force = false) {\n    const rail = main.querySelector(\'.progress-sticky\');\n    const step = rail?.querySelector(\'[aria-current="step"]\');\n    if (!step || (!force && lastProgress === step.dataset.step)) return;\n    lastProgress = step.dataset.step;\n    if (rail.scrollWidth > rail.clientWidth) {\n      const box = step.getBoundingClientRect(), container = rail.getBoundingClientRect();\n      rail.scrollLeft += box.left-container.left-(rail.clientWidth-box.width)/2;\n    }\n  }\n  window.addEventListener(\'resize\', () => alignProgress(true));\n  function inspect(node) {\n    main.querySelectorAll(\'[data-node]\').forEach(b => b.setAttribute(\'aria-pressed\', String(b.dataset.node === node)));\n    main.querySelectorAll(\'[data-inspector]\').forEach(p => { p.hidden = p.dataset.inspector !== node; });\n    main.querySelectorAll(\'.inspector-placeholder\').forEach(p => { p.hidden = true; });\n  }\n  function updateMotion() {\n    const paused = document.documentElement.dataset.motion === \'paused\';\n    main.querySelectorAll(\'[data-motion-toggle]\').forEach(b => {\n      b.setAttribute(\'aria-pressed\', String(paused)); b.textContent = paused ? \'Resume motion\' : \'Pause motion\';\n    });\n  }\n  main.addEventListener(\'click\', event => {\n    const node = event.target.closest(\'[data-node]\');\n    if (node) inspect(node.dataset.node);\n    if (event.target.closest(\'[data-motion-toggle]\')) {\n      document.documentElement.dataset.motion = document.documentElement.dataset.motion === \'paused\' ? \'playing\' : \'paused\';\n      updateMotion();\n    }\n  });\n  function cvePreview() {\n    const select = main.querySelector(\'select[name="role"]\');\n    main.querySelectorAll(\'[data-cve-preview]\').forEach(el => {\n      el.hidden = !select || el.dataset.cvePreview !== select.value;\n    });\n  }\n  function home(data) {\n    latestHome = data;\n    main.querySelectorAll(\'[data-readiness-status]\').forEach(el => {el.textContent=data.coordinator_label;});\n    main.querySelectorAll(\'[data-active-count]\').forEach(el => {el.textContent=data.active_runs;});\n    main.querySelectorAll(\'[data-retained-count]\').forEach(el => {el.textContent=data.retained_runs+\' (latest 50)\';});\n    const panel = document.getElementById(\'readiness-panel\');\n    if (panel && lastReadiness !== data.readiness_html) { panel.innerHTML = data.readiness_html; lastReadiness = data.readiness_html; }\n    const select = main.querySelector(\'select[name="role"]\');\n    // Leave the native popup untouched while the user is choosing. Even an\n    // identical textContent assignment can close it on a polling update.\n    if (select && document.activeElement !== select) [...select.options].forEach(o => {\n      const available = data.cve_roles.includes(o.value), label = o.dataset.label || o.textContent;\n      const nextLabel = available ? label : label + \' · fresh context needed\';\n      if (o.disabled !== !available) o.disabled = !available;\n      if (o.textContent !== nextLabel) o.textContent = nextLabel;\n    });\n    main.querySelectorAll(\'form[action="/submit"]\').forEach(form => {\n      const cve = !!form.querySelector(\'[name="cve"]\');\n      const incident = form.dataset.workflow === \'incident-triage\';\n      const available = cve ? !!select && data.cve_roles.includes(select.value) : incident ? data.incident_available : data.service_available;\n      form.querySelector(\'button\').disabled = !data.can_start || !available;\n      const hint = document.getElementById(cve ? \'cve-availability\' : incident ? \'incident-availability\' : \'service-availability\');\n      if (hint) hint.textContent = available ? \'Prepared context available.\' : data.missing_context_hint;\n    });\n  }\n  async function poll() {\n    const controller = new AbortController();\n    const timeout = setTimeout(() => controller.abort(), 10000);\n    try {\n      const response = await fetch(main.dataset.liveUrl, {credentials:\'same-origin\',cache:\'no-store\',redirect:\'error\',signal:controller.signal,headers:{Accept:\'application/json\', ...(revision ? {\'If-None-Match\': \'"\'+revision+\'"\'} : {})}});\n      if (response.status === 401 || response.status === 403) {\n        freeze();\n        setNotice(\'Your sign-in has expired or access is unavailable. Use Sign in again to continue. An existing run keeps its original deadline.\');\n        const link = document.createElement(\'a\'); link.href = \'/login\'; link.textContent = \' Sign in again\'; notice.append(link);\n        stopped = true; return;\n      }\n      if (response.status === 304) {\n        setSessionDeadline(Number(response.headers.get(\'X-Session-Deadline\')));\n        failures=0; setNotice(\'\'); return;\n      }\n      if (!response.ok) throw new Error(\'status unavailable\');\n      const data = await response.json();\n      clockOffset = data.server_time * 1000 - Date.now();\n      setSessionDeadline(data.session_deadline);\n      failures = 0; setNotice(\'\');\n      if (main.dataset.liveKind === \'home\') home(data);\n      else {\n        if (data.revision !== revision) { patch(data.html); revision = data.revision; }\n        if (!data.poll) stopped = true;\n      }\n      document.querySelectorAll(\'[data-connection-label]\').forEach(el => { el.textContent = data.poll === false ? \'Final recorded state\' : \'Live updates connected\'; });\n    } catch (_) {\n      failures++;\n      setNotice(\'Reconnecting to live updates. The last recorded state remains below. Do not submit the same action again.\');\n    } finally {\n      clearTimeout(timeout);\n      if (!stopped) setTimeout(poll, Math.min(15000, 2500 * Math.max(1, failures)));\n    }\n  }\n  // Enter confirms a workload selection; starting a run requires activating\n  // its explicit button. The server still authorizes every actual submission.\n  main.addEventListener(\'keydown\', event => {\n    if (event.key === \'Enter\' && event.target.matches(\'select\')) event.preventDefault();\n  });\n  main.addEventListener(\'focusout\', event => {\n    if (event.target.matches(\'select\') && latestHome) setTimeout(() => home(latestHome), 0);\n  });\n  document.addEventListener(\'submit\', event => {\n    const form = event.target;\n    if (form.dataset.submitting) { event.preventDefault(); return; }\n    form.dataset.submitting = \'true\';\n    setTimeout(() => {\n      if (event.defaultPrevented) { delete form.dataset.submitting; return; }\n      form.querySelectorAll(\'button\').forEach(b => { b.disabled = true; });\n    }, 0);\n  });\n  main.addEventListener(\'change\', () => { cvePreview(); if (latestHome) home(latestHome); });\n  setInterval(() => {\n    const now = (Date.now() + clockOffset) / 1000;\n    main.querySelectorAll(\'[data-elapsed-since]\').forEach(el => {\n      const seconds = Math.max(0, Math.floor(now - Number(el.dataset.elapsedSince)));\n      el.textContent = seconds >= 60 ? Math.floor(seconds / 60) + \'m \' + seconds % 60 + \'s\' : seconds + \'s\';\n    });\n    main.querySelectorAll(\'[data-deadline]\').forEach(el => {\n      const seconds = Math.max(0, Math.ceil(Number(el.dataset.deadline) - now));\n      el.textContent = seconds ? Math.floor(seconds / 60) + \'m \' + seconds % 60 + \'s remaining\' : \'Expired\';\n    });\n  }, 1000);\n  cvePreview();\n  alignProgress();\n  poll();\n})();\n'
+LIVE_SCRIPT = (Path(__file__).parent / "console.js").read_text()

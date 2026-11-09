@@ -8,7 +8,7 @@ import pytest
 
 import dependency_flow
 from dependency_flow import IsolatedService
-import probe_native_exchange as native
+import native_exchange as native
 
 
 class Services:

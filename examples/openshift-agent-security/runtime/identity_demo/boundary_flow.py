@@ -12,7 +12,8 @@ from uuid import uuid4
 from identity_demo_workspaces import WORKSPACES, ACCOUNT
 from agent_egress import program as agent_egress_program
 from permission_flow import PermissionFlow
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from deployment_profile import active_profile
 
 from provider_contract import DIAGNOSTIC_IMAGE as IMAGE
@@ -55,7 +56,7 @@ class BoundaryFlow(PermissionFlow):
         result = subprocess.run(["oc", "--kubeconfig", self.args.kubeconfig, "--request-timeout=20s", *words],
             input=data, capture_output=True, timeout=60)
         self.ordinal = getattr(self, "ordinal", 0) + 1
-        native.private_write(self.args.output_dir / ("boundary-command-" + str(self.ordinal) + ".private.json"),
+        write_evidence(self.args.output_dir / ("boundary-command-" + str(self.ordinal) + ".private.json"),
             {"exit": result.returncode, "stdout": result.stdout.decode(errors="replace"), "stderr": result.stderr.decode(errors="replace")})
         return result
 
@@ -82,7 +83,7 @@ class BoundaryFlow(PermissionFlow):
                     native.kube(self.args, "create", "--dry-run=server", "-f", "-", "-o", "json", payload=obj)
                     value = native.kube(self.args, "create", "-f", "-", "-o", "json", payload=obj)
                     created.append(value)
-                    native.private_write(self.args.output_dir / (namespace + "-" + obj["kind"] + ".private.json"), value)
+                    write_evidence(self.args.output_dir / (namespace + "-" + obj["kind"] + ".private.json"), value)
                 ready = self.command("wait", "--for=condition=Ready", "pod/" + name, "-n", namespace, "--timeout=45s")
                 assert ready.returncode == 0
                 binary_path = Path(self.args.spire_agent_cli)
@@ -181,5 +182,5 @@ print(json.dumps({'cases':cases,'all_required_passed':all(c['passed'] for c in c
             "scope_limit": "Namespace Pod administrators can copy supervisor labels; they remain trusted. This does not prove namespace-level egress denial for administrators or disconnected operation.",
             "backend_after": self.backend_count(), "original_public_route_carried_from_step4": True,
             "steps5_and6_complete": False}
-        native.private_write(self.args.output_dir / (self.args.label + ".boundary.summary.json"), summary)
+        write_evidence(self.args.output_dir / (self.args.label + ".boundary.summary.json"), summary)
         return summary

@@ -9,8 +9,9 @@ import time
 import yaml
 
 from service_request_core import ServiceRequestCore
-from gateway_evidence_flow import GatewayEvidenceFlow
-import probe_native_exchange as native
+from gateway_evidence_flow import accept_with_gateway_evidence
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from deployment_profile import active_profile
 from provider_contract import MODEL, URL, HOST
 
@@ -41,7 +42,7 @@ def profile(name: str) -> dict:
         "binaries": ["/workspace/.venv/bin/python", "/usr/bin/python3.12"]}
 
 
-class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
+class ModelExecutionFlow(ServiceRequestCore):
     """Reuse the same user, run, consent, native MCP and protected backend flow."""
 
     def proposal_program(self) -> str:
@@ -62,14 +63,14 @@ class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
             return value
         except AgentRuntimeFailure as error:
             self.progress('agent_stopping', {'agent_error_category': str(error), 'failure_code': 'agent_failed'})
-            native.private_write(self.args.output_dir / (self.args.label + '.agent-failure.summary.json'),
+            write_evidence(self.args.output_dir / (self.args.label + '.agent-failure.summary.json'),
                                  {'agent_failed': True, 'error_category': str(error), 'no_fallback': True})
             raise
 
     def validate_report(self, report: dict) -> None:
         """A failed inference never turns into a fixture or an approvable action."""
         if report.get("inference_failed"):
-            native.private_write(self.args.output_dir / (self.args.label + ".inference-failure.summary.json"), report)
+            write_evidence(self.args.output_dir / (self.args.label + ".inference-failure.summary.json"), report)
             raise RuntimeError("Workload inference failed; sanitized receipt retained")
         super().validate_report(report)
         evidence = report["inference"]
@@ -78,7 +79,7 @@ class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
         self.inference_evidence = {
             **evidence, "run_id": self.run_id, "source_sha256": report["source_sha256"],
             "actual_native_workload": True}
-        native.private_write(self.args.output_dir / (self.args.label + ".inference.summary.json"),
+        write_evidence(self.args.output_dir / (self.args.label + ".inference.summary.json"),
                              self.inference_evidence)
         self.progress("draft_validated", {"model_inference": True, "model": evidence["model"]})
 
@@ -91,7 +92,7 @@ class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
         assert not any(p.get("id") == name for p in profiles)
         assert not any(p.get("name") == name for p in providers)
         location = self.args.output_dir / "enmaas-profile.yaml"
-        native.private_write(location, yaml.safe_dump(profile(name), sort_keys=False))
+        write_evidence(location, yaml.safe_dump(profile(name), sort_keys=False))
         execute(["provider", "profile", "lint", "-f", str(location)])
         imported = created = attached = False
         provider_id = None
@@ -105,7 +106,7 @@ class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
                     self.proposal_program()], json_output=True)
                 assert unavailable == {"inference_failed": True, "error_category": "connection_or_tls"}
                 assert self.backend_count() == before
-                native.private_write(self.args.output_dir / "enmaas-unavailable.summary.json", {
+                write_evidence(self.args.output_dir / "enmaas-unavailable.summary.json", {
                     **unavailable, "passed": True, "run_id": self.run_id,
                     "no_proposal_or_backend_write": True, "failure_boundary": "native provider absent"})
             execute(["provider", "profile", "import", "-f", str(location)])
@@ -122,7 +123,7 @@ class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
             found = [p for p in current if p.get("name") == name and p.get("type") == name]
             assert len(found) == 1
             provider_id = found[0]["id"]
-            native.private_write(self.args.output_dir / "enmaas-provider-ledger.json", {
+            write_evidence(self.args.output_dir / "enmaas-provider-ledger.json", {
                 "name": name, "id": provider_id, "workload": context.workload,
                 "profile_sha256": hashlib.sha256(location.read_bytes()).hexdigest(),
                 "credential_storage": "owned native gateway; no agent credential"})
@@ -135,7 +136,7 @@ class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
                 "--no-login-shell", "--timeout", "90", "--no-tty", "--", "python", "-c",
                 program()], json_output=True)
             assert egress["passed"]
-            native.private_write(self.args.output_dir / "model-agent-egress.summary.json", {
+            write_evidence(self.args.output_dir / "model-agent-egress.summary.json", {
                 **egress, "scope": "actual agent direct sockets while model/MCP providers are attached",
                 "exceptions": ["trusted supervisor egress", "cluster DNS", "kubelet image pulls",
                                "operator browser and management traffic"],
@@ -154,8 +155,8 @@ class ModelExecutionFlow(ServiceRequestCore, GatewayEvidenceFlow):
                     "elapsed_since_initial_read_seconds": round(time.monotonic() - self.initial_read_monotonic, 2),
                     "read_after_configured_30_second_final_token_lifetime": True,
                     "certificate_rotation_or_external_api_key_rotation_proven": False}
-                native.private_write(self.args.output_dir / "model-path-renewal.summary.json", renewal)
-            result = super().accept(execute, resource, context)
+                write_evidence(self.args.output_dir / "model-path-renewal.summary.json", renewal)
+            result = accept_with_gateway_evidence(self, execute, resource, context)
             result["model_inference"] = self.inference_evidence
             result["restricted_connectivity"] = egress
             result["final_token_renewal"] = renewal

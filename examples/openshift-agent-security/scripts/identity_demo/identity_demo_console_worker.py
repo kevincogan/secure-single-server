@@ -26,11 +26,12 @@ from identity_demo_action_policy import DRIVER
 from identity_demo_operator_access import OperatorAccessUnavailable
 from identity_demo_runtime import guard
 from identity_demo_runtime_cli import private_path
-from permission_flow import PermissionFlow
+from identity_demo_control_transport import driver_request
 from gateway_evidence_flow import GatewayEvidenceFlow
 from model_execution import ModelExecutionFlow, private_inference
 from execution_context import ExecutionContext
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 
 READINESS_MAX_AGE = 120
 
@@ -70,7 +71,7 @@ class Control:
             if status != 200:
                 raise ControlRejected(status)
             return json.loads(body)
-        from permission_flow import NoRedirect
+        from identity_demo_fixture_http import NoRedirect
         client = build_opener(ProxyHandler({}), NoRedirect())
         request = Request(DRIVER + '/internal/operator/console/' + suffix,
             data=json.dumps(data).encode() if data is not None else None,
@@ -132,68 +133,67 @@ class Control:
                                'stage': stage, 'evidence': evidence or {}})
 
 
-class AttachedFlow:
-    """Use the genuine browser-created association instead of automating sign-in/consent."""
+class ConsoleRunSession:
+    """Attach to the original trusted run and wait for its owner's exact consent."""
 
-    control: Control
-    job: dict
+    def __init__(self, control: Control, job: dict) -> None:
+        from identity_demo_fixture_http import NoRedirect
 
-    def http(self, *args: object, **kwargs: object) -> tuple:
+        self.control, self.job = control, job
+        self.client = build_opener(ProxyHandler({}), NoRedirect())
+
+    def http(self, flow, url, fields=None, value=None, operator=False):
         from identity_demo_worker_lease import assert_current
-        assert_current()
-        if kwargs.get('operator') and self.control.transport:
-            url = args[0]
-            if not isinstance(url, str) or not url.startswith(DRIVER + '/internal/operator/'):
-                raise ValueError('Exact driver operator target required')
-            if kwargs.get('fields') is not None:
-                raise ValueError('Operator form fields refused')
-            data = json.dumps(kwargs['value']).encode() if kwargs.get('value') is not None else None
-            return self.control.transport.request(url.removeprefix(DRIVER), self.control.secret, data)
-        return PermissionFlow.http(self, *args, **kwargs)
 
-    def login(self, context: ExecutionContext) -> dict:
+        assert_current()
+        return driver_request(self.client, url, fields=fields, value=value,
+            operator_secret=self.control.secret if operator else None,
+            operator_transport=self.control.transport)
+
+
+    def login(self, flow, context: ExecutionContext) -> dict:
         """Use only the initiating browser session and immutable trusted association."""
         if context.workload != self.job['workload']:
             raise ValueError('Console workload binding mismatch')
-        self.run_id, self.user = self.job['run_id'], self.job['user']
-        record = self.control.request('runs/' + self.run_id)
-        if (record['run']['user'] != self.user or record['run']['workload'] != context.workload
-                or record['run']['user_role'] != self.username):
+        flow.run_id, flow.user = self.job['run_id'], self.job['user']
+        record = self.control.request('runs/' + flow.run_id)
+        if (record['run']['user'] != flow.user or record['run']['workload'] != context.workload
+                or record['run']['user_role'] != flow.username):
             raise ValueError('Console authenticated user binding mismatch')
-        status, _, body = self.http(DRIVER + '/internal/operator/credentials/' + self.run_id, operator=True)
+        status, _, body = flow.http(DRIVER + '/internal/operator/credentials/' + flow.run_id, operator=True)
         if status != 200:
             raise RuntimeError('Human reauthentication required before execution')
         value = json.loads(body)
-        if value['user'] != self.user or value['workload'] != context.workload:
+        if value['user'] != flow.user or value['workload'] != context.workload:
             raise ValueError('Console credential association mismatch')
-        native.private_write(self.args.output_dir / (self.args.label + '.driver-association.json'),
-            {'run_id': self.run_id, 'user': self.user, 'workload': context.workload,
+        write_evidence(flow.args.output_dir / (flow.args.label + '.driver-association.json'),
+            {'run_id': flow.run_id, 'user': flow.user, 'workload': context.workload,
              'real_browser_login': True, 'real_browser_submission': True,
              'expires_at': value['expires_at']})
         return {'access_token': value['access_token']}
 
-    def progress(self, stage: str, evidence: dict | None = None) -> None:
+    def progress(self, flow, stage: str, evidence: dict | None = None) -> None:
         """Relay observed milestones without performing an authorization decision."""
         evidence = dict(evidence or {})
         if evidence.get('backend_fields_match_approval') is True and evidence.get('verified_issue_key'):
             preview = getattr(self.control, 'preview', None)
             evidence['jira_preview_ready'] = bool(preview and preview.allow_key(evidence['verified_issue_key']))
-        self.control.update(self.run_id, stage, evidence)
+        self.control.update(flow.run_id, stage, evidence)
 
-    def approve_proposal(self, report: dict) -> None:
+    def approve_proposal(self, flow, report: dict) -> None:
         """Only persisted consent from the authenticated browser owner releases execution."""
-        self.progress('awaiting_approval')
+        flow.progress('awaiting_approval')
         while not self.control.lost.is_set():
-            record = self.control.request('runs/' + self.run_id)
+            record = self.control.request('runs/' + flow.run_id)
             run = record['run']
             if not run['active'] or run['expires'] <= time.time():
                 raise RuntimeError('Console run cancelled or expired')
-            matches = [a for a in record['actions'] if a['id'] == self.proposal['action_id']]
-            if (len(matches) != 1 or matches[0]['digest'] != self.proposal['digest']
-                    or json.loads(matches[0]['payload']) != self.proposal['arguments']):
+            matches = [a for a in record['actions'] if a['id'] == flow.proposal['action_id']]
+            if (len(matches) != 1 or matches[0]['digest'] != flow.proposal['digest']
+                    or json.loads(matches[0]['payload']) != flow.proposal['arguments']):
                 raise ValueError('Console exact proposal binding mismatch')
             if matches[0]['state'] == 'approved':
-                if matches[0]['approver'] != self.user or matches[0]['approval_expires'] <= time.time():
+                if matches[0]['approver'] != flow.user or matches[0]['approval_expires'] <= time.time():
                     raise RuntimeError('Console approval is no longer valid')
                 return
             if matches[0]['state'] != 'proposed':
@@ -202,38 +202,16 @@ class AttachedFlow:
                 break
         raise RuntimeError('Console coordinator stopped before approval')
 
-    def close(self) -> None:
+    def close(self, flow) -> None:
         """Revoke this exact run through the original trusted operator endpoint."""
-        if self.run_id:
-            status, _, _ = self.http(DRIVER + '/internal/operator/revoke',
-                                    value={'run_id': self.run_id}, operator=True)
+        if flow.run_id:
+            status, _, _ = flow.http(DRIVER + '/internal/operator/revoke',
+                                    value={'run_id': flow.run_id}, operator=True)
             if status != 200:
                 raise RuntimeError('Console run retirement failed')
 
-    def accept(self, execute: object, resource: str, context: ExecutionContext) -> dict:
-        """Record genuine native execution and independent outcome evidence."""
-        self.progress('identity_verified', {'native_bound_read': True})
-        result = super().accept(execute, resource, context)
-        gateway = result.get('gateway_introduction', {})
-        evidence = {'gateway_ready': bool(gateway.get('passed') and gateway.get('registration_ready')),
-                    'tool_names': [t['name'] for t in gateway.get('published_tool_schemas', [])]}
-        if result.get('model_inference'):
-            evidence.update(model_inference=True, model=result['model_inference']['model'],
-                egress_denied=bool(result.get('restricted_connectivity', {}).get('passed')),
-                final_token_renewal=bool(result.get('final_token_renewal', {}).get('passed')))
-        self.progress('outcome_verified', evidence)
-        return result
 
-
-class ConsoleCveFlow(AttachedFlow, GatewayEvidenceFlow):
-    """Keep the original CVE proposal producer and native permission path."""
-
-
-class ConsoleModelFlow(AttachedFlow, ModelExecutionFlow):
-    """Keep the original native Messages provider and protected Jira path."""
-
-
-class ConsoleIncidentFlow(ConsoleModelFlow):
+class ConsoleIncidentFlow(ModelExecutionFlow):
     """Apply the same bounded read/draft loop to synthetic operational incidents."""
 
     workflow = 'incident-triage'
@@ -260,7 +238,7 @@ def execute_job(base: argparse.Namespace, control: Control, job: dict) -> bool:
     output = base.output_dir / ('run-' + job['run_id'])
     output.mkdir(mode=0o700)
     context_file = output / 'context.private.json'
-    native.private_write(context_file, {k: job['context'][k] for k in ExecutionContext.__dataclass_fields__})
+    write_evidence(context_file, {k: job['context'][k] for k in ExecutionContext.__dataclass_fields__})
     args = argparse.Namespace(**vars(base))
     args.output_dir, args.context_file = output, str(context_file)
     args.label = 'walkthrough-console-' + job['run_id'][:12]
@@ -272,10 +250,10 @@ def execute_job(base: argparse.Namespace, control: Control, job: dict) -> bool:
         setattr(args, name, False)
     for name in ('upstream_development_issuer', 'check_run_binding', 'protected_listener', 'diagnose_native_grant'):
         setattr(args, name, True)
-    flow_type = {'cve': ConsoleCveFlow, 'service-request': ConsoleModelFlow,
-                 'incident-triage': ConsoleIncidentFlow}[job['workflow']]
-    flow = flow_type(args, Path(args.driver_credentials_file), username=job['user_role'])
-    flow.control, flow.job, flow.run_id = control, job, job['run_id']
+    workflow = {'cve': GatewayEvidenceFlow, 'service-request': ModelExecutionFlow,
+                'incident-triage': ConsoleIncidentFlow}[job['workflow']]
+    flow = workflow(args, username=job['user_role'], run_session=ConsoleRunSession(control, job))
+    flow.run_id = job['run_id']
     diagnostic = getattr(base, 'diagnostic_failure', None)
     if diagnostic == 'model-timeout':
         flow.model_request_timeout = .1
@@ -318,7 +296,7 @@ def execute_job(base: argparse.Namespace, control: Control, job: dict) -> bool:
                 raise RuntimeError('Startup run retirement requires recovery')
             result = {'cleanup_verified': True, 'native_commands_dispatched': 0}
             raise
-        native.private_write(output / 'native-result.private.json', result)
+        write_evidence(output / 'native-result.private.json', result)
         if (not result['passed'] or not result.get('permission_flow', {}).get('passed')
                 or result.get('cleanup_verified') is not True):
             raise RuntimeError('Native console scenario failed; inspect private evidence')
@@ -327,7 +305,7 @@ def execute_job(base: argparse.Namespace, control: Control, job: dict) -> bool:
         return True
     except BaseException as error:
         import traceback
-        native.private_write(output / 'failure.private.json', {'kind': type(error).__name__, 'traceback': traceback.format_exc()})
+        write_evidence(output / 'failure.private.json', {'kind': type(error).__name__, 'traceback': traceback.format_exc()})
         try:
             record = control.request('runs/' + job['run_id'])
             cancelled = any(e['event'] == 'cancelled' for e in record['audit'])

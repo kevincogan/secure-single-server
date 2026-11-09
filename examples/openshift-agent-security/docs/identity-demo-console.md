@@ -69,10 +69,8 @@ isolation policy and approved execution profile. It has no human grant. Allocati
 atomically reserves it, binds the authenticated user, trusted workflow/connector
 and permitted resource scope, and records the original run deadline.
 
-| Installation mode | Ready targets | Compatibility |
-|---|---|---|
-| Profile mode, new installer | Six Triage + two Reader | Compatible CVE, Incident and Remediation workflows share Triage capacity; Reader remains separate |
-| Legacy, existing installations | Two per workflow/role, eight total | Original immutable workflow/project mappings remain valid until explicit idle migration |
+The profile pool targets six Triage and two Reader contexts. Compatible CVE,
+Incident and Remediation workflows share Triage capacity. Reader remains separate.
 
 The maximum is **12 non-retired contexts**, including pending preparation,
 allocated/consumed, retiring and quarantined entries. One execution and one
@@ -110,10 +108,9 @@ sign-in can review retained history without reopening execution authorization.
 | Consumed-identity tombstones and quarantine decisions | Preserve across restart, cleanup and rollback |
 | Failed/successful acceptance receipts | Retain privately outside Git |
 
-Manual preparation remains an operator fallback. Profile migration requires an
-idle installation and guarded retirement of obsolete unused contexts. Existing
-installations keep legacy behaviour until explicitly migrated. See
-[profile compatibility](identity-demo-reference.md#profile-pool-compatibility).
+Manual batches and fixed slots were retired. Existing installations using those
+modes need the [guarded migration](identity-demo-reference.md#profile-pool-compatibility)
+before enabling profiles. History and quarantine records are retained.
 
 ## 3. Check the installed services
 
@@ -185,6 +182,14 @@ procedures. Do not start local workers alongside the cluster workers.
 | Kubelet coverage missing after node replacement | Ask the platform owner for [exact-host reconciliation](identity-demo-reference.md#restore-kubelet-coverage-after-worker-replacement); do not widen subnets |
 | Model unavailable | Check the approved endpoint/model/key reference; preserve the failed run without a fabricated draft or write retry |
 | Write or cleanup uncertain | Establish the original dispatch/backend outcome before another execution; preserve all safety state |
+
+For a quarantined **periodic verification**, inspect its private failure receipt.
+On the private operator listener, post `{"action":"recheck-quarantine","id":"<failed reservation>","receipt_sha256":"<failure digest>"}`
+to `/internal/operator/console/pool` with the installer-held operator credential.
+The preparer checks the original unused identity, current profile and loaded policy
+before returning it to the pool. Use the returned reservation to correlate the
+outcome with the original failure. Failed creation and retirement have separate
+maintenance procedures.
 
 A locally rejected query can receive bounded grammar feedback within the original
 model-turn/run limits. An out-of-project protected request is still denied; the

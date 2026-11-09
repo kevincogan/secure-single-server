@@ -161,7 +161,8 @@ def unchanged_backup_data(before: dict, after: dict, *, idle_heartbeat: bool = F
 
 def backup_data(args: argparse.Namespace) -> dict:
     """Export stable quiescent application data; change no persistent resources."""
-    from identity_demo_setup import kube, owned, write
+    from identity_demo_setup import kube, owned
+    from openshift_security.artifacts import write_json_receipt as write
 
     profile = args.profile
     owned(kube(args, "get", "namespace", profile.core_namespace, "-o", "json"), profile)
@@ -249,7 +250,7 @@ def backup_data(args: argparse.Namespace) -> dict:
 
 def verify_backup(args: argparse.Namespace) -> dict:
     """Restore to new private local files and compare every table/schema/hash."""
-    from identity_demo_setup import private_file, sha, write
+    from openshift_security.artifacts import require_private_file as private_file, sha256_file as sha, write_json_receipt as write
 
     manifest_path = private_file(args.backup_manifest)
     if not args.backup_sha256 or sha(manifest_path) != args.backup_sha256:
@@ -285,7 +286,8 @@ def restart_data(args: argparse.Namespace) -> dict:
     This proves retained-PVC restart, not disaster restoration. A separate
     recovery procedure must reconcile post-backup actions before any live restore.
     """
-    from identity_demo_setup import kube, owned, private_file, sha, write
+    from identity_demo_setup import kube, owned
+    from openshift_security.artifacts import require_private_file as private_file, sha256_file as sha, write_json_receipt as write
 
     # Restore verification is an offline prerequisite and leaves new private
     # copies beside this command's receipts; it never replaces live databases.

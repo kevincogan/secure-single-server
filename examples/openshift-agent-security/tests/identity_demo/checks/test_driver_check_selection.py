@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import probe_native_exchange as native
+import native_exchange as native
 
 
 @pytest.mark.parametrize("selection", ["permission", "read-security", "native-renewal"])

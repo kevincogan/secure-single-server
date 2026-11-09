@@ -6,51 +6,36 @@ import json
 from pathlib import Path
 import sqlite3
 import time
-from uuid import uuid4
 
 import pytest
+from agent_security_runtime import RunStore as CoreRunStore
+from identity_demo_jira_contract import JIRA
 from identity_demo_run_store import Denied, RunStore, canonical, strict_json
 
+from checks.support.run_store import prepare, decision, rejected_dispatch
 
-def prepare(
-    tmp_path: Path, user_role: str = "analyst", workload_role: str = "triage"
-) -> tuple:
-    """Use private synthetic storage; no issuer or backend calls are mocked as proof."""
+
+
+
+
+
+
+
+def test_workload_revocation_accepts_a_long_identity_bound_to_a_run(tmp_path: Path) -> None:
     tmp_path.chmod(0o700)
-    store = RunStore(tmp_path / "runs.db")
-    workload = "spiffe://agents.example.test/openshell/sandbox/" + str(uuid4())
+    domain = f"{'a' * 60}.{'b' * 60}.test"
+    workload = f"spiffe://{domain}/openshell/sandbox/12345678-1234-4234-8234-123456789abc"
+    store = CoreRunStore(tmp_path / "runs.db", connector=JIRA, trust_domain=domain)
     run = store.create_run(
-        issuer="https://issuer.example.test/realms/pilot",
-        user="user-a",
-        user_role=user_role,
-        workload=workload,
-        workload_role=workload_role,
-        project="TEST",
-        expires=int(time.time()) + 300,
-        assessment="synthetic assessment",
+        issuer="https://issuer.example.test", user="user-a", user_role="analyst",
+        workload=workload, workload_role="triage", project="TEST",
+        expires=int(time.time()) + 100, assessment="synthetic",
     )
-    proposal = store.propose(
-        run,
-        "user-a",
-        {
-            "project": "TEST",
-            "summary": "Synthetic CVE",
-            "description": "Frozen assessment",
-        },
-    )
-    store.approve(
-        run, proposal["action_id"], "user-a", proposal["digest"], int(time.time()) + 100
-    )
-    return store, run, workload, proposal
 
-
-def decision(
-    store: RunStore, run: str, workload: str, proposal: dict, **kwargs: object
-) -> dict:
-    """Supply the actor and payload that the gateway/adapter must independently verify."""
-    return store.decision(
-        run, proposal["action_id"], "user-a", workload, proposal["arguments"], **kwargs
-    )
+    assert store.revoke("workload", workload) == 1
+    with store.read_transaction() as db, pytest.raises(Denied, match="run_inactive"):
+        store.active_run(db, run, "user-a", workload)
+    assert store.assessment(run, "user-a") == "synthetic"
 
 
 def test_authorization_does_not_consume_approval(tmp_path: Path) -> None:
@@ -383,12 +368,6 @@ def test_reconciliation_does_not_accept_an_unclaimed_or_changed_action(
     assert store.reconciliation(run, proposal["action_id"])["allowed"]
 
 
-def rejected_dispatch(tmp_path):
-    store, run, workload, proposal = prepare(tmp_path)
-    claim = decision(store, run, workload, proposal, claim=True)
-    store.finish(run, proposal['action_id'], claim['execution_id'], state='unknown')
-    store.revoke('run_id', run)
-    return store, run, workload, proposal, claim
 
 
 def test_installer_rejection_review_preserves_history_and_never_reopens_execution(tmp_path):

@@ -9,8 +9,9 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from checks.test_adapter import adapter_request
-from checks.test_gateway import sanitized_error_result
+from checks.support.adapter import adapter_request
+from checks.support.gateway import sanitized_error_result
+
 
 
 class ErrorResponseTests(unittest.TestCase):
@@ -44,7 +45,7 @@ class ErrorResponseTests(unittest.TestCase):
         for status in (401, 403, 500):
             with self.subTest(status=status):
                 error = HTTPError("http://127.0.0.1:18087/mcp", status, "synthetic", {}, BytesIO(body))
-                with patch("checks.test_adapter.urlopen", side_effect=error):
+                with patch("checks.support.adapter.urlopen", side_effect=error):
                     actual, _, value = adapter_request("/mcp")
                 self.assertEqual(actual, status)
                 self.assertEqual(value, {"result": True})
@@ -52,6 +53,6 @@ class ErrorResponseTests(unittest.TestCase):
     def test_adapter_rejects_oversized_error_body(self) -> None:
         """Do not infer no result from a response truncated at the proof bound."""
         error = HTTPError("http://127.0.0.1:18087/mcp", 401, "synthetic", {}, BytesIO(b"x" * 2_000_001))
-        with patch("checks.test_adapter.urlopen", side_effect=error):
+        with patch("checks.support.adapter.urlopen", side_effect=error):
             with self.assertRaisesRegex(RuntimeError, "proof size bound"):
                 adapter_request("/mcp")

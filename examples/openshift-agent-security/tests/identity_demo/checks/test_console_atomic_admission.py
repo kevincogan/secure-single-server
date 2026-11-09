@@ -7,8 +7,9 @@ import sqlite3
 
 import pytest
 
-from checks.test_console import configured
 from identity_demo_run_store import Denied
+
+from checks.support.console import configured
 
 
 def test_competing_starts_reserve_exactly_one_identity_and_job(tmp_path):

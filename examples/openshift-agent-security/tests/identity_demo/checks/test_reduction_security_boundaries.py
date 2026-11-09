@@ -3,7 +3,8 @@
 import time
 import pytest
 from identity_demo_run_store import Denied
-from checks.test_run_store import prepare
+
+from checks.support.run_store import prepare
 
 
 def test_exact_approval_cannot_authorize_another_project(tmp_path):

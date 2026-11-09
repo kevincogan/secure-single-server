@@ -18,8 +18,6 @@ from identity_demo_run_store import Denied, RunStore
 import identity_demo_pool_profiles as profiles
 
 LIMIT = 12
-SLOTS = (('cve', 'triage', 'TEST'), ('cve', 'reader', 'TEST'),
-         ('incident-triage', 'triage', 'OPS'), ('service-request', 'triage', 'SERVICE'))
 
 
 def initialize(db: sqlite3.Connection) -> None:
@@ -34,10 +32,6 @@ def initialize(db: sqlite3.Connection) -> None:
           ('preparing','ready','allocated','consumed','retiring','quarantined','retired')),
         disposable INTEGER NOT NULL, receipt TEXT NOT NULL, updated INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS pool_state_updated ON console_pool_items(state,updated,id);
-      CREATE INDEX IF NOT EXISTS pool_slot ON console_pool_items(
-        coalesce(json_extract(context,'$.workflow'),'cve'),
-        json_extract(context,'$.role'),
-        coalesce(json_extract(context,'$.project'),'TEST'));
       CREATE TABLE IF NOT EXISTS console_pool_state_counts (
         state TEXT PRIMARY KEY, n INTEGER NOT NULL CHECK(n>=0));
       WITH states(state) AS (VALUES ('preparing'),('ready'),('allocated'),
@@ -92,14 +86,16 @@ def blocked_identity(db: sqlite3.Connection, workload: str) -> bool:
 def ready(db: sqlite3.Connection, workload: str) -> bool:
     if blocked_identity(db, workload):
         return False
-    if profiles.configuration(db) and not profiles.ready(db, workload):
+    configuration = profiles.configuration(db)
+    if (configuration and not profiles.ready(db, workload)) or (not configuration and db.execute(
+            'SELECT 1 FROM console_pool_settings WHERE id=1').fetchone()):
         return False
     return not enabled(db) or bool(db.execute(
         "SELECT 1 FROM console_pool_items WHERE workload=? AND state='ready'", (workload,)).fetchone())
 
 
 def allocate(db: sqlite3.Connection, workload: str) -> None:
-    if profiles.configuration(db) and not profiles.ready(db, workload):
+    if not ready(db, workload):
         raise Denied('context_unavailable')
     if enabled(db) and db.execute("UPDATE console_pool_items SET state='allocated',updated=? "
             "WHERE workload=? AND state='ready'", (int(time.time()), workload)).rowcount != 1:
@@ -115,48 +111,55 @@ def closed(db: sqlite3.Connection, workload: str) -> bool:
     return all(j['state'] in ('completed', 'failed') and json.loads(j['evidence']).get('cleanup_verified') is True for j in jobs)
 
 
-def configure(db: sqlite3.Connection, contexts: list[dict], enable: bool,
-              receipt: str, retired: list[str], *, initial_empty: bool = False) -> None:
-    """Explicit idle migration; retirement receipts never erase immutable mappings."""
-    if (type(enable) is not bool or type(initial_empty) is not bool or initial_empty and not enable
-            or not isinstance(receipt, str) or not re.fullmatch('[a-f0-9]{64}', receipt)
-            or not isinstance(retired, list) or len(retired) > 64
-            or any(not isinstance(w, str) for w in retired) or len(set(retired)) != len(retired)):
+def retirement_identity(context: dict) -> str:
+    from execution_context import ExecutionContext
+    return profiles.digest({field: context.get(field) for field in ExecutionContext.__dataclass_fields__})
+
+
+def pause(db: sqlite3.Connection, contexts: list[dict], receipt: str, retired: dict[str, str]) -> None:
+    """Pause profiles or stage exact legacy inventory for guarded migration."""
+    if (not isinstance(receipt, str) or not re.fullmatch('[a-f0-9]{64}', receipt)
+            or not isinstance(retired, dict) or len(retired) > 32
+            or any(not isinstance(value, str) or not re.fullmatch('[a-f0-9]{64}', value)
+                   for value in retired.values())):
         raise Denied('pool_configuration')
-    slots = {(c.get('workflow', 'cve'), c['role'], c.get('project', 'TEST')) for c in contexts}
-    if initial_empty:
-        # Never reinterpret missing contexts or previous history as a clean install.
-        tables = ('runs','actions','audit','console_preparations','console_batches',
-                  'console_pool_items','console_pool_settings')
-        if contexts or any(db.execute('SELECT 1 FROM '+table+' LIMIT 1').fetchone() for table in tables):
-            raise Denied('pool_initial_state')
-    elif enable and not set(SLOTS).issubset(slots):
-        raise Denied('pool_slots_missing')
-    known = {c['workload']: c for c in contexts}
-    if any(w not in known or not closed(db, w) for w in retired):
-        raise Denied('pool_retirement_receipt')
     now = int(time.time())
-    for workload, c in known.items():
-        used = db.execute('SELECT 1 FROM runs WHERE workload=?', (workload,)).fetchone()
-        state = 'retired' if workload in retired else 'consumed' if used else 'ready'
-        existing = db.execute('SELECT context,state FROM console_pool_items WHERE workload=?', (workload,)).fetchone()
-        text = json.dumps(c, sort_keys=True)
-        if existing:
-            if existing['context'] != text:
+    if profiles.configuration(db):
+        if retired:
+            raise Denied('pool_retirement_receipt')
+    else:
+        sync_closed(db)
+        known = {context['workload']: context for context in contexts}
+        if retired and (enabled(db) or any(workload not in known
+                or retirement_identity(known[workload]) != digest or not closed(db, workload)
+                for workload, digest in retired.items())):
+            raise Denied('pool_retirement_receipt')
+        for workload, context in known.items():
+            existing = db.execute('SELECT context,state FROM console_pool_items WHERE workload=?',
+                                  (workload,)).fetchone()
+            encoded = json.dumps(context, sort_keys=True)
+            if existing and existing['context'] != encoded:
                 raise Denied('pool_context_changed')
             if workload in retired:
+                # Old paused pools left used rows ready. The exact identity and
+                # closed run above still need to match the retirement proof.
+                if existing and existing['state'] not in ('ready', 'consumed', 'retired'):
+                    raise Denied('pool_retirement_receipt')
+                state = 'retired'
+            elif existing:
+                continue
+            else:
+                used = db.execute('SELECT 1 FROM runs WHERE workload=?', (workload,)).fetchone()
+                state = 'consumed' if used else 'ready'
+            if existing:
                 db.execute("UPDATE console_pool_items SET state='retired',receipt=?,updated=? WHERE workload=?",
                            (receipt, now, workload))
-            elif used and existing['state'] == 'ready':
-                db.execute("UPDATE console_pool_items SET state='consumed',updated=? WHERE workload=?", (now, workload))
-        else:
-            db.execute('INSERT INTO console_pool_items VALUES(?,?,?,?,?,?,?)',
-                       (uuid4().hex, workload, text, state, 0, receipt, now))
-    if enable and db.execute("SELECT count(*) FROM console_pool_items WHERE state<>'retired'").fetchone()[0] > LIMIT:
-        raise Denied('pool_capacity')
-    db.execute("UPDATE console_batches SET state='superseded',updated=? WHERE state IN ('holding','preparing')", (now,))
-    db.execute('INSERT INTO console_pool_settings VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET '
-               'enabled=excluded.enabled,receipt=excluded.receipt,updated=excluded.updated', (int(enable), receipt, now))
+            else:
+                db.execute('INSERT INTO console_pool_items VALUES(?,?,?,?,?,?,?)',
+                           (uuid4().hex, workload, encoded, state, 0, receipt, now))
+        db.execute("UPDATE console_batches SET state='superseded',updated=? WHERE state IN ('holding','preparing')", (now,))
+    db.execute('INSERT INTO console_pool_settings VALUES(1,0,?,?) ON CONFLICT(id) DO UPDATE SET '
+               'enabled=0,receipt=excluded.receipt,updated=excluded.updated', (receipt, now))
 
 
 def sync_closed(db: sqlite3.Connection) -> None:
@@ -167,54 +170,18 @@ def sync_closed(db: sqlite3.Connection) -> None:
 
 
 def status(db: sqlite3.Connection, *, synchronize: bool = True) -> dict | None:
-    if not enabled(db):
+    if not enabled(db) or not profiles.configuration(db):
         return None
     if synchronize:
         sync_closed(db)
-    if profiles.configuration(db):
-        return profiles.snapshot(db)
-    rows = db.execute("SELECT * FROM console_pool_items WHERE state<>'retired'").fetchall()
-    slots = []
-    for workflow, role, project in SLOTS:
-        group = [r for r in rows if (lambda c: (c.get('workflow', 'cve'), c.get('role'), c.get('project', 'TEST')))(json.loads(r['context'])) == (workflow, role, project)]
-        slots.append({'workflow': workflow, 'role': role, 'project': project, 'target': 2,
-                      'available': sum(r['state'] == 'ready' for r in group),
-                      'preparing': sum(r['state'] == 'preparing' for r in group)})
-    counts = profiles.state_counts(db)
-    return {'mode': 'automatic', 'target': 8, 'limit': LIMIT, 'managed': len(rows),
-            'states': counts, 'slots': slots}
+    return profiles.snapshot(db)
 
 
 def next_target(db: sqlite3.Connection) -> dict | None:
-    if not enabled(db):
-        return None
-    if profiles.configuration(db):
+    if enabled(db) and profiles.configuration(db):
+        sync_closed(db)
         return profiles.next_target(db, closed)
-    snapshot = status(db)
-    if snapshot is None:
-        return None
-    attempted = {slot: db.execute("SELECT max(rowid) FROM console_pool_items WHERE "
-        "coalesce(json_extract(context,'$.workflow'),'cve')=? AND "
-        "json_extract(context,'$.role')=? AND "
-        "coalesce(json_extract(context,'$.project'),'TEST')=?", slot).fetchone()[0] or 0
-        for slot in SLOTS}
-    depleted = sorted((s for s in snapshot['slots'] if s['available'] < s['target']),
-                      key=lambda s: (s['available'], attempted.get((s['workflow'], s['role'], s['project']), 0)))
-    # Retire first at capacity, otherwise refill first. Consumed items eventually
-    # retire even with a full ready pool, so native resources cannot accumulate.
-    if snapshot['managed'] >= LIMIT or not depleted:
-        item = db.execute("SELECT * FROM console_pool_items WHERE state='consumed' ORDER BY updated,id LIMIT 1").fetchone()
-        if item and closed(db, item['workload']):
-            c = json.loads(item['context'])
-            db.execute("UPDATE console_pool_items SET state='retiring',updated=? WHERE id=?", (int(time.time()), item['id']))
-            return {'operation': 'retire', 'automatic': True, 'item_id': item['id'], 'previous': c,
-                    'workflow': c.get('workflow', 'cve'), 'role': c['role'], 'project': c.get('project', 'TEST'),
-                    'disposable': bool(item['disposable'])}
-    if snapshot['managed'] >= LIMIT or not depleted:
-        return None
-    s = depleted[0]
-    return {k: s[k] for k in ('workflow', 'role', 'project')} | {
-        'operation': 'prepare', 'automatic': True, 'previous': None, 'disposable': True}
+    return None
 
 
 def reserved(db: sqlite3.Connection, reservation: dict) -> None:
@@ -226,9 +193,40 @@ def reserved(db: sqlite3.Connection, reservation: dict) -> None:
                    (reservation['id'], json.dumps(target, sort_keys=True), int(time.time())))
 
 
+def reverification_target(db: sqlite3.Connection, failure: str, receipt: str) -> dict:
+    """Bind a fresh read-only check to the current quarantine of an unused identity."""
+    row = db.execute("SELECT target FROM console_preparations WHERE id=? AND state='quarantined' AND receipt=?",
+                     (failure, receipt)).fetchone()
+    old = json.loads(row['target']) if row else {}
+    if old.get('operation') != 'verify' or old.get('automatic') is not True:
+        raise Denied('quarantine_binding')
+    item = db.execute("SELECT workload,context FROM console_pool_items WHERE id=? AND state='quarantined' AND receipt=?",
+                      (old.get('item_id'), receipt)).fetchone()
+    previous = old.get('previous')
+    if (not item or not isinstance(previous, dict) or not item['workload']
+            or previous.get('workload') != item['workload'] or json.loads(item['context']) != previous
+            or not db.execute('SELECT 1 FROM console_contexts WHERE workload=? AND context=?',
+                              (item['workload'], item['context'])).fetchone()
+            or db.execute('SELECT 1 FROM runs WHERE workload=?', (item['workload'],)).fetchone()):
+        raise Denied('quarantine_binding')
+    profile = profiles.profile_for(db, previous.get('profile_id'))
+    if previous.get('profile_fingerprint') != profiles.fingerprint(profile):
+        raise Denied('quarantine_binding')
+    return {'operation': 'verify', 'automatic': True, 'item_id': old['item_id'], 'previous': previous,
+            'role': previous['role'], 'profile_id': profile['id'], 'profile': profile,
+            'recheck_of': failure, 'failure_sha256': receipt}
+
+
 def finish(db: sqlite3.Connection, row: sqlite3.Row, context: dict | None, receipt: str) -> None:
     target = json.loads(row['target'])
     identifier = target.get('item_id', row['id'])
+    if 'recheck_of' in target:
+        checked = reverification_target(db, target['recheck_of'], target['failure_sha256'])
+        if checked != {k: v for k, v in target.items() if k != 'suffix'}:
+            raise Denied('quarantine_binding')
+        RunStore.event(db, 'maintenance:'+row['id'], None,
+                       'quarantine_reverified' if context is not None else 'quarantine_recheck_failed',
+                       {'original_reservation': target['recheck_of'], 'receipt_sha256': receipt})
     if target.get('profile_id') and target['operation'] in ('prepare','verify'):
         profiles.finish(db,target,context)
     state = 'retired' if target['operation'] == 'retire' and context is not None else 'ready' if context is not None else 'quarantined'

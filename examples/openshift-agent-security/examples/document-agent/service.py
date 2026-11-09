@@ -19,7 +19,7 @@ from starlette.routing import Route
 from agent_security_runtime import RunStore, prepare_storage
 from agent_security_runtime import Denied, strict_json, tool_arguments
 from agent_security_runtime import BackendPort, SecurityService, VerifiedActor
-from identity_demo_oidc import OIDCSession, valid_delegation, safe_https, secret_matches
+from openshift_security.oidc import OIDCSession, safe_https, secret_matches
 from contract import DOCUMENTS
 
 
@@ -89,7 +89,8 @@ class DocumentHost:
         self.store.recover_dispatched()
         self.security = SecurityService(self.store, BackendPort(DOCUMENTS.fingerprint,
             backend.dispatch, backend.observe, backend.read))
-        self.authentication = OIDCSession(config, self.store, verifier)
+        self.authentication = OIDCSession(config, self.store, verifier,
+                                          role_map={"analyst": "reviewer", "viewer": "viewer"})
         self.contexts = {}
         for context in config.contexts:
             if (set(context) != {"name", "workload", "role", "collection"}
@@ -137,7 +138,7 @@ class DocumentHost:
         context = self.contexts[fields["context"]]
         claims = session["claims"]
         run = self.store.create_run(issuer=claims["iss"], user=claims["sub"],
-            user_role={"analyst": "reviewer", "viewer": "viewer"}[self.authentication.role(claims)],
+            user_role=self.authentication.role(claims),
             workload=context["workload"], workload_role=context["role"], project=context["collection"],
             expires=int(claims["exp"]), assessment="Synthetic document publication")
         session.setdefault("runs", set()).add(run)
@@ -205,14 +206,7 @@ class DocumentHost:
         values = request.headers.getlist("authorization")
         if len(values) != 1 or not values[0].startswith("Bearer "):
             raise Denied("missing_token")
-        claims = await run_in_threadpool(self.authentication.verify, values[0][7:], self.config.audience)
-        if not valid_delegation(claims):
-            raise Denied("delegation_contract")
-        run = self.store.identity_run(claims["sub"], claims["azp"])
-        role = {"analyst": "reviewer", "viewer": "viewer"}[self.authentication.role(claims)]
-        if (role != run["user_role"] or claims["iat"] < run["not_before"]
-                or claims["exp"] > run["expires"]):
-            raise Denied("credential_binding")
+        claims, run = await self.authentication.delegated_run(values[0][7:], binding_denial="credential_binding")
         return VerifiedActor(claims["sub"], claims["azp"]), run["id"]
 
     async def mcp(self, request):

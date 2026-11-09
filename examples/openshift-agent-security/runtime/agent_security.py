@@ -21,7 +21,7 @@ import time
 from typing import Iterator
 from uuid import UUID, uuid4
 
-from agent_security_contracts import ConnectorContract, Denied, strict_json, tool_arguments
+from agent_security_contracts import ConnectorContract, Denied, WORKLOAD_ID_LIMIT, strict_json, tool_arguments
 
 
 
@@ -492,10 +492,11 @@ class RunStore:
 
     def revoke(self, selector: str, value: str) -> int:
         """Disable trusted run associations without reviving or undoing dispatched work."""
+        limit = WORKLOAD_ID_LIMIT if selector == "workload" else 160
         if (
             selector not in ("run_id", "user", "workload")
             or not isinstance(value, str)
-            or not 1 <= len(value) <= 160
+            or not 1 <= len(value) <= limit
         ):
             raise Denied("revocation_selector")
         column = {"run_id": "id", "user": "user", "workload": "workload"}[selector]

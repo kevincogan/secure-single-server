@@ -9,7 +9,8 @@ import pytest
 from starlette.testclient import TestClient
 
 from identity_demo_driver import COOKIE, Driver
-from checks.test_driver import setup
+
+from checks.support.driver import setup
 
 
 def configured(tmp_path: Path) -> tuple:

@@ -51,6 +51,28 @@ the protected operation through this boundary. A real integration must also
 prevent direct agent access to protected credentials or alternate backend routes.
 These Python APIs do not provide network isolation by themselves.
 
+## Component ownership
+
+The driver composes application operations with separate browser, protected-adapter
+and operator HTTP modules. Console rendering and fixed CSS/JavaScript consume
+projected display state. The backend can start with `with_ui=False` without
+loading rendering. Shared admission timing is independent of presentation;
+allocation, fencing and queue reservation retain their original transactions.
+The trusted OpenShift package under `scripts/identity_demo/openshift_security/`
+owns PKCE/session handling and verified delegation-to-run binding. Both the
+Jira driver and document host supply their own explicit issuer-to-connector role
+map. Issuer verification, original deadlines and backend authorization still
+have separate responsibilities. The same package is used in the projected
+driver code map and the separately built document proof image. Private
+operator artifact writers also live outside the installer and execution
+entrypoints.
+
+The native exchange engine has a separate pure provider-policy renderer and
+context preflight. The historical `probe_native_exchange.py` entry point remains
+compatible. Test setup lives in domain support modules, outside runtime delivery.
+
+For a minimal independent integration, start with the [BYOA quickstart](byoa-quickstart.md).
+
 ## Existing OpenShift integration
 
 The existing browser and trusted operator paths use `RunService` for proposal and
@@ -67,8 +89,9 @@ pool/job admission. Allocation, fencing and job reservation remain in the same
 transaction as run creation. Coordinator and preparer privileges remain separate.
 
 `runtime/identity_demo/` owns OpenShell execution, native MCP transport and the
-sample workflows. Cluster model flows share an explicit execution lifecycle and
-do not inherit browser automation. `scripts/identity_demo/` owns the OIDC/UI,
+sample workflows. The cluster coordinator supplies an attached run session to the workflow.
+It reads the original authenticated association and waits for durable consent.
+Browser qualification supplies a separate session to the same workflow. `scripts/identity_demo/` owns the OIDC/UI,
 Keycloak/SPIRE/OpenShift integrations and installation/maintenance entrypoints.
 
 Runtime services do not import `tests/identity_demo/`. That directory contains
@@ -77,8 +100,9 @@ automated checks and optional browser/qualification tools. The runtime build use
 the Python test suite, pytest and browser tooling. The explicit allowlist also
 retains shared setup modules and the native diagnostic compiler fixture they
 consume. It is not a minimal service-only image. These platform tools are
-separate from the three-module reusable core. The installer retains the full
-source verification and qualification tooling.
+separate from the three-module reusable core. The worker image excludes the six optional boundary/concurrency/dependency/key-rotation/
+lifecycle/recovery qualification flows. The installer retains their full source
+and tooling, including the boundary rehearsal; their tests remain in the suite.
 
 ## Prove reuse without Jira or the browser
 

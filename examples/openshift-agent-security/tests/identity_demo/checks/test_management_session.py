@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-import probe_native_exchange as native
+import native_exchange as native
 import identity_demo_management_session as session
 def source_profile(tmp_path: Path) -> Path:
     root = tmp_path / 'source'

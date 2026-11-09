@@ -19,7 +19,8 @@ from identity_demo_action_policy import DRIVER
 from lifecycle_flow import LifecycleFlow
 from native_delegation_acceptance import DelegationAcceptance
 from identity_demo_keycloak_upstream import BASE
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from protected_listener import HOST
 from identity_demo_fixture_http import NoRedirect
 
@@ -104,7 +105,7 @@ class DependencyFlow(LifecycleFlow):
     def accept(self, execute: Callable, resource: str, context: object) -> dict:
         """Do not dispatch writes; restore Services and verify native read recovery."""
         before = self.backend_count()
-        native.private_write(self.args.output_dir / "backend-before.summary.json", {"issues": before})
+        write_evidence(self.args.output_dir / "backend-before.summary.json", {"issues": before})
         fixture = Path(__file__).with_name("cve_runtime_fixture.py").read_text()
         report = execute(["sandbox", "exec", "--name", context.sandbox_name,
             "--no-login-shell", "--timeout", "90", "--no-tty", "--", "python", "-c",
@@ -152,7 +153,7 @@ class DependencyFlow(LifecycleFlow):
             token, claims = sender.final()
             sessions = sender.initialize_session(name, token)
             isolation = IsolatedService(read, patch, name, lambda: endpoints(name, True))
-            native.private_write(self.args.output_dir / (name + "-service-before.private.json"), isolation.before)
+            write_evidence(self.args.output_dir / (name + "-service-before.private.json"), isolation.before)
             # Acquire fresh credentials after initialization, immediately before interruption.
             token, claims = sender.final()
             with isolation.unavailable():
@@ -202,5 +203,5 @@ class DependencyFlow(LifecycleFlow):
             "backend_before": before, "backend_after": self.backend_count(), "writes_dispatched": 0,
             "driver_process_restart": "carried from accepted lost-response recovery",
             "issuer_new_grant_outage_proven": True, "steps5_and6_complete": False}
-        native.private_write(self.args.output_dir / (self.args.label + ".dependency.summary.json"), summary)
+        write_evidence(self.args.output_dir / (self.args.label + ".dependency.summary.json"), summary)
         return summary

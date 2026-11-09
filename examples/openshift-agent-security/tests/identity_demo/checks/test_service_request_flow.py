@@ -39,7 +39,7 @@ def test_untrusted_or_wrong_workflow_report_denied(change: dict) -> None:
 
 def test_read_and_default_cve_hooks(monkeypatch: object) -> None:
     """Only the workflow/project changes; all requests use the shared transport."""
-    import probe_native_exchange as native
+    import native_exchange as native
 
     monkeypatch.setattr(native, "read_program", lambda resource, tool, arguments, field: arguments)
     service = object.__new__(ServiceRequestFlow)

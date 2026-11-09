@@ -12,7 +12,7 @@ from typing import Callable
 
 import jwt
 
-import probe_native_exchange as native
+import native_exchange as native
 from native_delegation_acceptance import DelegationAcceptance
 from probe_discovery import run as discovery_run
 

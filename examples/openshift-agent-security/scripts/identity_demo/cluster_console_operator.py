@@ -115,11 +115,43 @@ print(json.dumps({'management_profile_verified':True,'projected_api_identity_ver
     return observed
 
 
+def confirmed_legacy_retirements(args, profile):
+    """Acknowledge closed contexts only after an independent read proves retirement."""
+    from deployment_profile import active_profile
+    from execution_context import context_identity
+    from identity_demo_controller_identity import enabled as controller_identities, verify
+    from identity_demo_execution_setup import read
+    from identity_demo_warm_pool import retirement_identity
+
+    files = getattr(args, "retired_context_file", ())
+    if not files:
+        return {}
+    if len(files) > 32 or active_profile() != profile:
+        raise ValueError("Exact installation and bounded retirement receipts required")
+    retired = {}
+    for filename in files:
+        value = read_json(setup.private_file(filename))
+        context = context_identity(value)
+        if context.workload in retired:
+            raise ValueError("Duplicate retirement receipt")
+        for kind, name in (("sandboxes.agents.x-k8s.io", context.resource_name),
+                           ("pod", context.resource_name), ("pod", "os-supervisor-" + context.sandbox_id)):
+            if read(args, kind, name, context.namespace, optional=True):
+                raise ValueError("Retirement requires exact native resource absence")
+        if controller_identities():
+            verify(context, lambda kind, name, ns=None: read(args, kind, name, ns), require_status=False)
+        elif read(args, "clusterstaticentries.spire.spiffe.io", context.registration_name, optional=True):
+            raise ValueError("Retirement requires exact registration absence")
+        retired[context.workload] = retirement_identity(value)
+    return retired
+
+
 def run(args,profile):
     configured=receipt(args.console_configuration_receipt,args.console_configuration_sha256)
     if not configured.get('applied') or configured.get('stage')!='configure':
         raise ValueError('Completed private console configuration required')
-    recorded(args,profile,configured['updated'],'Deployment','fixture-identity-driver')
+    targets = configured['observed'] if configured.get('observed_fresh_configuration') is True else configured['updated']
+    recorded(args, profile, targets, 'Deployment', 'fixture-identity-driver')
     before=private_request(args,profile,'pool')
     setup.write(args.output_dir/'pool-before.private.json',before)
     if args.console_runtime_stage=='status':
@@ -136,6 +168,9 @@ def run(args,profile):
     resume = bool(getattr(args, 'resume_retired_pool', False))
     if resume and not enable:
         raise ValueError('Retired-pool resume requires explicit automatic-enable')
+    if enable and getattr(args, 'retired_context_file', None):
+        raise ValueError('Record legacy retirement while scheduling is paused')
+    retired = {} if enable else confirmed_legacy_retirements(args, profile)
     proof=[]
     if enable:
         created=receipt(args.console_worker_receipt,args.console_worker_sha256)
@@ -145,6 +180,8 @@ def run(args,profile):
             raise ValueError('Initial empty pool required; existing inventory needs explicit migration review')
         if resume and (initial.get('pool_items', 0) <= 0 or initial.get('non_retired_pool_items') != 0):
             raise ValueError('History-preserving resume requires only durable retired inventory')
+        if not resume and initial.get('pool_items', 0):
+            raise ValueError('Durable inventory requires explicit retired-pool resume')
         proof=[worker(args,profile,created['created'],role) for role in ('coordinator','preparer')]
         if proof[0]['pod_uid']==proof[1]['pod_uid'] or proof[0]['port']==proof[1]['port']:
             raise ValueError('Separate worker management contexts required')
@@ -159,17 +196,16 @@ def run(args,profile):
         wait_ready(args, profile)
     proof_path=args.output_dir/'pool-activation.receipt.private.json'
     setup.write(proof_path,{'enabled':enable,'target':8,'limit':12,'worker_checks':proof,
-        'resume_retired_pool':resume,'checked_at':int(time.time())})
-    mode=getattr(args,'pool_mode','legacy')
-    if enable and mode=='profiles':
+        'resume_retired_pool':resume,'retired_workloads':retired,'checked_at':int(time.time())})
+    if enable:
         from identity_demo_pool_profiles import validate
         filename=getattr(args,'pool_profile_configuration',None)
         configuration=validate(read_json(setup.private_file(filename))) if filename else demo_configuration(getattr(args, "workload_image", None))
         setup.write(args.output_dir/'pool-profile-configuration.private.json',configuration)
         payload={'action':'profiles','configuration':configuration,'receipt_sha256':setup.sha(proof_path)}
     else:
-        payload={'action':'automatic','enabled':enable,'receipt_sha256':setup.sha(proof_path),
-                 'retired_workloads':[], 'initial_empty':enable and not resume}
+        payload={'action':'automatic','enabled':False,'receipt_sha256':setup.sha(proof_path),
+                 'retired_workloads':retired}
     if args.apply:
         setup.write(args.output_dir/'pool-activation.pending.json',payload)
         after=private_request(args,profile,'pool',payload)
@@ -177,7 +213,7 @@ def run(args,profile):
     return {'applied':args.apply,'automatic_pool_enabled':enable if args.apply else False,
             'scoped_worker_profiles_verified':len(proof),'target_ready':8,'managed_limit':12,
             'existing_legacy_inventory_adopted':False,'retired_history_preserved':resume,
-            'mutation_replayed':False,'pool_mode':mode if enable else 'disabled'}
+            'mutation_replayed':False,'pool_mode':'profiles' if enable else 'disabled'}
 
 
 def wait_ready(args, profile):

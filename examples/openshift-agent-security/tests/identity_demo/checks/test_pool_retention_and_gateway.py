@@ -31,7 +31,7 @@ def scratch(tmp_path, monkeypatch):
     args=Namespace(output_dir=tmp_path,disposable_workspace_reservation='a'*32)
     proof=retention.capture(args,context,'a'*32,read)
     args.disposable_workspace_receipt=str(tmp_path/'disposable-workspaces.private.json')
-    import probe_native_exchange as native
+    import native_exchange as native
     monkeypatch.setattr(native,'kube',lambda *a,**kw:{'items':[pod]})
     return args,context,sandbox,claim,pod,read
 
@@ -57,7 +57,7 @@ def test_replaced_foreign_or_unproved_workspace_is_preserved(tmp_path,monkeypatc
 def test_unexpected_live_consumer_blocks_disposal(tmp_path,monkeypatch):
     args,context,sandbox,claim,pod,read=scratch(tmp_path,monkeypatch)
     foreign=deepcopy(pod);foreign['metadata']['ownerReferences']=[{'uid':'someone-else'}]
-    import probe_native_exchange as native
+    import native_exchange as native
     monkeypatch.setattr(native,'kube',lambda *a,**kw:{'items':[pod,foreign]})
     with pytest.raises(ValueError,match='consumer'):retention.verify(args,context,sandbox,read)
 
@@ -73,7 +73,7 @@ def test_inactive_controller_or_clone_reference_blocks_disposal(tmp_path,monkeyp
     if kind=='MultiOwnerDeployment':
         foreign['kind']='Deployment'
         foreign['metadata']['ownerReferences']=[{'uid':'new-sandbox','kind':'Sandbox'},{'uid':'foreign-owner','kind':'Deployment'}]
-    import probe_native_exchange as native
+    import native_exchange as native
     monkeypatch.setattr(native,'kube',lambda a,verb,resource,*rest,**kw:{'items':[pod] if resource=='pods' else [foreign]})
     with pytest.raises(ValueError,match='declared controller or clone'):
         retention.verify(args,context,sandbox,read)

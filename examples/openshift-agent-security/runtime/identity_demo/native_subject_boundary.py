@@ -153,7 +153,8 @@ def verify_diagnostic_assertion(
 
 def investigate(args: argparse.Namespace, human: dict[str, Any]) -> dict[str, Any]:
     """Use only exact live owned resources; output no credential or raw body."""
-    import probe_native_exchange as native
+    import native_exchange as native
+    from openshift_security.artifacts import write_evidence
     import probe_keycloak_recovery as recovery
 
     pod_name = "os-supervisor-" + native.SANDBOX_ID
@@ -191,7 +192,7 @@ def investigate(args: argparse.Namespace, human: dict[str, Any]) -> dict[str, An
         status, data, message = exchange(ca, bootstrap, native.SANDBOX_ID, native.PREFIX, assertions[0])
         private = {"grpc_status": status, "grpc_message": message,
                    "raw_response_base64": base64.b64encode(data).decode()}
-        native.private_write(args.output_dir / (args.label + ".subject-" + name + ".private.json"), private)
+        write_evidence(args.output_dir / (args.label + ".subject-" + name + ".private.json"), private)
         verified = False
         if status == 0:
             claims = native.components.verify(token_from_response(data), subject,

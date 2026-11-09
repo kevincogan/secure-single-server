@@ -1,13 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Driver boundary tests; real issuer and gateway proof is separate live evidence."""
 
-import base64
-import hashlib
 import json
 from pathlib import Path
 import time
 from types import SimpleNamespace
-from uuid import uuid4
 from dataclasses import replace
 from urllib.parse import parse_qs, urlparse
 
@@ -16,16 +13,12 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from starlette.testclient import TestClient
 from identity_demo_console import LIVE_SCRIPT
-from identity_demo_driver import (
-    Config,
-    COOKIE,
-    Driver,
-    Verifier,
-    valid_delegation,
-    NoIssuerRedirect,
-    prepare_storage,
-)
+from identity_demo_driver import COOKIE, Driver, Verifier, valid_delegation, NoIssuerRedirect, prepare_storage
 from identity_demo_run_store import Denied
+
+from checks.support.driver import setup, approved, auth_context
+
+
 
 
 def test_empty_installation_starts_without_authorizing_a_workload(tmp_path: Path) -> None:
@@ -43,83 +36,8 @@ def test_empty_installation_starts_without_authorizing_a_workload(tmp_path: Path
     assert not driver.config.contexts
 
 
-def setup(
-    tmp_path: Path, role: str = "analyst", workload_role: str = "triage"
-) -> tuple:
-    """Create synthetic trusted inputs without claiming these authenticate a live user."""
-    tmp_path.chmod(0o700)
-    wid = str(uuid4())
-    workload = "spiffe://agents.example.test/openshell/sandbox/" + wid
-    config = Config(
-        "https://issuer.example.test/realms/pilot",
-        "identity-demo-driver",
-        "https://driver.example.test",
-        "https://mcp.example.test/mcp",
-        tmp_path / "runs.db",
-        (
-            {
-                "role": workload_role,
-                "namespace": "demo-" + workload_role,
-                "service_account": "fixture-openshell-sandbox",
-                "workload": workload,
-                "sandbox_id": wid,
-            },
-        ),
-        "g" * 40,
-        "o" * 40,
-        "a" * 40,
-    )
-    now = int(time.time())
-    user = {
-        "iss": config.issuer,
-        "sub": "user-a",
-        "aud": config.client,
-        "azp": config.client,
-        "iat": now,
-        "exp": now + 300,
-        "realm_access": {"roles": [role]},
-    }
-    final = {
-        **user,
-        "aud": config.audience,
-        "azp": workload,
-        "exp": now + 30,
-    }
-
-    def verify(token: str, audience: str) -> dict:
-        assert token in ("human", "final")
-        value = user if token == "human" else final
-        assert value["aud"] == audience
-        return value
-
-    driver = Driver(config, verify)
-    run = driver.register_run(user, config.contexts[0])
-    # A final exchange happens after run registration. Avoid minting the test
-    # token in the preceding wall-clock second and tripping the real iat gate.
-    final["iat"] = driver.store.describe(run, user["sub"])["run"]["not_before"]
-    final["exp"] = final["iat"] + 30
-    driver.sessions["opaque"] = {
-        "claims": user,
-        "token": "human",
-        "csrf": "csrf-fixture",
-        "runs": {run},
-    }
-    client = TestClient(driver.app, base_url=config.origin)
-    client.cookies.set(COOKIE, "opaque")
-    return driver, client, run, final
 
 
-def approved(driver: Driver, run: str) -> dict:
-    """Persist consent to the exact fixture action."""
-    p = driver.store.propose(
-        run,
-        "user-a",
-        {"project": "TEST", "summary": "Summary", "description": "Description"},
-    )
-    driver.store.approve(
-        run, p["action_id"], "user-a", p["digest"], int(time.time()) + 100
-    )
-    return p
 
 
 def test_ui_displays_profile_menu_session_and_verified_run_role(tmp_path: Path) -> None:
@@ -188,31 +106,6 @@ def test_reauthentication_cannot_approve_expired_run(tmp_path: Path, monkeypatch
     assert driver.store.describe(run, "user-a")["actions"][0]["state"] == "proposed"
 
 
-def auth_context(driver: Driver, run: str, claims: dict, p: dict) -> dict:
-    """Shape the authenticated gateway context without unsigned identity authority."""
-    body = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tools/call",
-        "params": {
-            "name": "step56_jira_createJiraIssue",
-            "arguments": {"run_id": run, "action_id": p["action_id"], **p["arguments"]},
-        },
-    }
-    return {
-        "context": {
-            "request": {
-                "http": {
-                    "path": "/mcp",
-                    "method": "POST",
-                    "headers": {
-                        "authorization": "Bearer final",
-                    },
-                    "body": json.dumps(body),
-                }
-            }
-        }
-    }
 
 
 def test_actual_body_matches_approval_and_authorization_does_not_claim(
@@ -506,7 +399,7 @@ def test_real_callback_contract(
         human if token == "human" else {**human, "nonce": nonce}
     )
     monkeypatch.setattr(
-        "identity_demo_oidc.exchange_code",
+        "openshift_security.oidc.exchange_code",
         lambda *args: {"access_token": "human", "id_token": "identity"},
     )
     callback = "/callback?state=" + state + "&code=one-use"

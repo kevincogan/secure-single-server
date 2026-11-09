@@ -13,7 +13,7 @@ import json
 import re
 from typing import Callable
 
-from agent_security_contracts import Denied, tool_arguments
+from agent_security_contracts import Denied, WORKLOAD_ID_LIMIT, tool_arguments
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ class VerifiedActor:
 
     def __post_init__(self):
         if (not isinstance(self.user, str) or not 1 <= len(self.user) <= 160
-                or not isinstance(self.workload, str) or not 1 <= len(self.workload) <= 512):
+                or not isinstance(self.workload, str) or not 1 <= len(self.workload) <= WORKLOAD_ID_LIMIT):
             raise ValueError("Verified bounded actor association required")
 
 

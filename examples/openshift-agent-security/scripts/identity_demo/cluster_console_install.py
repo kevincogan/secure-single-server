@@ -160,7 +160,7 @@ def configure(args, profile):
             or bundle.get('installation_profile') != profile.to_dict()
             or ledger.get('installation_profile') != profile.to_dict()):
         raise ValueError('Same fresh application and installation ledger required')
-    def read(kind, name):
+    def read(kind, name, *, expected=None):
         records = [r for r in ledger['created'] if r['kind'] == kind and r['metadata']['name'] == name
                    and r.get('namespace') == profile.core_namespace]
         if len(records) != 1:
@@ -169,12 +169,27 @@ def configure(args, profile):
         setup.owned(live, profile)
         if live['metadata']['uid'] != records[0]['metadata']['uid'] or live['metadata'].get('deletionTimestamp'):
             raise ValueError('Application object replaced or terminating')
+        if expected is not None:
+            if not setup.recorded_configuration_matches(args, live, expected, records[0]['fingerprint']):
+                raise ValueError('Fresh console object changed after creation')
+            return {'kind': kind, 'name': name, 'uid': live['metadata']['uid'],
+                    'fingerprint': records[0]['fingerprint']}
         return live
     from identity_demo_execution_setup import inspect_state
-    from connected_install import presenter_subject
     args.namespace = profile.core_namespace
     if not inspect_state(args)['rollback_quiescent']:
         raise ValueError('Idle certain application required')
+    if 'fresh_console' in bundle:
+        plan = bundle['fresh_console']
+        objects = {(obj['kind'], obj['metadata']['name']): obj for obj in setup.validate(bundle)
+                   if obj['metadata'].get('namespace') == profile.core_namespace}
+        records = {}
+        for group in ('created', 'configured'):
+            records[group] = [read(item['kind'], item['name'],
+                                   expected=objects[item['kind'], item['name']]) for item in plan[group]]
+        return {'applied': args.apply, 'stage': 'configure', 'created': records['created'], 'updated': [],
+                'observed': records['configured'], 'observed_fresh_configuration': True, 'private_listener_wired': True,
+                'runtime_workloads_activated': False, 'functional_acceptance_passed': False}
     driver = read('Deployment', 'fixture-identity-driver')
     adapter = read('Deployment', 'fixture-protected-adapter')
     isolation = read('NetworkPolicy', 'fixture-isolation')
@@ -186,17 +201,11 @@ def configure(args, profile):
         code = updated_web_code(args, profile, code_name)
     # Load executable modules only from the repository's fixed renderer list.
     # This includes newly added support modules while retaining installed data.
-    template = read_json(setup.ROOT/'infra/identity-demo/templates/application.json')
-    declared, = [o['data'] for o in template['objects'] if o['kind'] == 'ConfigMap'
-                 and 'identity_demo_driver.py' in o.get('data', {})]
-    for name, reference in declared.items():
-        if name.endswith('.py') and isinstance(reference, dict) and set(reference) == {'$source'}:
-            path = setup.ROOT/reference['$source']
-            if path.is_symlink() or not path.resolve().is_relative_to(setup.ROOT):
-                raise ValueError('Regular repository console module required')
-            code['data'][name] = path.read_text()
+    from driver_code_projection import driver_code
+    code['data'].update({name: text for name, text in driver_code(setup.ROOT).items()
+                         if name.endswith('.py')})
     keys = {role+'_secret': secrets.token_urlsafe(48) for role in ('coordinator','preparer')}
-    new, changed = render(profile, driver, code, adapter, [presenter_subject(bundle['objects'])], keys)
+    new, changed = render(profile, driver, code, adapter, keys)
     network, desired_isolation = private_network(profile, isolation)
     new = [*network, *new]
     before = [isolation, adapter, driver]

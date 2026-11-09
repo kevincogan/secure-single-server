@@ -566,7 +566,7 @@ def build_session(args):
             _, rendered = run(
                 "03-render",
                 "render",
-                ["--installation-config", str(routed)],
+                ["--installation-config", str(routed), "--render-console"],
             )
             _, native = run(
                 "04-native",
@@ -633,6 +633,7 @@ def build_session(args):
                     str(install_path),
                     "--state-file",
                     str(rendered / "installation-state.private.json"),
+                    "--render-console",
                 ],
             )
             if not read_json(final / "stack.private.json").get(

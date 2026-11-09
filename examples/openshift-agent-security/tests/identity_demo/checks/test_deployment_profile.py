@@ -69,7 +69,7 @@ def test_parallel_gateway_identity_and_registration_do_not_collide() -> None:
 
 def test_native_provider_endpoint_is_profile_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     """A public issuer and the internal verified-TLS token destination are distinct."""
-    import probe_native_exchange as native
+    import native_exchange as native
     profile = DeploymentProfile.from_dict({**LEGACY.to_dict(), 'core_namespace': 'new-core'})
     monkeypatch.setattr(native, 'active_profile', lambda: profile)
     assert native.provider_token_endpoint('https://public-issuer.invalid/realms/demo', True) == (

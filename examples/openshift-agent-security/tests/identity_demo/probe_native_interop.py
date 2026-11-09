@@ -63,7 +63,7 @@ async def native(credentials: dict, username: str, private_context: dict | None 
     """Observe supported client calls without changing headers, bodies or policy."""
     import httpx
     from mcp import ClientSession
-    from checks.test_gateway_oauth import _native_login_workflow
+    from checks.support.gateway_oauth import _native_login_workflow
     import identity_demo_fixture_http as components
 
     events: list[dict] = []

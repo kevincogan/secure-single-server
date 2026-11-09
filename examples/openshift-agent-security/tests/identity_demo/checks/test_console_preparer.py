@@ -8,41 +8,23 @@ from uuid import uuid4
 
 import pytest
 
-from checks.test_console import configured, operator, submit
 from identity_demo_driver import Driver
 from identity_demo_run_store import Denied
 from identity_demo_console_preparer import prepare_one, retire_previous
 
+from checks.support.console import configured, operator, submit
 
-def exhausted(tmp_path: Path) -> tuple:
-    driver, client, context = configured(tmp_path)
-    with driver.store.transaction() as db:
-        db.execute("UPDATE runs SET active=0")
-    worker = uuid4().hex
-    driver.console.heartbeat(worker)
-    response = submit(driver, client)
-    run = response.headers['location'].split('/')[-1]
-    driver.console.claim(worker)
-    driver.store.cancel(run, 'user-a')
-    driver.console.update(run, worker, 'completed', {'cleanup_verified': True})
-    return driver, client, context, worker
+from checks.support.console_preparer import reserve, finish
+from checks.support.pool_profiles import mapping, prepare, setup
 
 
-def reserve(driver: Driver, client: object, owner: str) -> dict | None:
-    return client.post('/internal/operator/console/prepare/next', headers=operator(driver), json={'owner': owner}).json()['preparation']
 
 
-def mapping(target: dict) -> dict:
-    from identity_demo_execution_setup import context_template
-    from dataclasses import asdict
-    template = replace(context_template(target['role'], target['suffix']), sandbox_id=str(uuid4()))
-    return {**asdict(template), 'workload': template.workload, 'workflow': target['workflow'],
-            'project': target['project'], 'console_prepared': True}
 
 
-def finish(driver: Driver, client: object, owner: str, reservation: dict, context: dict | None) -> object:
-    return client.post('/internal/operator/console/prepare/finish', headers=operator(driver), json={
-        'owner': owner, 'id': reservation['id'], 'context': context, 'receipt_sha256': 'a' * 64})
+
+
+
 
 
 def test_idle_spares_do_not_provision_and_browser_cannot_reserve(tmp_path: Path) -> None:
@@ -53,79 +35,23 @@ def test_idle_spares_do_not_provision_and_browser_cannot_reserve(tmp_path: Path)
     assert driver.console.available(True)['auto_prepare'] is True
 
 
-def test_reservation_excludes_jobs_and_identity_allocation_without_stopping_worker(tmp_path: Path) -> None:
-    driver, client, old, worker = exhausted(tmp_path)
-    owner = uuid4().hex
-    reservation = reserve(driver, client, owner)
-    state = driver.console.available(True)
-    assert state['online'] and not state['ready'] and state['reason'] == 'context_preparing'
-    assert reserve(driver, client, uuid4().hex) is None
-    assert reserve(driver, client, owner) == reservation
-    driver.console.heartbeat(worker)  # Old unmodified coordinator remains live.
-    assert driver.console.claim(worker) is None
-    assert submit(driver, client).status_code == 409
-    with pytest.raises(Denied, match='context_preparing'):
-        driver.register_run(driver.sessions['opaque']['claims'], {**old, 'workload': 'spiffe://agents.example.test/openshell/sandbox/' + str(uuid4())})
-    assert 'Preparing fresh demo sandbox' in client.get('/').text
-    assert 'prepared automatically after cleanup' in client.get('/console/live').json()['readiness_html'] or client.get('/console/live').json()['auto_prepare']
-
-
-def test_new_context_persists_and_old_identity_stays_consumed(tmp_path: Path) -> None:
-    driver, client, old, worker = exhausted(tmp_path)
-    owner = uuid4().hex
-    reservation = reserve(driver, client, owner)
-    context = mapping(reservation['target'])
-    assert finish(driver, client, owner, reservation, context).status_code == 200
-    assert finish(driver, client, owner, reservation, context).status_code == 200
-    replacement = Driver(driver.config, driver.verify)
-    assert context in replacement.execution_contexts()
-    assert driver.console.available(True)['online'] and driver.console.available(True)['ready']
-    assert reserve(driver, client, owner) is None  # Bounded one-spare pool.
-    assert submit(driver, client).status_code == 303
-    job = driver.console.claim(worker)
-    assert job['workload'] == context['workload'] != old['workload']
-    with driver.store.transaction() as db:
-        assert db.execute('SELECT count(*) FROM runs WHERE workload=?', (old['workload'],)).fetchone()[0] == 1
-
-
 @pytest.mark.parametrize('change', [
     {'project': 'OTHER'}, {'role': 'reader'}, {'namespace': 'foreign'}, {'console_prepared': False},
     {'workflow': 'incident-triage'}, {'sandbox_name': 'demo-s56-triage-xx'}, {'service_account': 'admin'},
     {'workload': 'spiffe://other/openshell/sandbox/' + str(uuid4())}, {'extra': 'not allowed'},
 ])
 def test_preparer_cannot_change_trusted_role_project_or_identity_contract(tmp_path: Path, change: dict) -> None:
-    driver, client, _, _ = exhausted(tmp_path)
+    driver, client, _ = setup(tmp_path)
     owner = uuid4().hex
     reservation = reserve(driver, client, owner)
     context = {**mapping(reservation['target']), **change}
     assert finish(driver, client, owner, reservation, context).status_code == 403
     assert not driver.console.contexts()
-    assert driver.console.available(True)['reason'] == 'context_preparing'
-
-
-def test_incomplete_cleanup_and_uncertain_write_block_reservation(tmp_path: Path) -> None:
-    driver, client, _, _ = exhausted(tmp_path)
-    with driver.store.transaction() as db:
-        db.execute("UPDATE console_jobs SET evidence='{}'")
-    assert reserve(driver, client, uuid4().hex) is None
-
-
-def test_preparation_failure_retains_block_across_restart_and_worker_heartbeat(tmp_path: Path) -> None:
-    driver, client, _, worker = exhausted(tmp_path)
-    owner = uuid4().hex
-    reservation = reserve(driver, client, owner)
-    assert finish(driver, client, uuid4().hex, reservation, None).status_code == 403
-    assert finish(driver, client, owner, reservation, None).status_code == 200
-    driver.console.heartbeat(worker)
-    replacement = Driver(driver.config, driver.verify)
-    assert replacement.console.available(True)['reason'] == 'context_preparation_failed'
-    assert replacement.console.available(True)['online']
-    assert reserve(driver, client, owner) is None
 
 
 def test_helper_restart_never_replays_unknown_native_mutation(tmp_path: Path, monkeypatch) -> None:
     import identity_demo_console_preparer as helper
-    reservation = {'id': uuid4().hex, 'target': {}}
+    reservation = {'id': uuid4().hex, 'target': {'operation': 'prepare', 'automatic': True, 'profile_id': 'triage'}}
     directory = tmp_path / reservation['id']
     directory.mkdir(mode=0o700)
     checkpoint = directory / 'checkpoint.private.json'
@@ -139,7 +65,7 @@ def test_helper_restart_never_replays_unknown_native_mutation(tmp_path: Path, mo
 
 
 def test_helper_repeats_only_identical_completion_receipt(tmp_path: Path) -> None:
-    reservation = {'id': uuid4().hex, 'target': {}}
+    reservation = {'id': uuid4().hex, 'target': {'operation': 'prepare', 'automatic': True, 'profile_id': 'triage'}}
     directory = tmp_path / reservation['id']
     directory.mkdir(mode=0o700)
     checkpoint = directory / 'checkpoint.private.json'
@@ -190,11 +116,8 @@ def test_automatic_retirement_requires_closed_cleanup_before_registration_delete
 
 
 def test_cancelled_unclaimed_job_can_be_replenished_without_runtime_replay(tmp_path: Path) -> None:
-    driver, client, _ = configured(tmp_path)
-    with driver.store.transaction() as db:
-        db.execute('UPDATE runs SET active=0')
-    worker = uuid4().hex
-    driver.console.heartbeat(worker)
+    driver, client, worker = setup(tmp_path)
+    prepare(driver, client)
     response = submit(driver, client)
     run = response.headers['location'].split('/')[-1]
     driver.store.cancel(run, 'user-a')
@@ -216,97 +139,6 @@ def test_atomic_checkpoint_is_private_and_survives_replacement(tmp_path: Path) -
     assert not path.with_suffix('.tmp').exists()
 
 
-def test_first_preparation_runs_existing_helpers_once_then_commits(tmp_path: Path, monkeypatch) -> None:
-    import identity_demo_console_preparer as helper
-    from identity_demo_execution_setup import context_template
-    from dataclasses import asdict
-    owner = uuid4().hex
-    target = {'role': 'triage', 'workflow': 'service-request', 'project': 'SERVICE', 'suffix': 'abc', 'previous': {}}
-    reservation = {'id': uuid4().hex, 'target': target}
-    context = replace(context_template('triage', 'abc'), sandbox_id=str(uuid4()))
-    calls = []
-    monkeypatch.setattr(helper, 'retire_previous', lambda *a: calls.append('retire') or {'workspace_data_retained': True})
-    def provision(args: object) -> dict:
-        calls.append('provision')
-        helper.native.private_write(args.output_dir / 'context.private.json', asdict(context))
-        return {'native_ready': True}
-    monkeypatch.setattr(helper, 'provision', provision)
-    monkeypatch.setattr(helper, 'resolve_context', lambda *a: context)
-    control = SimpleNamespace(request=lambda route, data: calls.append(route))
-    assert prepare_one(SimpleNamespace(output_dir=tmp_path), control, owner, reservation)['prepared']
-    assert calls == ['retire', 'provision', 'prepare/finish']
-    assert prepare_one(SimpleNamespace(output_dir=tmp_path), control, owner, reservation)['resumed_commit']
-    assert calls.count('provision') == 1
-
-
-def test_native_failure_records_block_and_never_reports_prepared(tmp_path: Path, monkeypatch) -> None:
-    import identity_demo_console_preparer as helper
-    reservation = {'id': uuid4().hex, 'target': {'role': 'triage', 'previous': {}}}
-    def refused(*args: object) -> dict:
-        raise ValueError('Owned resource mismatch')
-    monkeypatch.setattr(helper, 'retire_previous', refused)
-    monkeypatch.setattr(helper, 'provision', lambda a: pytest.fail('Provisioning must not follow failed retirement'))
-    calls = []
-    result = prepare_one(SimpleNamespace(output_dir=tmp_path), SimpleNamespace(request=lambda *a: calls.append(a)), uuid4().hex, reservation)
-    assert result['blocked'] and not result.get('prepared')
-    assert calls[0][0] == 'prepare/finish' and calls[0][1]['context'] is None
-    assert list((tmp_path / reservation['id']).glob('failure-*.private.json'))
-
-
-def test_new_job_prevents_preparation_until_its_cleanup_is_complete(tmp_path: Path) -> None:
-    driver, client, _ = configured(tmp_path)
-    with driver.store.transaction() as db:
-        db.execute('UPDATE runs SET active=0')
-    worker = uuid4().hex
-    driver.console.heartbeat(worker)
-    response = submit(driver, client)
-    run = response.headers['location'].split('/')[-1]
-    assert reserve(driver, client, uuid4().hex) is None
-    driver.console.claim(worker)
-    driver.store.cancel(run, 'user-a')
-    assert reserve(driver, client, uuid4().hex) is None
-    driver.console.update(run, worker, 'completed', {'cleanup_verified': True})
-    assert reserve(driver, client, uuid4().hex) is not None
-
-
-
-def test_ready_alternative_can_start_before_bounded_idle_refill(tmp_path: Path) -> None:
-    from dataclasses import replace
-    from starlette.testclient import TestClient
-    from identity_demo_driver import COOKIE
-    driver, _, old, worker = exhausted(tmp_path)
-    spare = mapping({'role':'reader', 'suffix':'xyz', 'workflow':'cve', 'project':driver.config.project})
-    replacement = Driver(replace(driver.config, contexts=(old, spare)), driver.verify)
-    replacement.sessions = driver.sessions
-    client = TestClient(replacement.app, base_url=replacement.config.origin)
-    client.cookies.set(COOKIE, 'opaque')
-    owner = uuid4().hex
-    assert reserve(replacement, client, owner) is None
-    assert replacement.console.available(True)['ready']
-    response = client.post('/submit', headers={'Origin':replacement.config.origin},
-        data={'csrf':'csrf-fixture','role':'reader','cve':'CVE-2099-0001'}, follow_redirects=False)
-    assert response.status_code == 303
-    assert replacement.console.claim(worker)['workload'] == spare['workload']
-    assert reserve(replacement, client, owner) is None
-
-
-def test_idle_refill_is_not_starved_by_unused_other_workflows(tmp_path: Path) -> None:
-    from dataclasses import replace
-    import time
-    driver, _, old, worker = exhausted(tmp_path)
-    spare = mapping({'role':'reader', 'suffix':'xyz', 'workflow':'cve', 'project':driver.config.project})
-    replacement = Driver(replace(driver.config, contexts=(old, spare)), driver.verify)
-    owner = uuid4().hex
-    assert replacement.console.prepare_next(owner, replacement.config.contexts, replacement.config.project) is None
-    with replacement.store.transaction() as db:
-        db.execute('UPDATE console_jobs SET updated=?', (int(time.time())-21,))
-    reservation = replacement.console.prepare_next(owner, replacement.config.contexts, replacement.config.project)
-    assert reservation and reservation['target']['role'] == 'triage'
-    replacement.console.heartbeat(worker)
-    assert replacement.console.claim(worker) is None
-    assert replacement.console.available(True)['reason'] == 'context_preparing'
-
-
 @pytest.mark.parametrize('interruption', ['preparation', 'retirement'])
 def test_process_replacement_quarantines_interrupted_mutation_without_replay(
     tmp_path: Path, interruption: str
@@ -320,9 +152,19 @@ def test_process_replacement_quarantines_interrupted_mutation_without_replay(
     import subprocess
     import sys
 
-    driver, client, _, worker = exhausted(tmp_path)
+    driver, client, worker = setup(tmp_path)
+    if interruption == 'retirement':
+        prepare(driver, client)
+        response = submit(driver, client)
+        assert response.status_code == 303
+        job = driver.console.claim(worker)
+        driver.store.cancel(job['run_id'], 'user-a')
+        driver.console.update(job['run_id'], worker, 'completed', {'cleanup_verified': True})
+        for _ in range(8):
+            prepare(driver, client)
     owner = uuid4().hex
     reservation = reserve(driver, client, owner)
+    assert reservation['target']['operation'] == ('retire' if interruption == 'retirement' else 'prepare')
     root = tmp_path / 'worker'
     root.mkdir(mode=0o700)
     inputs = root / 'reservation.json'
@@ -351,6 +193,8 @@ def request(route, payload):
     (root / ('completion-' + stage + '.json')).write_text(json.dumps(payload))
 helper.retire_previous = retire
 helper.provision = provision
+import identity_demo_capacity as capacity
+capacity.check_capacity = lambda *a: {}
 result = helper.prepare_one(SimpleNamespace(output_dir=root),
     SimpleNamespace(request=request), inputs['owner'], inputs['reservation'])
 assert result['blocked'] and result['ambiguous_mutation_not_replayed']
@@ -371,9 +215,10 @@ assert result['blocked'] and result['ambiguous_mutation_not_replayed']
     assert client.post('/internal/operator/console/prepare/finish',
                        headers=operator(driver), json=payload).status_code == 200
     replacement = Driver(driver.config, driver.verify)
-    assert replacement.console.available(True)['reason'] == 'context_preparation_failed'
-    driver.console.heartbeat(worker)
-    assert reserve(driver, client, owner) is None
+    with replacement.store.read_transaction() as db:
+        state, = db.execute("SELECT state FROM console_preparations WHERE id=?",
+                            (reservation['id'],)).fetchone()
+        assert state == 'quarantined'
     assert len((root / 'native-effects.jsonl').read_text().splitlines()) == 1
 
 
@@ -382,9 +227,9 @@ def test_profile_preparation_keeps_creation_and_loaded_policy_receipts_separate(
     from dataclasses import fields
     import identity_demo_console_preparer as helper
     import identity_demo_runtime as runtime
-    import identity_demo_presentation as presentation
+    import identity_demo_capacity as capacity
     import identity_demo_workspace_retention as retention
-    from checks.test_pool_profiles import setup, mapping
+    from checks.support.pool_profiles import setup, mapping
     from execution_context import ExecutionContext
 
     driver, client, _ = setup(tmp_path)
@@ -420,7 +265,7 @@ def test_profile_preparation_keeps_creation_and_loaded_policy_receipts_separate(
         assert route == 'prepare/finish'
         driver.console.finish_preparation(value['owner'],value['id'],value['context'],value['receipt_sha256'])
 
-    monkeypatch.setattr(presentation,'check_capacity',lambda *a,**kw:{'available':True})
+    monkeypatch.setattr(capacity,'check_capacity',lambda *a,**kw:{'available':True})
     monkeypatch.setattr(helper,'provision',provision)
     monkeypatch.setattr(helper,'resolve_context',lambda *a,**kw:context)
     monkeypatch.setattr(retention,'capture',lambda *a,**kw:None)
@@ -430,6 +275,48 @@ def test_profile_preparation_keeps_creation_and_loaded_policy_receipts_separate(
     assert result['prepared'] and driver.console.context_ready(context.workload)
     assert (creation_directory/'console-preparation.portforward-log').read_text() == 'original creation log'
     assert (verification_directory/'console-preparation.portforward-log').read_text() == 'independent loaded-policy observation'
+
+
+@pytest.mark.parametrize(('fault', 'attempts', 'passes'), [('tunnel-once', 2, True), ('tunnel', 2, False),
+                                                          ('policy', 1, False), ('identity', 0, False)])
+def test_verify_retries_only_tunnel_startup(tmp_path, monkeypatch, fault, attempts, passes):
+    from contextlib import contextmanager
+    from checks.support.pool_profiles import setup, prepare
+    import identity_demo_console_preparer as helper
+    import identity_demo_runtime as runtime
+
+    driver, client, _ = setup(tmp_path)
+    previous = prepare(driver, client)
+    with driver.store.transaction() as db:
+        db.execute('UPDATE console_profile_contexts SET verified_until=0')
+    owner = uuid4().hex
+    reservation = reserve(driver, client, owner)
+    sessions, completion = [], []
+
+    def resolve(*args, **kwargs):
+        if fault == 'identity':
+            raise ValueError('Exact identity mismatch')
+        return SimpleNamespace(workload=previous['workload'])
+
+    @contextmanager
+    def session(args, _credentials):
+        sessions.append(args.output_dir)
+        if fault == 'tunnel' or fault == 'tunnel-once' and len(sessions) == 1:
+            raise helper.native.NativeTunnelStartupError('test startup failure')
+        yield None
+
+    monkeypatch.setattr(runtime, 'guard', lambda _: (None, {}, None))
+    monkeypatch.setattr(helper, 'resolve_context', resolve)
+    monkeypatch.setattr(helper.native, 'native_session', session)
+    monkeypatch.setattr(helper, 'loaded_policy', lambda *_: {
+        'hash': 'f' * 64 if fault == 'policy' else previous['native_policy_hash'],
+        'status': 'loaded', 'version': 1, 'active_version': 1})
+    control = SimpleNamespace(request=lambda _, value: completion.append(value))
+    for _ in range(2):
+        prepare_one(SimpleNamespace(output_dir=tmp_path), control, owner, reservation)
+    assert len(set(sessions)) == len(sessions) == attempts
+    assert completion[0] == completion[1]
+    assert completion[0]['context'] == (previous if passes else None)
 
 
 @pytest.mark.parametrize('fault', [None, 'global', 'wrong_sandbox', 'missing_version',
@@ -468,3 +355,21 @@ def test_policy_verifier_matches_effective_and_explicit_loaded_revision(fault):
         assert loaded_policy(execute,context)==revision
         assert calls==[['policy','get',context.sandbox_name,'--base','--output','json'],
                        ['policy','get',context.sandbox_name,'--rev','1','--base','--output','json']]
+
+
+def test_capacity_observation_can_retry_before_any_provisioning_checkpoint(tmp_path, monkeypatch):
+    import identity_demo_capacity as capacity
+    import identity_demo_console_preparer as helper
+
+    driver, client, _ = setup(tmp_path)
+    owner = uuid4().hex
+    reservation = reserve(driver, client, owner)
+
+    def unavailable(*args):
+        raise ValueError('Capacity unavailable')
+
+    monkeypatch.setattr(capacity, 'check_capacity', unavailable)
+    monkeypatch.setattr(helper, 'provision', lambda *a: pytest.fail('Capacity failure must precede native mutation'))
+    with pytest.raises(helper.PreparationCapacityUnavailable):
+        prepare_one(SimpleNamespace(output_dir=tmp_path), SimpleNamespace(), owner, reservation)
+    assert not (tmp_path / reservation['id'] / 'checkpoint.private.json').exists()

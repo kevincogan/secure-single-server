@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from openshift_security.artifacts import write_evidence
 import re
 import shutil
 import subprocess
@@ -175,38 +176,47 @@ def state(args, context, value, phase, absence_sha256=''):
                'reservation': value['reservation'], 'context_sha256': value['pool_context_sha256'],
                'review_sha256': args.review_sha256, 'absence_sha256': absence_sha256,
                'profile': value['profile'], 'modules': hashes}
-    program = '''import hashlib,json,os,sys
+    program = '''import hashlib, json, os, sys
 from pathlib import Path
 import identity_demo_warm_pool as warm
 import identity_demo_run_store as runs
-import agent_security,agent_security_contracts
-value=runs.strict_json(sys.stdin.buffer.read())
-assert json.loads(Path(os.environ['IDENTITY_DEMO_CONFIG']).read_text())==value['profile']
-for module in (warm,runs,agent_security,agent_security_contracts):
- assert hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()==value['modules'][module.__name__], 'Reviewed durable guards must be deployed first'
-store=runs.RunStore.__new__(runs.RunStore);store.path=Path(os.environ['DRIVER_DATABASE'])
-phase=value['phase'];assert phase in ('plan','begin','eligible','finish')
-with (store.transaction() if phase in ('begin','finish') else store.read_transaction()) as db:
- row=db.execute('SELECT id,context FROM console_pool_items WHERE workload=?',(value['workload'],)).fetchone()
- assert row and all(json.loads(row['context']).get(k)==v for k,v in value['identity'].items())
- if phase=='plan':
-  warm.unused_retirement_gate(db);warm.unused_context(db,value['workload'],value['context_sha256'])
- elif phase=='begin':
-  warm.quarantine_unused(db,value['workload'],value['context_sha256'],value['reservation'],value['review_sha256'])
- else:
-  target=warm.unused_retirement(db,value['reservation'],value['review_sha256'])
-  assert target['workload']==value['workload'] and target['context_sha256']==value['context_sha256']
-  if phase=='finish':warm.complete_unused_retirement(db,value['reservation'],value['review_sha256'],value['absence_sha256'])
-print(json.dumps({'eligible':True,'phase':phase,'reservation':value['reservation'],'business_run_created':False,'native_mutation_replayed':False,'item_id':row['id']}))
+import agent_security, agent_security_contracts
+value = runs.strict_json(sys.stdin.buffer.read())
+if not json.loads(Path(os.environ['IDENTITY_DEMO_CONFIG']).read_text()) == value['profile']:
+    raise ValueError('Required maintenance or interface check failed')
+for module in (warm, runs, agent_security, agent_security_contracts):
+    if not hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest() == value['modules'][module.__name__]:
+        raise ValueError('Reviewed durable guards must be deployed first')
+store = runs.RunStore.__new__(runs.RunStore)
+store.path = Path(os.environ['DRIVER_DATABASE'])
+phase = value['phase']
+if not phase in ('plan', 'begin', 'eligible', 'finish'):
+    raise ValueError('Required maintenance or interface check failed')
+with store.transaction() if phase in ('begin', 'finish') else store.read_transaction() as db:
+    row = db.execute('SELECT id,context FROM console_pool_items WHERE workload=?', (value['workload'],)).fetchone()
+    if not (row and all((json.loads(row['context']).get(k) == v for k, v in value['identity'].items()))):
+        raise ValueError('Required maintenance or interface check failed')
+    if phase == 'plan':
+        warm.unused_retirement_gate(db)
+        warm.unused_context(db, value['workload'], value['context_sha256'])
+    elif phase == 'begin':
+        warm.quarantine_unused(db, value['workload'], value['context_sha256'], value['reservation'], value['review_sha256'])
+    else:
+        target = warm.unused_retirement(db, value['reservation'], value['review_sha256'])
+        if not (target['workload'] == value['workload'] and target['context_sha256'] == value['context_sha256']):
+            raise ValueError('Required maintenance or interface check failed')
+        if phase == 'finish':
+            warm.complete_unused_retirement(db, value['reservation'], value['review_sha256'], value['absence_sha256'])
+print(json.dumps({'eligible': True, 'phase': phase, 'reservation': value['reservation'], 'business_run_created': False, 'native_mutation_replayed': False, 'item_id': row['id']}))
 '''
-    execution.native.private_write(args.output_dir/('unused-'+phase+'.pending.private.json'), payload)
+    write_evidence(args.output_dir/('unused-'+phase+'.pending.private.json'), payload)
     result = subprocess.run(['oc', '--kubeconfig', args.kubeconfig, '-n', active_profile().core_namespace,
         'exec', '-i', 'deployment/fixture-identity-driver', '--', 'python', '-c', program],
         input=json.dumps(payload), capture_output=True, text=True, timeout=35)
     if result.returncode:
         raise ValueError('Unused-retirement state check stopped; inspect durable quarantine, never replay automatically')
     observed = strict_json(result.stdout.encode())
-    execution.native.private_write(args.output_dir/('unused-'+phase+'.result.private.json'), observed)
+    write_evidence(args.output_dir/('unused-'+phase+'.result.private.json'), observed)
     return observed
 
 
@@ -258,7 +268,7 @@ def run(args):
         from identity_demo_workspace_retention import verify_absent
         verify_absent(args, context, scratch['claims'], execution.read)
     path = args.output_dir/'unused-absence.private.json'
-    execution.native.private_write(path, {'reservation': value['reservation'], 'absent': absent,
+    write_evidence(path, {'reservation': value['reservation'], 'absent': absent,
         'review_sha256': args.review_sha256, 'resources': value['resources']})
     # Recheck fencing and identity before completing the durable tombstone.
     review(args, context)

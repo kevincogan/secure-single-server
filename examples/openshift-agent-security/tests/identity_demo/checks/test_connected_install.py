@@ -97,7 +97,6 @@ def test_ordered_setup_reuses_existing_helpers(harness: SimpleNamespace,
     environment = (harness.out / "operator-inputs.env").read_text()
     assert "export IDENTITY_DEMO_CONFIG=" in environment
     assert "export DEMO_CATALOG_CREDENTIAL=" in environment
-    assert "export DEMO_PRESENTER_SUBJECT=12345678-1234-4234-8234-123456789012" in environment
     assert "export DEMO_RUNTIME_CA=" in environment and "export DEMO_CORE_NAMESPACE=" in environment
     assert "must-not-export" not in environment
     assert "synthetic" not in environment
@@ -253,19 +252,6 @@ def test_stage_exit_failure_keeps_private_receipt(monkeypatch: pytest.MonkeyPatc
     assert (tmp_path / "failed.private.log").stat().st_mode & 0o077 == 0
 
 
-@pytest.mark.parametrize('change',['duplicate','missing','disabled','role','invalid-id'])
-def test_presenter_metadata_refuses_ambiguous_or_wrong_user(change):
-    user={'username':'analyst','enabled':True,'id':'12345678-1234-4234-8234-123456789012','realmRoles':['analyst']}
-    users=[user]
-    if change=='duplicate':users.append(dict(user))
-    if change=='missing':users=[]
-    if change=='disabled':user['enabled']=False
-    if change=='role':user['realmRoles']=['viewer']
-    if change=='invalid-id':user['id']='not-an-id'
-    obj={'kind':'Secret','metadata':{'name':'fixture-keycloak-upstream-realm'},'data':{'realm.json':base64.b64encode(json.dumps({'users':users}).encode()).decode()}}
-    with pytest.raises(ValueError):connected.presenter_subject([obj])
-
-
 def test_real_inference_precheck_needs_no_test_tree(harness, monkeypatch, tmp_path):
     """Run the real preflight child process with only its declared runtime paths."""
     from provider_contract import MODEL, URL
@@ -350,7 +336,8 @@ def test_cluster_activation_missing_handoffs_stops_before_first_stage(harness):
 
 @pytest.mark.parametrize('fault', [None, 'unverified', 'foreign-repository', 'digest', 'no-inference'])
 def test_cluster_activation_requires_exact_verified_input_handoffs(tmp_path, fault):
-    args = SimpleNamespace(profile=LEGACY, inference_config='private-path')
+    args = SimpleNamespace(profile=LEGACY, inference_config='private-path',
+                           workload_image='registry.example.test/workload@sha256:'+'b'*64)
     tmp_path.chmod(0o700)
     for name, content in (
         ('namespace_creation', {}), ('administrator', {}), ('runtime_publication', {

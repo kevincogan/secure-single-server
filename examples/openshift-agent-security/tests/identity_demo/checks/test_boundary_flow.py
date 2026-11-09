@@ -4,7 +4,7 @@
 import pytest
 
 from boundary_flow import manifests, TARGETS, IMAGE
-import probe_native_exchange as native
+import native_exchange as native
 
 
 def services() -> dict:

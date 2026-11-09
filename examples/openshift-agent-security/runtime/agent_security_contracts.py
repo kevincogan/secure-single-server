@@ -15,6 +15,9 @@ import re
 from typing import Callable
 
 
+WORKLOAD_ID_LIMIT = 512
+
+
 class Denied(ValueError):
     """A deliberate, safe authorization or lifecycle denial."""
 

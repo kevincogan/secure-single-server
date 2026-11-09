@@ -107,6 +107,12 @@ the same immutable configuration and output directory. A pending operation
 requires inspection of its original response and backend state. Do not delete
 checkpoints to force another run.
 
+The document image build context places the agent files under `source/` and
+the shared `openshift_security` package beside them. Copy `__init__.py`, `oidc.py`
+and `login_state.py` from `scripts/identity_demo/openshift_security/` into
+`source/openshift_security/`. The reviewed security wheel remains a separate
+build input. The host supplies its own issuer-to-connector role mapping.
+
 The resource renderer uses service-serving certificates and the existing native
 server-authenticated TLS listener. It leaves the human control listener without an MCP route. The
 runner observes the effective Envoy route name before applying three route-local

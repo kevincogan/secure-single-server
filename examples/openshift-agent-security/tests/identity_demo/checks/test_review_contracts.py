@@ -28,7 +28,7 @@ def test_producers_and_animation_share_the_durable_stage_vocabulary() -> None:
     from identity_demo_console_visuals import EVENTS
     root = Path(__file__).resolve().parents[3]
     produced = set()
-    for directory in ('scripts/identity_demo', 'tests/identity_demo'):
+    for directory in ('runtime/identity_demo', 'scripts/identity_demo', 'tests/identity_demo'):
         for source in (root / directory).glob('*.py'):
             for call in ast.walk(ast.parse(source.read_text())):
                 if (isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)

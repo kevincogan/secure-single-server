@@ -152,7 +152,9 @@ def test_cli_operator_requests_use_only_the_explicit_private_transport(tmp_path,
     from types import SimpleNamespace
     import json
     import identity_demo_control_transport as control
-    from permission_flow import PermissionFlow, DRIVER, BASE
+    from identity_demo_action_policy import DRIVER
+    from identity_demo_keycloak_upstream import BASE
+    from permission_flow import PermissionFlow
     credentials, keys, ca = (tmp_path / name for name in ('users.json', 'keys.json', 'ca.pem'))
     for path, value in ((credentials, {'analyst': 'synthetic'}), (keys, {'operator_secret': 's' * 40})):
         path.write_text(json.dumps(value))

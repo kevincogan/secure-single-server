@@ -11,7 +11,7 @@ import time
 from native_subject_boundary import (
     encode_string, subject_substitution_denied, token_from_response, verify_diagnostic_assertion,
 )
-from probe_native_exchange import PREFIX, require_native_provider_id
+from native_exchange import PREFIX, require_native_provider_id
 
 
 class NativeSubjectBoundaryTests(unittest.TestCase):

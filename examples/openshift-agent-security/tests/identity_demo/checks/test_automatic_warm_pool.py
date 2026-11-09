@@ -1,37 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
 """Real driver/database gates for concurrent refill, immutable allocation and caps."""
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
-import json
-from pathlib import Path
 import time
 from uuid import uuid4
 
 import pytest
-from starlette.testclient import TestClient
 
-from checks.test_console import configured, operator, submit
-from checks.test_console_preparer import mapping, reserve, finish
-from identity_demo_driver import Driver, COOKIE
+from identity_demo_driver import Driver
 from identity_demo_run_store import Denied
-import identity_demo_warm_pool as warm
+
+from checks.support.console import operator, submit
+from checks.support.console_preparer import reserve, finish
+from checks.support.pool_profiles import mapping
+
+from checks.support.automatic_warm_pool import automatic
 
 
-def automatic(tmp_path: Path):
-    driver, _, _ = configured(tmp_path)
-    contexts = tuple(mapping({'workflow': w, 'role': r, 'project': p, 'suffix': 'w'+str(i)})
-                     for i, (w, r, p) in enumerate(warm.SLOTS))
-    with driver.store.transaction() as db:
-        db.execute('UPDATE runs SET active=0')
-    driver.config = replace(driver.config, contexts=contexts)
-    client = TestClient(driver.app, base_url=driver.config.origin)
-    client.cookies.set(COOKIE, 'opaque')
-    worker = uuid4().hex
-    driver.console.heartbeat(worker, checked_at=int(time.time()))
-    response = client.post('/internal/operator/console/pool', headers=operator(driver), json={
-        'action': 'automatic', 'enabled': True, 'receipt_sha256': 'b'*64, 'retired_workloads': []})
-    assert response.status_code == 200, response.text
-    return driver, client, contexts, worker
+
 
 
 def test_ready_run_can_start_and_be_claimed_while_another_context_is_preparing(tmp_path):
@@ -102,7 +87,7 @@ def test_full_pool_retires_only_verified_closed_identity_without_changing_histor
     driver.store.cancel(job['run_id'], 'user-a')
     driver.console.update(job['run_id'], worker, 'completed', {'cleanup_verified': True})
     owner = uuid4().hex
-    # Refill all four slots to two; consumed instance remains counted meanwhile.
+    # Refill both profiles; the consumed context remains counted meanwhile.
     while True:
         reservation = reserve(driver, client, owner)
         if reservation['target']['operation'] == 'retire':break
@@ -131,7 +116,7 @@ def test_uncertain_write_and_incomplete_cleanup_still_stop_execution_and_refill(
 def test_settings_show_automatic_progress_and_browser_cannot_enable_mode(tmp_path):
     driver, client, _, _ = automatic(tmp_path)
     page = client.get('/settings')
-    assert 'You do not need to prepare another batch' in page.text
+    assert 'Contexts are prepared and retired automatically' in page.text
     assert '4 ready' in page.text and '4 / 12' in page.text
     assert '/settings/prepare' not in page.text
     assert 'Preparation needed' not in page.text
@@ -140,11 +125,11 @@ def test_settings_show_automatic_progress_and_browser_cannot_enable_mode(tmp_pat
     assert driver.config.operator_secret not in page.text
 
 
-def test_unknown_retirement_and_enable_during_job_are_refused(tmp_path):
+def test_unknown_retirement_and_pause_during_job_are_refused(tmp_path):
     driver, client, _, worker = automatic(tmp_path)
     def request(retired):
         return client.post('/internal/operator/console/pool',headers=operator(driver),json={
-            'action':'automatic','enabled':True,'receipt_sha256':'c'*64,'retired_workloads':retired})
+            'action':'automatic','enabled':False,'receipt_sha256':'c'*64,'retired_workloads':retired})
     assert request(['spiffe://other/workload']).status_code == 403
     assert submit(driver,client).status_code == 303
     assert request([]).status_code == 403

@@ -8,7 +8,8 @@ from __future__ import annotations
 import json
 from ipaddress import ip_network
 from deployment_profile import DeploymentProfile
-from identity_demo_setup import ROOT, kube, private_file, write, owned
+from identity_demo_setup import ROOT, kube, owned
+from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
 
 
 def object_for(profile, api, kind, name, spec=None, namespace=None):

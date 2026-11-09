@@ -12,7 +12,7 @@ import unittest
 import jwt
 import pytest
 
-import checks.test_components as components
+import checks.support.components as components
 
 AUDIENCE = "https://fixture-protected-adapter.demo-core.svc:8443/mcp"
 CLIENT = "fixture-gateway-service"

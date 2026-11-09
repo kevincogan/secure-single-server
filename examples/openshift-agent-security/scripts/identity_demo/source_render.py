@@ -25,6 +25,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from deployment_profile import DeploymentProfile
 from deployment_artifacts import IMAGE_ROLES as IMAGE_ROLES, validate_artifacts
+from driver_code_projection import code_items
 
 ROOT = Path(__file__).resolve().parents[2]
 TEMPLATES = ROOT / "infra/identity-demo/templates"
@@ -297,7 +298,7 @@ def realm_template(name):
     return {**common['fields'], **expand(value)}
 
 
-def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, dict]:
+def render(config_file: Path, state: dict | None = None, *, final_console: bool = False) -> tuple[dict, dict, dict]:
     """Produce a complete private application bundle from checked-in templates."""
     profile, artifacts, trust, cidrs = load_inputs(config_file)
     from managed_certificates import configuration, resources, public_trust, openshell_trust, SECRETS
@@ -329,7 +330,8 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
                 name = value["$source"]
                 source = ROOT / name
                 if (not source.resolve().is_relative_to(ROOT)
-                        or (source.suffix != ".py" and name != 'runtime/provider-contract.json')
+                        or (source.suffix != ".py" and name not in ('runtime/provider-contract.json',
+                            'scripts/identity_demo/console.js', 'scripts/identity_demo/console.css'))
                         or not name.startswith(("scripts/identity_demo/", "runtime/"))):
                     raise ValueError("Repository Python source required")
                 data = source.read_bytes()
@@ -406,12 +408,30 @@ def render(config_file: Path, state: dict | None = None) -> tuple[dict, dict, di
                     for volume in workload["spec"]["template"]["spec"].get("volumes", []):
                         if volume.get("configMap", {}).get("name") == old_name:
                             volume["configMap"]["name"] = new_name
+                            if "identity_demo_driver.py" in item["data"]:
+                                volume["configMap"]["items"] = code_items(item["data"])
     for source_path in [*TEMPLATES.glob("*.json"), ROOT / "scripts/identity_demo/source_render.py",
                         ROOT / "scripts/identity_demo/deployment_profile.py",
+                        ROOT / "scripts/identity_demo/driver_code_projection.py",
                         ROOT / "scripts/identity_demo/managed_certificates.py",
                         ROOT / "scripts/identity_demo/deployment_artifacts.py"]:
         pins[str(source_path.relative_to(ROOT))] = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    console = {}
+    if final_console:
+        from cluster_console_configuration import configure_fresh
+
+        state = dict(state)
+        role_keys = state.get("console_role_keys")
+        if role_keys is None:
+            role_keys = {role + "_secret": secrets.token_urlsafe(48)
+                         for role in ("coordinator", "preparer")}
+            state["console_role_keys"] = role_keys
+        objects, console = configure_fresh(profile, objects, role_keys)
+        for name in ("cluster_console_configuration.py", "cluster_console_resources.py"):
+            path = ROOT / "scripts/identity_demo" / name
+            pins[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
     bundle = {"schema_version": 2, "expected_server": profile.expected_server,
+              **({"fresh_console": console} if final_console else {}),
               "installation_profile": profile.to_dict(), "objects": objects, "source_pins": pins,
               "source_rendered": True, "fresh_driver_contexts": True,
               "native_management_scope": management_scope,

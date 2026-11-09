@@ -193,34 +193,6 @@ def explicit_tool_denial(observations: list[dict]) -> bool:
         return body.strip() in ("", "Forbidden", "forbidden")
     return isinstance(value, dict) and "result" not in value and "issues" not in value
 
-
-def initialization_response(token: str) -> dict:
-    """Capture the first actual HTTP boundary before interpreting SDK behavior."""
-    request = Request(f"http://127.0.0.1:{PORT}/mcp", data=json.dumps({
-        "jsonrpc": "2.0", "id": 44, "method": "initialize", "params": {
-            "protocolVersion": "2025-11-25", "capabilities": {},
-            "clientInfo": {"name": "owned-credential-route-probe", "version": "1"},
-        }}).encode(), headers={"Host": candidate.HOST, "Authorization": "Bearer " + token,
-            "Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
-    try:
-        response = urlopen(request, timeout=10)
-    except HTTPError as error:
-        response = error
-    with response:
-        body = response.read(131073)
-        if len(body) > 131072:
-            raise ValueError("Bounded MCP initialization response required")
-        value = {"http_status": response.code, "headers": dict(response.headers),
-                 "body": body.decode(errors="replace")}
-        session = response.headers.get("mcp-session-id")
-    if session and value["http_status"] == 200:
-        cleanup = Request(f"http://127.0.0.1:{PORT}/mcp", method="DELETE", headers={
-            "Host": candidate.HOST, "Authorization": "Bearer " + token, "Mcp-Session-Id": session})
-        with urlopen(cleanup, timeout=10) as response:
-            value["session_delete_status"] = response.code
-    return value
-
-
 def initialized_expected_adapter(response: dict) -> bool:
     """A valid broker initialization cannot count as reaching the protected adapter."""
     if response.get("http_status") != 200:
@@ -229,15 +201,5 @@ def initialized_expected_adapter(response: dict) -> bool:
         body = json.loads(response["body"])
         return body.get("jsonrpc") == "2.0" and not body.get("error") and (
             body.get("result", {}).get("serverInfo", {}).get("name") == "identity-demo-protected-jira")
-    except (ValueError, KeyError, TypeError, AttributeError):
-        return False
-
-
-def initialized_expected_broker(response: dict) -> bool:
-    """Broker initialization is expected only for the explicitly registered probe."""
-    try:
-        value = json.loads(response["body"])
-        return response.get("http_status") == 200 and not value.get("error") and (
-            value.get("result", {}).get("serverInfo", {}).get("name") == "Kuadrant MCP Gateway")
     except (ValueError, KeyError, TypeError, AttributeError):
         return False

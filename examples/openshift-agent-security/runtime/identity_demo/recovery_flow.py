@@ -11,7 +11,8 @@ import subprocess
 
 from identity_demo_action_policy import DRIVER
 from permission_flow import PermissionFlow
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 
 
 class RecoveryFlow(PermissionFlow):
@@ -26,7 +27,7 @@ class RecoveryFlow(PermissionFlow):
             "--", "python", "-c", program,
         ], capture_output=True, text=True, timeout=30)
         if result.returncode:
-            native.private_write(self.args.output_dir / "recovery-diagnostic-failure.private.json",
+            write_evidence(self.args.output_dir / "recovery-diagnostic-failure.private.json",
                                  {"exit": result.returncode, "stderr": result.stderr})
             raise RuntimeError("Recovery diagnostic failed; details withheld")
         return json.loads(result.stdout)
@@ -130,65 +131,9 @@ print(json.dumps(asyncio.run(t.reconcile(RUN,ACTION))))"""
                 "retry_returns_original_issue": True, "assessment_retained": True,
                 "verified_issue_key": resolved["issue_key"], "backend_before": before,
                 "backend_after": self.backend_count(), "steps5_and6_complete": False}
-            native.private_write(self.args.output_dir / (self.args.label + ".recovery.summary.json"), summary)
+            write_evidence(self.args.output_dir / (self.args.label + ".recovery.summary.json"), summary)
             return summary
         finally:
             self.cluster_python("fixture-protected-adapter", "import pathlib,json;p=pathlib.Path(" + repr(selector)
                 + ");p.unlink(missing_ok=True);print(json.dumps({'fault_disabled':not p.exists()}))")
             self.close()
-
-
-class ResumeRecoveryFlow(RecoveryFlow):
-    """Resume an active uncertain run after a harness interruption; never reassign it."""
-
-    def login(self, context: object) -> dict:
-        """Reauthenticate the original owner and read the original durable proposal."""
-        association = json.loads(Path(self.args.resume_association_file).read_text())
-        assert association["workload"] == context.workload
-        self.run_id, self.user = association["run_id"], association["user"]
-        self.authenticate()
-        status, _, body = self.http(DRIVER + "/internal/operator/credentials/" + self.run_id,
-                                   operator=True)
-        assert status == 200
-        credential = json.loads(body)
-        assert credential["user"] == self.user and credential["workload"] == context.workload
-        record = self.cluster_python("fixture-identity-driver", """import os,json,sqlite3
-d=sqlite3.connect('file:'+os.environ['DRIVER_DATABASE']+'?mode=ro',uri=True);d.row_factory=sqlite3.Row
-r=d.execute('SELECT * FROM runs WHERE id=?',(RUN,)).fetchone()
-rows=d.execute('SELECT * FROM actions WHERE run_id=?',(RUN,)).fetchall()
-assert r['active']==1 and r['user']==USER and len(rows)==1 and rows[0]['state']=='unknown'
-a=rows[0];print(json.dumps({'action_id':a['id'],'arguments':json.loads(a['payload']),'digest':a['digest']}))"""
-            .replace("RUN", repr(self.run_id)).replace("USER", repr(self.user)))
-        self.proposal = record
-        return {"access_token": credential["access_token"]}
-
-    def accept(self, execute: object, resource: str, context: object) -> dict:
-        """Complete positive reconciliation and a real native duplicate on the same run."""
-        before = self.backend_count()
-        unknown = self.action_state("unknown")
-        resolved = self.cluster_python("fixture-protected-adapter", """import asyncio,json,os
-from pathlib import Path
-from identity_demo_jira_action_adapter import JiraTools
-t=JiraTools(Path(os.environ['DRIVER_ADAPTER_SECRET_FILE']).read_text().strip(),os.environ['JIRA_USER'],os.environ['JIRA_TOKEN'],os.environ['DRIVER_CA_FILE'])
-print(json.dumps(asyncio.run(t.reconcile(RUN,ACTION))))"""
-            .replace("RUN", repr(self.run_id)).replace("ACTION", repr(self.proposal["action_id"])))
-        assert resolved["resolved"]
-        state = self.action_state("succeeded")
-        assert state["execution_id"] == unknown["execution_id"] and state["issue_key"] == resolved["issue_key"]
-        arguments = {"run_id": self.run_id, "action_id": self.proposal["action_id"], **self.proposal["arguments"]}
-        result = execute([
-            "sandbox", "exec", "--name", context.sandbox_name, "--no-login-shell",
-            "--timeout", "90", "--no-tty", "--", "python", "-c",
-            native.read_program(resource, "step56_jira_createJiraIssue", arguments, "key"),
-        ], json_output=True)
-        assert result["read_passed"] and result["verified_tool_result"] == {
-            "key": resolved["issue_key"], "duplicate": True}
-        assert self.backend_count() == before
-        self.close()
-        summary = {"passed": True, "resumed_same_active_run": True,
-                   "reconciled_original_unknown_action": True, "single_dispatch": True,
-                   "native_duplicate_returned_original_issue": True,
-                   "backend_before": before, "backend_after": self.backend_count(),
-                   "verified_issue_key": resolved["issue_key"], "steps5_and6_complete": False}
-        native.private_write(self.args.output_dir / (self.args.label + ".recovery.summary.json"), summary)
-        return summary

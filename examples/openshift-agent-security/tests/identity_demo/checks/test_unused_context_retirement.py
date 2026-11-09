@@ -1,31 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 """Installer quarantine is durable, single-use and distinct from business runs."""
 import hashlib
-import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 import pytest
 
-from checks.test_automatic_warm_pool import automatic
-from checks.test_console import operator
 from identity_demo_driver import Driver
 from identity_demo_run_store import Denied
 import identity_demo_warm_pool as warm
 
+from checks.support.console import operator
+from checks.support.pool_profiles import apply_profiles, configuration
 
-def idle_installation(tmp_path):
-    driver, client, contexts, _ = automatic(tmp_path)
-    response = client.post('/internal/operator/console/pool', headers=operator(driver), json={
-        'action': 'automatic', 'enabled': False, 'receipt_sha256': 'c'*64, 'retired_workloads': []})
-    assert response.status_code == 200
-    with driver.store.transaction() as db:
-        db.execute('UPDATE console_worker SET updated=0')
-        db.execute('UPDATE console_preparer SET updated=0')
-        row = db.execute('SELECT context FROM console_pool_items WHERE workload=?',
-                         (contexts[0]['workload'],)).fetchone()
-    return driver, client, contexts, hashlib.sha256(row['context'].encode()).hexdigest()
+from checks.support.unused_context_retirement import idle_installation
+
+
+
 
 
 def test_quarantine_and_completed_retirement_never_create_a_business_run(tmp_path):
@@ -54,7 +46,7 @@ def test_quarantine_and_completed_retirement_never_create_a_business_run(tmp_pat
         assert [v[0] for v in db.execute('SELECT event FROM audit WHERE run_id=? ORDER BY sequence',
                                        ('maintenance:'+reservation,))] == [
             'unused_retirement_quarantined', 'unused_retirement_completed']
-    assert restored.console.context_for_workload(workload) is None  # Configured mapping is still retained by config.
+    assert restored.console.context_for_workload(workload)['workload'] == workload
     assert restored.config.contexts == driver.config.contexts
     assert not restored.console.context_ready(workload)
     with pytest.raises(Denied, match='retired_workload'):
@@ -86,8 +78,7 @@ def test_reenabling_automatic_pool_does_not_revive_unused_retirement_tombstones(
                                    reservation, 'd'*64)
         with driver.store.transaction() as db:
             warm.complete_unused_retirement(db, reservation, 'd'*64, 'e'*64)
-    response = client.post('/internal/operator/console/pool', headers=operator(driver), json={
-        'action': 'automatic', 'enabled': True, 'receipt_sha256': 'f'*64, 'retired_workloads': []})
+    response = apply_profiles(driver, client, configuration())
     assert response.status_code == 200
     assert response.json()['automatic']['managed'] == 0
     assert response.json()['automatic']['states']['retired'] == 4
@@ -126,7 +117,7 @@ def test_unfenced_or_uncertain_retirement_is_refused_atomically(tmp_path, change
     with driver.store.transaction() as db:
         if change == 'scheduling': db.execute('UPDATE console_pool_settings SET enabled=1')
         elif change == 'worker': db.execute('UPDATE console_worker SET updated=?', (int(time.time()),))
-        elif change == 'preparer': db.execute('INSERT INTO console_preparer VALUES(1,?)', (int(time.time()),))
+        elif change == 'preparer': db.execute('UPDATE console_preparer SET updated=?', (int(time.time()),))
         elif change == 'active-run': db.execute('UPDATE runs SET active=1')
         elif change == 'used': db.execute('UPDATE runs SET workload=?', (workload,))
         elif change == 'context': digest = '0'*64
@@ -166,13 +157,11 @@ def test_completed_unused_retirement_allows_verified_replacement_after_restart(t
         warm.quarantine_unused(db, contexts[0]['workload'], digest, reservation, 'd'*64)
     with driver.store.transaction() as db:
         warm.complete_unused_retirement(db, reservation, 'd'*64, 'e'*64)
-    response = client.post('/internal/operator/console/pool', headers=operator(driver), json={
-        'action': 'automatic', 'enabled': True, 'receipt_sha256': 'f'*64, 'retired_workloads': []})
+    response = apply_profiles(driver, client, configuration())
     assert response.status_code == 200
     restored = Driver(driver.config, driver.verify)
     restored.console.heartbeat(uuid4().hex, checked_at=int(time.time()))
     replacement = restored.console.prepare_next(uuid4().hex, restored.config.contexts, 'TEST')
     assert replacement and replacement['target']['operation'] == 'prepare'
-    assert replacement['target']['role'] == contexts[0]['role']
     assert 'demo-s56-' + replacement['target']['role'] + '-' + replacement['target']['suffix'] != contexts[0]['sandbox_name']
     assert not restored.console.context_ready(contexts[0]['workload'])

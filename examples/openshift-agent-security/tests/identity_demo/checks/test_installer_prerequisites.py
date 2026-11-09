@@ -10,65 +10,13 @@ import pytest
 
 from deployment_profile import LEGACY
 from cluster_installer_prerequisites import objects, run
-import identity_demo_setup as setup
 import installer_tools
 
+from checks.support.installer_prerequisites import source
 
-def source():
-    def item(kind, name, **fields):
-        return {
-            "apiVersion": setup.APIS[kind],
-            "kind": kind,
-            "metadata": {
-                "name": name,
-                "namespace": LEGACY.core_namespace,
-                "labels": dict(LEGACY.labels),
-            },
-            **fields,
-        }
 
-    application = [
-        item("ServiceAccount", "fixture-openshell", automountServiceAccountToken=False),
-        item(
-            "Role",
-            "fixture-openshell-sandbox",
-            rules=[
-                {
-                    "apiGroups": ["agents.x-k8s.io"],
-                    "resources": ["sandboxes"],
-                    "verbs": ["get", "create"],
-                }
-            ],
-        ),
-        item("Gateway", "fixture-mcp", spec={}),
-        item("HTTPRoute", "fixture-jira", spec={}),
-        item("HTTPRoute", "fixture-mcp-bound", spec={}),
-        # A private application Secret may exist in the input bundle. It must
-        # never appear in the public administrator review artifact.
-        item("Secret", "fixture-private-input", data={"private": "SYNTHETIC"}),
-    ]
-    bundle = {
-        "schema_version": 2,
-        "expected_server": LEGACY.expected_server,
-        "installation_profile": LEGACY.to_dict(),
-        "objects": application,
-        "native_build_contract_matches": True,
-    }
-    artifacts = {
-        "schema_version": 1,
-        "native_build_contract": LEGACY.native_build_contract,
-        "images": {
-            role: "registry.example/" + role + "@sha256:" + "a" * 64
-            for role in (
-                "jira_runtime",
-                "keycloak_management",
-                "keycloak_exchange",
-                "openshell_gateway",
-                "openshell_supervisor",
-            )
-        },
-    }
-    return bundle, artifacts
+
+
 
 
 def test_handoff_uses_the_existing_generators_and_excludes_private_application_state():
@@ -157,7 +105,7 @@ def test_public_archive_fetch_is_bounded_and_verified_before_use(
 
 def test_workspace_isolation_is_administrator_prepared_and_installer_read_only():
     from cluster_installer_application import authority
-    from checks.test_cluster_installer_session import config
+    from checks.support.cluster_installer_session import config
     bundle, artifacts = source()
     for namespace in LEGACY.application_namespaces:
         bundle["objects"].append({"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {"namespace": namespace, "name": "identity-demo-default-deny", "labels": dict(LEGACY.labels)}, "spec": {"podSelector": {}, "policyTypes": ["Ingress", "Egress"]}})

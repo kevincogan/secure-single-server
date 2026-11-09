@@ -12,11 +12,12 @@ import urllib.request
 import pytest
 
 import agent_runtime
-import probe_native_exchange as native
+import native_exchange as native
 from provider_contract import MODEL
 from identity_demo_run_store import Denied, read_call
 from identity_demo_jira_action_adapter import BODY_KEY
-from checks.test_jira_action_adapter import context, instance
+
+from checks.support.jira_action_adapter import context, instance
 
 
 def rpc(arguments: dict) -> bytes:
@@ -303,10 +304,10 @@ def test_agent_progress_contract_reaches_the_real_console_store(
     """Run both adapters against actual persisted evidence validation, without live inference claims."""
     import base64
     from dataclasses import replace
-    from types import MethodType
+    from functools import partial
     from uuid import uuid4
-    from checks.test_console import configured, operator
-    from identity_demo_console_worker import AttachedFlow
+    from checks.support.console import configured, operator
+    from identity_demo_console_worker import ConsoleRunSession
 
     driver, client, context = configured(tmp_path)
     driver.config = replace(
@@ -384,12 +385,11 @@ def test_agent_progress_contract_reaches_the_real_console_store(
         workflow=workflow,
         submission={"request": request_id},
         run_id=job["run_id"],
-        control=LocalControl(),
         args=SimpleNamespace(output_dir=tmp_path, label="offline-integration"),
     )
     if project == "OPS":
         flow.agent_scope_probe = "TEST"
-    flow.progress = MethodType(AttachedFlow.progress, flow)
+    flow.progress = partial(ConsoleRunSession(LocalControl(), job).progress, flow)
     result = agent_runtime.report(
         flow,
         execute,

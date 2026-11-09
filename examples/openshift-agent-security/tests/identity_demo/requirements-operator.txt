@@ -6,3 +6,4 @@ greenlet==3.5.6
 pyee==14.0.0
 pyte==0.8.2
 wcwidth==0.2.14
+ruff==0.15.6

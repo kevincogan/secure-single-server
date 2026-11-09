@@ -42,7 +42,7 @@ def unpack(archive, expected, member_name, target):
 
 
 def prepare_context(args):
-    from identity_demo_setup import write, private_file
+    from openshift_security.artifacts import write_json_receipt as write, require_private_file as private_file
     if args.apply:
         configured = read_json(private_file(args.runtime_configuration_receipt))
         if configured.get('completed') is not True or not configured.get('files'):
@@ -94,7 +94,7 @@ def prepare_context(args):
 
 
 def run(args):
-    from identity_demo_setup import write
+    from openshift_security.artifacts import write_json_receipt as write
     lock, cli_lock, plan, context = prepare_context(args)
     if not args.apply:
         return {'runtime_build_prepared': True, 'cluster_changed': False}

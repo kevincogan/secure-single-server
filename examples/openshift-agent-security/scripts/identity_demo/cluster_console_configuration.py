@@ -3,12 +3,12 @@
 from copy import deepcopy
 import hashlib
 import json
-from uuid import UUID
 
 from cluster_console_resources import resource
+from driver_code_projection import code_items
 
 
-def configure(profile, driver, code, adapter, presenters, role_keys):
+def configure(profile, driver, code, adapter, role_keys):
     """Change only the reviewed console mounts, flags and fixed adapter route."""
     if (driver['metadata'].get('namespace') != profile.core_namespace
             or driver['metadata']['name'] != 'fixture-identity-driver'
@@ -18,15 +18,14 @@ def configure(profile, driver, code, adapter, presenters, role_keys):
             or any(not isinstance(v, str) or len(v) < 40 for v in role_keys.values())
             or len(set(role_keys.values())) != 2):
         raise ValueError('Exact installation resources and separate role keys required')
-    if not presenters or any(str(UUID(v)) != v for v in presenters):
-        raise ValueError('Explicit canonical presenter subjects required')
     desired_driver, desired_adapter = deepcopy(driver), deepcopy(adapter)
     desired_code = deepcopy(code)
     data = desired_code['data']
     config = json.loads(data['config.json'])
     if config['origin'] != profile.origin('fixture-identity-driver'):
         raise ValueError('Exact console origin required')
-    config.update(coordinator_enabled=True, presenter_subjects=presenters, stateless_login=True,
+    config.pop('presenter_subjects', None)
+    config.update(coordinator_enabled=True, stateless_login=True,
                   private_operator_api=True,
                   jira_view_url='https://'+profile.service_host('fixture-protected-adapter')+':8443',
                   jira_view_ca='/issuer-ca/service-ca.crt')
@@ -39,7 +38,7 @@ def configure(profile, driver, code, adapter, presenters, role_keys):
     code_volumes = [v for v in pod['volumes'] if v['name'] == 'code']
     if len(code_volumes) != 1 or code_volumes[0]['configMap']['name'] != code['metadata']['name']:
         raise ValueError('Exact current console code reference required')
-    code_volumes[0]['configMap']['name'] = name
+    code_volumes[0]['configMap'].update(name=name, items=code_items(data))
     names = {v['name'] for v in pod['volumes']}
     if names.intersection({'operator-tls', 'runtime-private'}):
         raise ValueError('Private listener is already configured; inspect prior receipt')
@@ -62,6 +61,39 @@ def configure(profile, driver, code, adapter, presenters, role_keys):
     secret = resource(profile, 'v1', 'Secret', 'fixture-console-role-credentials', profile.core_namespace,
                       type='Opaque', stringData=role_keys)
     return [desired_code, secret], [desired_adapter, desired_driver]
+
+
+def configure_fresh(profile, objects, role_keys):
+    """Include the final console resources before the initial application create."""
+    from cluster_console_resources import private_network
+
+    by_key = {(obj["kind"], obj["metadata"].get("namespace"), obj["metadata"]["name"]): obj
+              for obj in objects}
+    namespace = profile.core_namespace
+    driver = by_key["Deployment", namespace, "fixture-identity-driver"]
+    adapter = by_key["Deployment", namespace, "fixture-protected-adapter"]
+    isolation = by_key["NetworkPolicy", namespace, "fixture-isolation"]
+    name, = (v["configMap"]["name"] for v in driver["spec"]["template"]["spec"]["volumes"]
+             if v["name"] == "code")
+    code = by_key["ConfigMap", namespace, name]
+    created, changed = configure(profile, driver, code, adapter, role_keys)
+    network, isolation = private_network(profile, isolation)
+    created += network
+    changed.append(isolation)
+
+    def key(obj):
+        return obj["kind"], obj["metadata"].get("namespace"), obj["metadata"]["name"]
+
+    del by_key[key(code)]
+    for obj in changed:
+        by_key[key(obj)] = obj
+    for obj in created:
+        if key(obj) in by_key:
+            raise ValueError("Fresh console resource name collision")
+        by_key[key(obj)] = obj
+    receipt = {group: [{"kind": obj["kind"], "name": obj["metadata"]["name"]} for obj in values]
+               for group, values in (("created", created), ("configured", changed))}
+    return list(by_key.values()), receipt
 
 
 def adapter_code_update(profile,adapter,code,source,*,action_source=None):

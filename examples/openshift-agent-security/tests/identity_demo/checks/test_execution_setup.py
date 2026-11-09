@@ -248,8 +248,15 @@ def test_register_driver_preserves_profile_and_support_modules(monkeypatch: pyte
     assert desired['data']['installation-profile.json'] == 'synthetic-profile'
     assert desired['data']['support.py'] == '# synthetic support'
     assert 'active_profile' in desired['data']['deployment_profile.py']
-    for module in ('identity_demo_oidc.py', 'identity_demo_login_state.py'):
-        assert desired['data'][module] == (setup.ROOT/'scripts/identity_demo'/module).read_text()
+    assert desired['data']['identity_demo_browser_routes.py'] == (
+        setup.ROOT / 'scripts/identity_demo/identity_demo_browser_routes.py').read_text()
+    deployment = json.loads((tmp_path / 'deployment-desired.private.json').read_text())
+    volume, = deployment['spec']['template']['spec']['volumes']
+    projected = {item['key']: item['path'] for item in volume['configMap']['items']}
+    for module in ('__init__.py', 'oidc.py', 'login_state.py'):
+        key = 'openshift_security.' + module
+        assert projected[key] == 'openshift_security/' + module
+        assert desired['data'][key] == (setup.ROOT/'scripts/identity_demo'/projected[key]).read_text()
     assert result['persistent_state_and_credentials_preserved']
     assert all('--dry-run=server' in words for words, _ in events)
 
@@ -371,7 +378,7 @@ def rejection_review_harness(tmp_path, monkeypatch):
     import hashlib
     import subprocess
     import sys
-    from checks.test_run_store import rejected_dispatch
+    from checks.support.run_store import rejected_dispatch
     import identity_demo_execution_setup as setup
     from deployment_profile import LEGACY
     store, run, workload, proposal, claim = rejected_dispatch(tmp_path)

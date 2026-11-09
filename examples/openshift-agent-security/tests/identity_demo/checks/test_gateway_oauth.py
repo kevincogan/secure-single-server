@@ -26,7 +26,7 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAu
 from pydantic import AnyUrl
 import pytest
 
-import checks.test_components as components
+import checks.support.components as components
 from response_evidence import sanitized_error_result
 
 
@@ -321,7 +321,7 @@ class GatewayOAuthTests(unittest.TestCase):
         # Even possession of a valid session ID cannot turn a public metadata
         # GET into an unauthenticated tool call. A 400 is protocol rejection,
         # not evidence that JWT authorization was evaluated.
-        from checks.test_gateway import initialize, rpc
+        from checks.support.gateway import initialize, rpc
         token = components.login("viewer", self.credentials["viewer"])["access_token"]
         status, headers, _ = initialize(token)
         self.assertEqual(status, 200)

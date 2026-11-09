@@ -24,10 +24,11 @@ from typing import Iterator
 from urllib.parse import urlencode, urlparse
 
 import native_subject_boundary as subject
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from probe_native_identity import certificates
 from protected_listener import HOST, NAME, RESOURCE
-from identity_demo_oidc import valid_delegation
+from openshift_security.oidc import valid_delegation
 from execution_context import context_of
 from deployment_profile import active_profile
 
@@ -65,7 +66,7 @@ class DelegationAcceptance:
     def save(self, name: str, value: object) -> Path:
         """Create immutable private files; never put credentials in console output."""
         path = self.directory / (self.args.label + ".delegation-" + name)
-        native.private_write(path, value)
+        write_evidence(path, value)
         return path
 
     def supervisor_bootstrap(self) -> str:

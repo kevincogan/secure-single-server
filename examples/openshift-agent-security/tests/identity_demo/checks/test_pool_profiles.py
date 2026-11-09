@@ -2,115 +2,30 @@
 """Profile capacity is shared; immutable run scope and permissions are not."""
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, replace
+from dataclasses import replace
 import json
 import time
 from uuid import uuid4
 
 import pytest
 
-from checks.test_console import configured, operator
-from checks.test_console_preparer import reserve, finish
 from identity_demo_driver import Driver
-from identity_demo_execution_setup import context_template
 from identity_demo_run_store import Denied
-from deployment_profile import active_profile
 import identity_demo_pool_profiles as profiles
 
+from checks.support.console import operator
+from checks.support.console_preparer import reserve, finish
 
-def configuration():
-    p = active_profile()
-    base = {
-        "service_account": "fixture-openshell-sandbox",
-        "workload_image": "registry.example.test/workload@sha256:" + "a" * 64,
-        "supervisor_image": "ghcr.io/nvidia/openshell/supervisor@sha256:4ab2b970cdb02c7518ba4ccbbadb4861ae9a8d0b8770e5b160697f0453b0a8e4",
-        "policy": {
-            "version": 1,
-            "filesystem_policy": {"read_only": ["/workspace"], "read_write": ["/tmp"]},
-            "network_policies": {},
-        },
-        "trust_domain": p.trust_domain,
-        "issuer": p.delegation_issuer,
-        "tools": ["jira.issue.read", "jira.issue.create"],
-    }
-    return {
-        "schema_version": 2,
-        "profiles": [
-            dict(
-                base,
-                id="shared-triage-v1",
-                role="triage",
-                namespace=p.triage_namespace,
-                write_actions=["jira.issue.create"],
-                target=6,
-            ),
-            dict(
-                base,
-                id="read-only-v1",
-                role="reader",
-                namespace=p.reader_namespace,
-                tools=["jira.issue.read"],
-                write_actions=[],
-                target=2,
-            ),
-        ],
-        "workflows": [
-            {
-                "workflow": w,
-                "profile": profile,
-                "project": project,
-                "connector": "jira.create.v1",
-            }
-            for w, profile, project in (
-                ("cve", "shared-triage-v1", "TEST"),
-                ("cve", "read-only-v1", "TEST"),
-                ("incident-triage", "shared-triage-v1", "OPS"),
-                ("service-request", "shared-triage-v1", "SERVICE"),
-            )
-        ],
-    }
+from checks.support.pool_profiles import configuration, setup, prepare, apply_profiles
 
 
-def setup(tmp_path):
-    driver, client, _ = configured(tmp_path)
-    with driver.store.transaction() as db:
-        db.execute("UPDATE runs SET active=0")
-    worker = uuid4().hex
-    driver.console.heartbeat(worker, checked_at=int(time.time()))
-    response = client.post(
-        "/internal/operator/console/pool",
-        headers=operator(driver),
-        json={
-            "action": "profiles",
-            "configuration": configuration(),
-            "receipt_sha256": "b" * 64,
-        },
-    )
-    assert response.status_code == 200, response.text
-    return driver, client, worker
 
 
-def mapping(target):
-    c = replace(
-        context_template(target["role"], target["suffix"]), sandbox_id=str(uuid4())
-    )
-    return dict(
-        asdict(c),
-        workload=c.workload,
-        console_prepared=True,
-        profile_id=target["profile_id"],
-        profile_fingerprint=target["profile_fingerprint"],
-        native_policy_hash="c" * 64,
-    )
 
 
-def prepare(driver, client):
-    owner = uuid4().hex
-    r = reserve(driver, client, owner)
-    assert r and r["target"]["operation"] == "prepare"
-    context = mapping(r["target"])
-    assert finish(driver, client, owner, r, context).status_code == 200
-    return context
+
+
+
 
 
 def test_shared_capacity_supports_all_triage_workflows_and_freezes_each_run_scope(
@@ -229,6 +144,51 @@ def test_stale_context_is_revalidated_without_new_identity_and_policy_substituti
         ]["managed"]
         == 1
     )
+
+
+@pytest.mark.parametrize('passes', [True, False])
+def test_reviewed_quarantine_rechecks_only_the_current_unused_context(tmp_path, passes):
+    from starlette.testclient import TestClient
+
+    driver, client, _ = setup(tmp_path)
+    context = prepare(driver, client)
+    with driver.store.transaction() as db:
+        db.execute('UPDATE console_profile_contexts SET verified_until=0')
+    owner = uuid4().hex
+    failed = reserve(driver, client, owner)
+    assert finish(driver, client, owner, failed, None).status_code == 200
+    payload = {'action': 'recheck-quarantine', 'id': failed['id'], 'receipt_sha256': 'a' * 64}
+    path = '/internal/operator/console/pool'
+    assert client.post(path, headers=operator(driver), json=payload).status_code == 403
+    driver = Driver(replace(driver.config, private_operator_api=True,
+                            coordinator_secret='w' * 32, preparer_secret='p' * 32), driver.verify)
+    private = TestClient(driver.private_app)
+    preparer = {'Authorization': 'Bearer ' + driver.config.preparer_secret}
+    assert private.post(path, headers=preparer, json=payload).status_code == 403
+    assert private.post(path, headers=operator(driver),
+                        json=dict(payload, receipt_sha256='b' * 64)).status_code == 403
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        reservations = list(workers.map(lambda _: driver.console.queue_quarantine_recheck(
+            failed['id'], 'a' * 64, driver.config.contexts), range(4)))
+    assert len(set(reservations)) == 1
+    response = private.post(path, headers=operator(driver), json=payload)
+    assert response.status_code == 200 and response.json() == {'id': reservations[0]}
+    next_path = '/internal/operator/console/prepare/next'
+    retry = private.post(next_path, headers=preparer, json={'owner': owner}).json()['preparation']
+    assert retry['id'] == reservations[0] and retry['target']['previous'] == context
+    assert not driver.console.context_ready(context['workload'])
+    assert private.post(next_path, headers=preparer, json={'owner': uuid4().hex}).json()['preparation'] is None
+    with pytest.raises(Denied, match='preparation_binding'):
+        driver.console.finish_preparation(owner, retry['id'], dict(context, native_policy_hash='f' * 64), 'b' * 64)
+    for _ in range(2):
+        driver.console.finish_preparation(owner, retry['id'], context if passes else None, 'b' * 64)
+    assert driver.console.context_ready(context['workload']) is passes
+    assert private.post(path, headers=operator(driver), json=payload).status_code == 403
+    with driver.store.read_transaction() as db:
+        assert tuple(db.execute('SELECT state,receipt FROM console_preparations WHERE id=?',
+                                (failed['id'],)).fetchone()) == ('quarantined', 'a' * 64)
+        assert db.execute('SELECT count(*) FROM audit WHERE run_id=?', ('maintenance:' + retry['id'],)).fetchone()[0] == 2
+        assert not db.execute('SELECT 1 FROM runs WHERE workload=?', (context['workload'],)).fetchone()
 
 
 def test_profile_fairness_cap_quarantine_and_restart(tmp_path):
@@ -351,12 +311,6 @@ def test_malformed_profile_inputs_are_denied_without_type_confusion(fault):
         profiles.validate(value)
 
 
-def apply_profiles(driver, client, value):
-    return client.post(
-        "/internal/operator/console/pool",
-        headers=operator(driver),
-        json={"action": "profiles", "configuration": value, "receipt_sha256": "b" * 64},
-    )
 
 
 def test_idle_target_and_workflow_revision_preserves_existing_run_bindings(tmp_path):
@@ -617,7 +571,7 @@ def test_profile_cannot_misdescribe_registered_connector_authority(fault):
 
 
 def test_non_jira_profile_uses_reviewed_document_actions_and_scope(monkeypatch):
-    from checks.test_connector_contract import DOCUMENTS
+    from checks.support.connector_contract import DOCUMENTS
     from identity_demo_connector import ConnectorRegistry
     contract = replace(DOCUMENTS,
         profile_tools=("document.read", "document.publish"),
@@ -636,7 +590,7 @@ def test_non_jira_profile_uses_reviewed_document_actions_and_scope(monkeypatch):
 
 
 def test_profile_rejects_connector_without_reviewed_pool_actions(monkeypatch):
-    from checks.test_connector_contract import DOCUMENTS
+    from checks.support.connector_contract import DOCUMENTS
     from identity_demo_connector import ConnectorRegistry
     monkeypatch.setattr(profiles, "supported_connectors", lambda: ConnectorRegistry((DOCUMENTS,)))
     value = configuration()

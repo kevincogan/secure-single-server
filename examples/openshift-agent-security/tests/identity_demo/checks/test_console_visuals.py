@@ -287,7 +287,6 @@ def test_accessibility_and_motion_controls_preserve_navigation() -> None:
     html = console.shell(
         console.run_page(r, "csrf", {}, j)[0],
         live_url="/runs/fixture/live",
-        presentation=True,
     )
     assert "prefers-reduced-motion:reduce" in html and "data-motion-toggle" in html
     assert 'aria-controls="inspector-spire"' in html and 'aria-current="step"' in html

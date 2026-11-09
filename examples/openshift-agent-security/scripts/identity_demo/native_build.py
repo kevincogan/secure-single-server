@@ -66,7 +66,7 @@ def capture(words: list[str]) -> str:
 
 def prepare(args: argparse.Namespace) -> tuple[dict, dict]:
     """Validate archive/patch/lock/trust inputs before executing source tools."""
-    from identity_demo_setup import private_file, write
+    from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
 
     helper_source = Path(__file__).read_bytes()
     lock = read_json(RECIPES / "inputs.lock.json")
@@ -161,7 +161,7 @@ def runtime_recipe(lock: dict, plan: dict, role: str) -> str:
 def runtime_context(args: argparse.Namespace, lock: dict, plan: dict, role: str,
                     builder_id: str, *, export_file=None) -> Path:
     """Create an allowlisted binary/library/public-trust context, never private state."""
-    from identity_demo_setup import write
+    from openshift_security.artifacts import write_json_receipt as write
 
     context = args.output_dir / role
     context.mkdir(mode=0o700)
@@ -245,7 +245,7 @@ def compiler_cache(args: argparse.Namespace, lock: dict) -> str | None:
     Native binaries and source/patch checks are never reused or bypassed. This
     avoids a registry metadata dependency when the identical compiler is local.
     """
-    from identity_demo_setup import private_file
+    from openshift_security.artifacts import require_private_file as private_file
     filename = getattr(args, "compiler_cache_receipt", None)
     expected = getattr(args, "compiler_cache_sha256", None)
     if not filename:
@@ -279,7 +279,8 @@ def seed_dependency_cache(args: argparse.Namespace, lock: dict, builder_id: str)
     with --locked and compiles --frozen without networking. No Cargo credentials
     or host configuration are copied, and no prior sender binary is retained.
     """
-    from identity_demo_setup import private_file, in_checkout
+    from identity_demo_setup import in_checkout
+    from openshift_security.artifacts import require_private_file as private_file
     filename = getattr(args, "native_cache_receipt", None)
     expected = getattr(args, "native_cache_sha256", None)
     if not filename:
@@ -334,7 +335,7 @@ def seed_dependency_cache(args: argparse.Namespace, lock: dict, builder_id: str)
 
 def native_build(args: argparse.Namespace) -> dict:
     """Run the source build locally only when explicitly applied."""
-    from identity_demo_setup import write
+    from openshift_security.artifacts import write_json_receipt as write
 
     lock, plan = prepare(args)
     if not args.apply:
@@ -393,7 +394,7 @@ def repackage(args: argparse.Namespace) -> dict:
     A new receipt links to the exact verified compilation. Contract/patch changes
     require native-build; this cannot reuse a binary from another installation.
     """
-    from identity_demo_setup import private_file, write
+    from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
     from source_render import certificate_bundle
     from deployment_profile import read_profile
     original = private_file(args.native_build_receipt)

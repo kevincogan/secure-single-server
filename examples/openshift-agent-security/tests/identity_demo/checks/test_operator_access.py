@@ -300,7 +300,8 @@ def test_preparation_authentication_failure_has_no_mutation_checkpoint(
             access.OperatorAccessUnavailable("renewal required")
         ),
     )
-    reservation = {"id": "owned-reservation", "target": {}}
+    reservation = {"id": "owned-reservation", "target": {
+        "operation": "prepare", "automatic": True, "profile_id": "shared-triage-v1"}}
     with pytest.raises(access.OperatorAccessUnavailable):
         preparer.prepare_one(args, None, "owned", reservation)
     assert not (tmp_path / "owned-reservation/checkpoint.private.json").exists()

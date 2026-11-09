@@ -10,7 +10,7 @@ import json
 from typing import Callable
 
 import gateway_credential_route as route
-import probe_native_exchange as native
+import native_exchange as native
 from native_backend import NativeBackend
 
 

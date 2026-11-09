@@ -416,11 +416,14 @@
         "identity_demo_issue_view.py": {
           "$source": "scripts/identity_demo/identity_demo_issue_view.py"
         },
-        "identity_demo_oidc.py": {
-          "$source": "scripts/identity_demo/identity_demo_oidc.py"
+        "openshift_security.__init__.py": {
+          "$source": "scripts/identity_demo/openshift_security/__init__.py"
         },
-        "identity_demo_login_state.py": {
-          "$source": "scripts/identity_demo/identity_demo_login_state.py"
+        "openshift_security.oidc.py": {
+          "$source": "scripts/identity_demo/openshift_security/oidc.py"
+        },
+        "openshift_security.login_state.py": {
+          "$source": "scripts/identity_demo/openshift_security/login_state.py"
         },
         "identity_demo_backend_observation.py": {
           "$source": "scripts/identity_demo/identity_demo_backend_observation.py"
@@ -454,6 +457,27 @@
         },
         "provider-contract.json": {
           "$source": "runtime/provider-contract.json"
+        },
+        "identity_demo_browser_routes.py": {
+          "$source": "scripts/identity_demo/identity_demo_browser_routes.py"
+        },
+        "identity_demo_operator_routes.py": {
+          "$source": "scripts/identity_demo/identity_demo_operator_routes.py"
+        },
+        "identity_demo_protected_routes.py": {
+          "$source": "scripts/identity_demo/identity_demo_protected_routes.py"
+        },
+        "identity_demo_http.py": {
+          "$source": "scripts/identity_demo/identity_demo_http.py"
+        },
+        "identity_demo_admission_policy.py": {
+          "$source": "scripts/identity_demo/identity_demo_admission_policy.py"
+        },
+        "console.js": {
+          "$source": "scripts/identity_demo/console.js"
+        },
+        "console.css": {
+          "$source": "scripts/identity_demo/console.css"
         }
       },
       "immutable": true,

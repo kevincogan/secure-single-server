@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Inspect native-container SVIDs; retain raw Workload API responses privately."""
+"""Inspect native-container SVIDs and retain only public certificate evidence."""
 
 from __future__ import annotations
 
@@ -81,9 +81,7 @@ def probe(args: argparse.Namespace) -> dict:
         "-n", namespace_name, "exec", args.pod, "-c", args.container, "--",
         args.binary, "api", "fetch", "x509", "-socketPath", "/spiffe-workload-api/spire-agent.sock",
         "-timeout", "8s", "-output", "json"], capture_output=True, text=True, timeout=25)
-    # The JSON contains private key material. Never emit it or exception bodies.
-    private_write(directory / (args.label + ".response.private-json"), result.stdout)
-    private_write(directory / (args.label + ".stderr"), result.stderr)
+    # The response can contain private keys. Parse it only in memory.
     if result.returncode:
         return {"passed": False, "exit_code": result.returncode,
                 "no_identity": "no identity" in result.stderr.lower(), "raw_output_withheld": True}

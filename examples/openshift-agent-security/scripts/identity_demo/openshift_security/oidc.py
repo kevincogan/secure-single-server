@@ -179,11 +179,14 @@ def secret_matches(actual: str, expected: str) -> bool:
 class OIDCSession:
     """Concrete PKCE/session mechanism; no UI, Jira or agent execution imports."""
 
-    def __init__(self, config, store, verifier=None):
-        self.config, self.store = config, store
+    def __init__(self, config, store, verifier=None, *, role_map: dict[str, str]):
+        if (not role_map or len(set(role_map.values())) != len(role_map)
+                or not set(role_map.values()) <= store.connector.user_roles):
+            raise ValueError("One-to-one reviewed issuer role mapping required")
+        self.config, self.store, self.role_map = config, store, dict(role_map)
         self.verify = verifier or Verifier(config.issuer, config.issuer_service, config.issuer_ca)
         self.sessions, self.pending = {}, {}
-        from identity_demo_login_state import LoginState
+        from .login_state import LoginState
         self.login_state = LoginState()
 
     def end_browser_session(self, identifier: str, session: dict) -> None:
@@ -488,13 +491,25 @@ class OIDCSession:
         return response
 
 
-    @staticmethod
-    def role(claims: dict) -> str:
-        """Accept only one approved human role from the verified token."""
-        roles = set(claims.get("realm_access", {}).get("roles", [])) & {
-            "analyst",
-            "viewer",
-        }
-        if len(roles) != 1:
+    def role(self, claims: dict) -> str:
+        """Map exactly one verified issuer role to a reviewed connector role."""
+        access = claims.get("realm_access")
+        roles = access.get("roles") if isinstance(access, dict) else None
+        if not isinstance(roles, list) or any(not isinstance(role, str) for role in roles):
             raise Denied("user_role")
-        return roles.pop()
+        selected = self.role_map.keys() & roles
+        if len(selected) != 1:
+            raise Denied("user_role")
+        return self.role_map[selected.pop()]
+
+    async def delegated_run(self, token: str, *, binding_denial: str | None = None) -> tuple[dict, dict]:
+        """Authenticate a grant and bind it to its exact live run and original deadline."""
+        claims = await run_in_threadpool(self.verify, token, self.config.audience)
+        if not valid_delegation(claims):
+            raise Denied("delegation_contract")
+        run = self.store.identity_run(claims["sub"], claims["azp"])
+        if self.role(claims) != run["user_role"]:
+            raise Denied(binding_denial or "user_permission")
+        if claims["iat"] < run["not_before"] or claims["exp"] > run["expires"]:
+            raise Denied(binding_denial or "credential_lifetime")
+        return claims, run

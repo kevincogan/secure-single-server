@@ -154,7 +154,7 @@ def native_agents(cluster, config, output, credentials_for):
     from deployment_profile import active_profile
     from execution_context import resolve_context
     from identity_demo_runtime import guard
-    import probe_native_exchange as native
+    import native_exchange as native
     import yaml
 
     settings = strict_json(private(config['native_inputs']).read_bytes())

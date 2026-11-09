@@ -15,7 +15,7 @@ import pytest
 import native_backend as backend
 import native_run_lifecycle as lifecycle
 import native_delegation_acceptance as sender
-import probe_native_exchange as native
+import native_exchange as native
 import native_audit
 from run_binding import ReadRun
 
@@ -429,7 +429,7 @@ def test_cli_selects_existing_gateway_mode_explicitly(tmp_path, monkeypatch, cap
     receipt = tmp_path / 'gateway.private.json'
     receipt.write_text('{}')
     receipt.chmod(0o600)
-    arguments = ['probe_native_exchange.py']
+    arguments = ['native_exchange.py']
     for flag in ('kubeconfig', 'expected-server', 'credentials-file', 'cli', 'cli-config-dir', 'label', 'output-dir'):
         arguments += ['--' + flag, str(tmp_path) if flag == 'output-dir' else 'synthetic']
     if selection in ('persistent', 'missing-receipt'):
@@ -449,3 +449,37 @@ def test_cli_selects_existing_gateway_mode_explicitly(tmp_path, monkeypatch, cap
         assert result.value.code == 0 and len(calls) == 1
         assert calls[0].gateway_mode == selection
         assert calls[0].gateway_receipt == (str(receipt) if selection == 'persistent' else None)
+
+
+def test_preflight_contexts_reach_the_native_session_without_issuer_mutations(tmp_path, monkeypatch):
+    """Exercise orchestration setup, including the state extracted from preflight."""
+    from types import SimpleNamespace
+    class ReachedNativeSession(Exception):
+        pass
+    args = argparse.Namespace(output_dir=tmp_path, label='preflight', expected_server=native.SERVER,
+                              require_substitution_denial=False, investigate_substitution=False)
+    context = SimpleNamespace(sandbox_name=native.SANDBOX, sandbox_id=native.SANDBOX_ID,
+                              workload=native.WORKLOAD, provider_prefix=native.PREFIX)
+    monkeypatch.setenv('IDENTITY_DEMO_REGISTRATION_MODE', 'static')
+    monkeypatch.setattr(native, 'context_of', lambda _: context)
+    monkeypatch.setattr(lifecycle, 'require_unused_identity', lambda *args: None)
+    monkeypatch.setattr(native, 'guard', lambda _: (None, {'gateway_url':'https://gateway.example.test/mcp'},
+                                                  'https://issuer.example.test'))
+    monkeypatch.setattr(native, 'kube', lambda *args, **kwargs: {
+        'metadata':{'labels':native.LABELS}, 'spec':{'host':'gateway.example.test'}})
+    monkeypatch.setattr(native, 'admin_token', lambda *args: 'synthetic-token')
+    # Restore shared fixture endpoints even though run updates them during setup.
+    monkeypatch.setattr(native.components, 'KEYCLOAK', native.components.KEYCLOAK)
+    monkeypatch.setattr(native.components, 'ISSUER', native.components.ISSUER)
+    calls = []
+    def issuer(base, path, **kwargs):
+        calls.append((path, kwargs.get('method')))
+        return 200, []
+    monkeypatch.setattr(native, 'fixture_request', issuer)
+    def session(actual, credentials):
+        assert actual.concurrent_contexts == []
+        raise ReachedNativeSession()
+    monkeypatch.setattr(native, 'native_session', session)
+    with pytest.raises(ReachedNativeSession):
+        native.run(args)
+    assert len(calls) == 2 and all(method == 'GET' for _, method in calls)

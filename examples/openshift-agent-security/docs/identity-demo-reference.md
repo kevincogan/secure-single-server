@@ -1205,7 +1205,7 @@ applicable gates below before the corresponding customer handoff.
 | Diagnostic CLI | The pinned SPIRE CLI has recorded unresolved Critical/High dependency matches; it is optional and no binary is bundled here |
 | Provenance and licences | Establish Jira emulator/CVE image and management/native build provenance, applicable licences, notices and distribution rights |
 | Supported operation | Review the preview/development identity-exchange components and native patches; vendor support is not implied |
-| Installation handoff | Have an independent engineer follow the quickstart on the approved target and retain passing target-specific receipts |
+| Installation handoff | The demo owner reports the second-lab walkthrough complete and running. Attach the tested revision, image digests, platform versions and scenario receipts, and verify the final quickstart on the intended customer target |
 | Recovery | Verify data backups and recovery for all retained databases, keys and workspaces; application bundle cleanup is not a complete uninstall |
 
 The root Apache-2.0 licence covers source under its applicable notices. External
@@ -1259,7 +1259,7 @@ uses its authenticated issue view; no operator-host preview service is required.
 
 | Area | Verified boundary | Remaining gate |
 |---|---|---|
-| Identity and authorization | Attested native exchange, exact subject/certificate binding, protected reads, Analyst create, Viewer/Reader denial and project isolation | Independent security review and supported-version/preview decisions |
+| Identity and authorization | Attested native exchange, exact workload subject verification before credential release, protected reads, Analyst create, Viewer/Reader denial and project isolation. Final delegated access uses bearer tokens with a maximum lifetime of 30 seconds | Independent security review and supported-version/preview decisions. Acceptance of copied-token replay risk applies to the synthetic demo |
 | Application TLS | Opt-in cert-manager leaves, 30-day requests/seven-day renewal, new keys, native reload/SDS and strict live TLS checks; owned-authority overlap tested | Platform-approved issuer; full application CA rollover remains reviewed maintenance, and HA peer RPC is untested in one replica |
 | Cluster operation | Separate scoped workers/profiles/Leases, natural projected-token rotation and local-worker-off browser-path acceptance | Independent walkthrough from another customer's workstation |
 | Automatic preparation | Eight-ready/twelve-managed limits, concurrent preparation, subsequent run and retained history | Demand beyond the bounded pool can still wait |
@@ -1276,6 +1276,10 @@ them unless ownership and dependencies are independently confirmed.
 Raw receipts, logs, screenshots and database backups are private evidence, not
 part of the customer package. No evaluation result constitutes production
 certification.
+
+The optional SPIRE identity diagnostic retains public certificates and sanitized
+verification metadata. Earlier certificate-bound token results in
+[the verification record](verification.json) apply to their historical builds.
 
 ### Preserve an existing UI during runtime configuration
 
@@ -1595,8 +1599,8 @@ routing or approval reuse across backends is supported.
 
 ### Profile pool compatibility
 
-Profile mode is additive and opt-in. It does not reinterpret legacy contexts.
-The prepared contract fingerprints images, namespace, ServiceAccount, isolation
+Profile scheduling is the only replenishment mode. It never adopts a legacy
+context as a verified profile context. The prepared contract fingerprints images, namespace, ServiceAccount, isolation
 policy, workload permissions and identity/issuer inputs. A context must match
 that fingerprint and pass fresh native-identity/policy checks before allocation.
 
@@ -1617,6 +1621,30 @@ existing runs keep their original binding and deadline. A profile's security
 fingerprint cannot change while any non-retired context still uses it, including
 an ambiguous or quarantined reservation. Retire those contexts through the guarded
 path before approving a replacement profile. Do not edit SQLite records directly.
+
+For an installation using manual batches or fixed slots:
+
+1. While running the original release, resolve uncertain actions and incomplete
+   preparations through the documented recovery paths. Review quarantines against
+   their exact identities and receipts. Take a verified private backup of the
+   current state and retain the original images and configuration.
+2. In an idle maintenance window, use the reviewed upgrade path and run the
+   cluster console `automatic-disable` stage to record the legacy inventory.
+   Both preparation and allocation of legacy pool contexts are blocked during
+   migration. Fence both workers for the guarded unused-context retirement.
+3. Retire each unused context with the
+   [guarded retirement](#retire-unused-contexts-for-maintenance). Retire consumed contexts with
+   the existing `retire` operation and its closed-run/provider checks. Run
+   `automatic-disable` with one `--retired-context-file` per consumed context to
+   record independently verified absence. A missing receipt, active run,
+   unverified cleanup or unresolved context stops activation.
+4. Restore the scoped workers and run `automatic-enable --resume-retired-pool`
+   with the reviewed profile configuration and pinned workload image. Verify
+   readiness, historical owner access and a new run using a fresh identity.
+   For rollback, fence both workers and preserve the current database, audit
+   and retirement receipts. Use the reviewed rollback procedure and prepare
+   fresh contexts under the prior release; never restore an older backup over
+   newer run or uncertainty records.
 
 The compatibility field `project` holds one trusted resource scope per workflow
 mapping. Jira interprets it as a project key; another connector must validate its

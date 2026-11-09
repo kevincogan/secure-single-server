@@ -49,8 +49,8 @@ def main() -> None:
     os.environ.update(IDENTITY_DEMO_KEYCLOAK_URL=credentials["keycloak_url"],
                       IDENTITY_DEMO_GATEWAY_HOST=gateway_host)
     import identity_demo_fixture_http as components
-    from checks.test_gateway import initialize, rpc
-    from checks.test_gateway_oauth import gateway_request
+    from checks.support.gateway import initialize, rpc
+    from checks.support.gateway_oauth import gateway_request
 
     def count() -> int:
         """Read the synthetic backend, returning only its issue count."""

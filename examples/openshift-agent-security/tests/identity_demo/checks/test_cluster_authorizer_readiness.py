@@ -9,7 +9,7 @@ import pytest
 from deployment_profile import active_profile
 import identity_demo_gateway_observation as observation
 import probe_broker_discovery as shared
-import probe_native_exchange as native
+import native_exchange as native
 
 
 @pytest.fixture

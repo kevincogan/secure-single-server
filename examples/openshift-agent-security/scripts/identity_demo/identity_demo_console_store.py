@@ -126,6 +126,8 @@ class ConsoleStore:
               target TEXT NOT NULL, updated INTEGER NOT NULL, receipt TEXT NOT NULL DEFAULT '');
             CREATE UNIQUE INDEX IF NOT EXISTS console_one_preparation ON console_preparations((1))
               WHERE state IN ('preparing','blocked');
+            CREATE UNIQUE INDEX IF NOT EXISTS console_one_queued_recheck ON console_preparations((1))
+              WHERE state='queued';
             CREATE TABLE IF NOT EXISTS console_batches (
               id TEXT PRIMARY KEY, plan TEXT NOT NULL, state TEXT NOT NULL,
               run_rowid INTEGER NOT NULL, updated INTEGER NOT NULL,
@@ -190,7 +192,6 @@ class ConsoleStore:
                 phase, reason = 'preparing', 'presentation_preparing'
         return {"automatic_pool": automatic, "auto_prepare": bool(preparer and (preparer['updated'] > time.time() - 45 or preparation)),
                 "preparing_context": bool(preparation or (batch and batch['state'] == 'preparing')),
-                "presentation_hold": bool(batch and batch['state'] == 'holding'),
                 "enabled": enabled, "online": online, "ready": bool(ready), "busy": bool(busy or uncertain),
                 "running": running, "uncertain": uncertain, "recovery_required": recovery,
                 "phase": phase, "reason": 'recovery_required' if uncertain or recovery else reason,
@@ -219,14 +220,13 @@ class ConsoleStore:
         """Count immutable mappings once; consumed identities never become spares again."""
         query = ("""SELECT c.context FROM console_pool_items p JOIN console_contexts c ON c.workload=p.workload
             WHERE p.state IN ('preparing','ready','allocated','consumed','retiring','quarantined')"""
-            if warm.enabled(db) else 'SELECT context FROM console_contexts')
+            if warm.enabled(db) and profiles.configuration(db) else 'SELECT context FROM console_contexts')
         values = (*configured, *(json.loads(r[0]) for r in db.execute(query)))
         return list({c['workload']: c for c in values if c.get('console_prepared') is True}.values())
 
     @staticmethod
-    def pool_counts(db: sqlite3.Connection, contexts: list[dict], project: str,
-                    batch: sqlite3.Row | None = None) -> dict:
-        """Report unused capacity and the remaining planned sequence without authorizing it."""
+    def pool_counts(db: sqlite3.Connection, contexts: list[dict]) -> dict:
+        """Report unused contexts without authorizing them."""
         workloads = [c['workload'] for c in contexts]
         used = set()
         blocked = set()
@@ -239,32 +239,13 @@ class ConsoleStore:
                 + ','.join('?' for _ in selected) + ')', selected))
         unused = [c for c in contexts if c['workload'] not in used and c['workload'] not in blocked]
         result = {'mapped': len(contexts), 'consumed': len(used & {c['workload'] for c in contexts}),
-                  'unused': len(unused), 'contexts': [{**c, 'consumed': False} for c in unused],
-                  'batch': None}
-        if batch:
-            plan = json.loads(batch['plan'])
-            recent = list(db.execute('SELECT workload_role,project FROM runs WHERE rowid>?', (batch['run_rowid'],)))
-            slots = []
-            for target in plan['targets']:
-                def matches(c: dict) -> bool:
-                    return (c.get('workflow', 'cve'), c['role'], c.get('project', project)) == (
-                        target['workflow'], target['role'], target['project'])
-                available = sum(matches(c) for c in unused)
-                consumed = sum(r['workload_role'] == target['role'] and r['project'] == target['project'] for r in recent)
-                slots.append({**target, 'available': available, 'consumed': consumed,
-                              'remaining': max(0, target['planned'] - consumed)})
-            result['batch'] = {'id': batch['id'], 'phase': batch['state'], 'receipt_sha256': batch['receipt'],
-                               'plan': plan, 'slots': slots, 'browser_requested': bool(batch['requested_by']),
-                               'verification_state': batch['verification_state'],
-                               'filled': all(s['available'] >= s['target'] for s in slots),
-                               'sequence_covered': all(s['available'] >= s['remaining'] for s in slots)}
+                  'unused': len(unused), 'contexts': [{**c, 'consumed': False} for c in unused]}
         return result
 
     def pool_status(self, configured: tuple[dict, ...], project: str, *, synchronize: bool = True) -> dict:
         """Expose accounting; display-only callers do not transition lifecycle state."""
         with (self.store.transaction() if synchronize else self.store.read_transaction()) as db:
-            batch = db.execute("SELECT * FROM console_batches WHERE state IN ('preparing','holding')").fetchone()
-            result = self.pool_counts(db, self.pool_contexts(db, configured), project, batch)
+            result = self.pool_counts(db, self.pool_contexts(db, configured))
             result['all_contexts'] = self.pool_contexts(db, configured)
             result['automatic'] = warm.status(db, synchronize=synchronize)
             if result['automatic']:
@@ -281,140 +262,44 @@ class ConsoleStore:
 
     @staticmethod
     def pool_idle(db: sqlite3.Connection) -> None:
-        """Require the same durable idle and recovery boundary for all batch transitions."""
-        if (db.execute("SELECT 1 FROM console_preparations WHERE state IN ('preparing','blocked')").fetchone()
+        """Require the durable idle and recovery boundary for pool changes."""
+        if (db.execute("SELECT 1 FROM console_preparations WHERE state IN ('queued','preparing','blocked')").fetchone()
                 or db.execute("SELECT 1 FROM console_jobs WHERE state IN ('queued','running')").fetchone()
                 or db.execute('SELECT 1 FROM runs WHERE active<>0').fetchone()
                 or db.execute("SELECT 1 FROM actions WHERE state IN ('executing','unknown')").fetchone()
                 or ConsoleStore.recovery_required(db)):
             raise Denied('presentation_not_idle')
 
-    def verification_state(self, identifier: str, state: str) -> None:
-        """Record trusted preparer verification progress; no caller may mark a batch ready here."""
-        if state not in ('verifying', 'blocked'):
-            raise Denied('presentation_verification')
+    def pause_pool(self, receipt: str, retired: dict[str, str],
+                   configured: tuple[dict, ...], project: str) -> dict:
+        """Pause scheduling and record verified legacy retirement without deleting history."""
         with self.store.transaction() as db:
             self.pool_idle(db)
-            batch = db.execute("SELECT * FROM console_batches WHERE id=? AND state='preparing'", (identifier,)).fetchone()
-            if not batch or not batch['requested_by']:
-                raise Denied('presentation_binding')
-            db.execute('UPDATE console_batches SET verification_state=? WHERE id=?', (state, identifier))
-
-    def configure_automatic(self, enable: bool, receipt: str, retired: list[str],
-                            configured: tuple[dict, ...], project: str, *, initial_empty: bool = False) -> dict:
-        """Enable only through explicit authenticated idle operator migration."""
-        with self.store.transaction() as db:
-            self.pool_idle(db)
-            warm.configure(db, self.pool_contexts(db, configured), enable, receipt, retired, initial_empty=initial_empty)
+            warm.pause(db, self.pool_contexts(db, configured), receipt, retired)
         return self.pool_status(configured, project)
 
-    def configure_profile_pool(self, configuration: dict, receipt: str, configured: tuple[dict,...], project: str) -> dict:
+    def configure_profile_pool(self, configuration: dict, receipt: str,
+                               configured: tuple[dict, ...], project: str) -> dict:
         with self.store.transaction() as db:
             self.pool_idle(db)
-            profiles.configure(db,configuration,receipt)
-        return self.pool_status(configured,project)
+            if not profiles.configuration(db):
+                if (warm.enabled(db)
+                        or db.execute("SELECT 1 FROM console_batches WHERE state IN ('preparing','holding')").fetchone()
+                        or db.execute("SELECT 1 FROM console_pool_items WHERE state<>'retired'").fetchone()):
+                    raise Denied('legacy_contexts_not_retired')
+                retired = {row[0] for row in db.execute("SELECT workload FROM console_pool_items WHERE state='retired'")}
+                if any(context['workload'] not in retired for context in self.pool_contexts(db, configured)):
+                    raise Denied('legacy_contexts_not_retired')
+            profiles.configure(db, configuration, receipt)
+        return self.pool_status(configured, project)
 
     def context_ready(self, workload: str) -> bool:
         with self.store.read_transaction() as db:
             return warm.ready(db, workload)
 
-    def configure_pool(self, value: dict, configured: tuple[dict, ...], project: str,
-                       *, requested_by: str = "") -> dict:
-        """Install a bounded, additive presentation plan; never retire a previous context."""
-        if (not isinstance(value, dict) or set(value) != {'sequence', 'buffer', 'workflow_limits', 'global_limit'}
-                or not isinstance(value['sequence'], list) or not 1 <= len(value['sequence']) <= 12
-                or type(value['buffer']) is not int or not 0 <= value['buffer'] <= 2
-                or type(value['global_limit']) is not int or not 1 <= value['global_limit'] <= 12
-                or not isinstance(value['workflow_limits'], dict)):
-            raise Denied('presentation_plan')
-        with self.store.transaction() as db:
-            if warm.enabled(db):
-                raise Denied('automatic_pool_enabled')
-            existing = db.execute("SELECT * FROM console_batches WHERE state='preparing'").fetchone()
-            if requested_by and existing:
-                if not existing['requested_by']:
-                    raise Denied('presentation_operator_managed')
-                if existing['verification_state'] == 'blocked':
-                    self.pool_idle(db)
-                    db.execute("UPDATE console_batches SET verification_state='' WHERE id=?", (existing['id'],))
-            else:
-                self.pool_idle(db)
-                if existing:
-                    raise Denied('presentation_exists')
-                contexts = self.pool_contexts(db, configured)
-                slots = {(c.get('workflow', 'cve'), c['role']): c.get('project', project) for c in contexts}
-                workflows = {s[0] for s in slots}
-                limits = value['workflow_limits']
-                if (set(limits) != workflows or any(type(n) is not int or not 1 <= n <= value['global_limit'] for n in limits.values())):
-                    raise Denied('presentation_limits')
-                targets = {}
-                for item in value['sequence']:
-                    if (not isinstance(item, dict) or set(item) != {'workflow', 'role'}
-                            or not all(isinstance(item[k], str) for k in ('workflow', 'role'))):
-                        raise Denied('presentation_plan')
-                    key = (item['workflow'], item['role'])
-                    if key not in slots:
-                        raise Denied('presentation_slot')
-                    target = targets.setdefault(key, {'workflow': key[0], 'role': key[1], 'project': slots[key],
-                                                       'planned': 0, 'target': value['buffer']})
-                    target['planned'] += 1
-                    target['target'] += 1
-                snapshot = self.pool_counts(db, contexts, project)
-                unused = [c for c in snapshot['contexts'] if not c['consumed']]
-                desired = {w: sum(c.get('workflow', 'cve') == w for c in unused) for w in workflows}
-                for (workflow, role), target in targets.items():
-                    available = sum(c.get('workflow', 'cve') == workflow and c['role'] == role for c in unused)
-                    desired[workflow] += max(0, target['target'] - available)
-                if sum(desired.values()) > value['global_limit'] or any(desired[w] > limits[w] for w in workflows):
-                    raise Denied('presentation_capacity')
-                plan = {**value, 'targets': list(targets.values())}
-                identifier = uuid4().hex
-                highwater = db.execute('SELECT COALESCE(MAX(rowid),0) FROM runs').fetchone()[0]
-                db.execute("UPDATE console_batches SET state='superseded',updated=? WHERE state='holding'", (int(time.time()),))
-                db.execute("INSERT INTO console_batches(id,plan,state,run_rowid,updated) VALUES(?,?,'preparing',?,?)",
-                           (identifier, json.dumps(plan, sort_keys=True), highwater, int(time.time())))
-                if requested_by:
-                    db.execute('UPDATE console_batches SET requested_by=? WHERE id=?', (requested_by, identifier))
-        return self.pool_status(configured, project)
-
-    def finish_pool(self, identifier: str, receipt: str, configured: tuple[dict, ...], project: str,
-                    *, release: bool = False, browser_only: bool = False) -> dict:
-        """Seal verified preparation or release its refill hold; retain the batch ledger."""
-        self.worker_id(identifier)
-        if not isinstance(receipt, str) or not re.fullmatch('[a-f0-9]{64}', receipt):
-            raise Denied('presentation_receipt')
-        with self.store.transaction() as db:
-            self.pool_idle(db)
-            batch = db.execute("SELECT * FROM console_batches WHERE id=? AND state IN ('preparing','holding')", (identifier,)).fetchone()
-            if not batch or browser_only and (release or not batch['requested_by']):
-                raise Denied('presentation_binding')
-            if not release:
-                worker = db.execute('SELECT * FROM console_worker WHERE id=1').fetchone()
-                if (not worker or worker['phase'] != 'ready' or worker['updated'] <= time.time() - 20
-                        or worker['checked_at'] < time.time() - 90
-                        or (worker['catalog_expires'] and worker['catalog_expires'] <= time.time() + 600)):
-                    raise Denied('coordinator_not_ready')
-                snapshot = self.pool_counts(db, self.pool_contexts(db, configured), project, batch)
-                if not snapshot['batch']['filled']:
-                    raise Denied('presentation_incomplete')
-                limits = snapshot['batch']['plan']
-                if (snapshot['unused'] > limits['global_limit'] or any(
-                        sum(c.get('workflow', 'cve') == workflow for c in snapshot['contexts']) > maximum
-                        for workflow, maximum in limits['workflow_limits'].items())):
-                    raise Denied('presentation_capacity')
-                if batch['state'] == 'holding' and batch['receipt'] != receipt:
-                    raise Denied('presentation_replay')
-            if release:
-                db.execute("UPDATE console_batches SET state='released',release_receipt=?,updated=? WHERE id=?",
-                           (receipt, int(time.time()), identifier))
-            else:
-                db.execute("UPDATE console_batches SET state='holding',receipt=?,updated=? WHERE id=?",
-                           (receipt, int(time.time()), identifier))
-        return self.pool_status(configured, project)
-
     @staticmethod
     def reserve_preparation(db: sqlite3.Connection, contexts: list[dict], owner: str,
-                            target: dict) -> dict:
+                            target: dict, *, queued: bool = False) -> dict:
         """Reserve an unoccupied native name and the sole shared preparation lane atomically."""
         names = {c.get('sandbox_name') for c in contexts}
         for row in db.execute('SELECT target FROM console_preparations'):
@@ -435,82 +320,71 @@ class ConsoleStore:
             raise Denied('preparation_names')
         target = {**target, 'suffix': suffix}
         reservation = uuid4().hex
-        db.execute("INSERT INTO console_preparations(id,owner,state,target,updated) VALUES(?,?,'preparing',?,?)",
-                   (reservation, owner, json.dumps(target, sort_keys=True), int(time.time())))
+        db.execute("INSERT INTO console_preparations(id,owner,state,target,updated) VALUES(?,?,?,?,?)",
+                   (reservation, owner, 'queued' if queued else 'preparing', json.dumps(target, sort_keys=True), int(time.time())))
         return {'id': reservation, 'target': target}
 
+    def queue_quarantine_recheck(self, failure: str, receipt: str, configured: tuple[dict, ...]) -> str:
+        """Accept one reviewed retry, leaving the context quarantined until verification succeeds."""
+        self.worker_id(failure)
+        if not isinstance(receipt, str) or not re.fullmatch('[a-f0-9]{64}', receipt):
+            raise Denied('preparation_receipt')
+        with self.store.transaction() as db:
+            if not warm.enabled(db):
+                raise Denied('automatic_pool_disabled')
+            target = warm.reverification_target(db, failure, receipt)
+            for row in db.execute("SELECT id,state,target FROM console_preparations WHERE state IN ('queued','preparing')"):
+                existing = json.loads(row['target']).get('recheck_of')
+                if existing == failure:
+                    return row['id']
+                if row['state'] == 'queued' or existing is not None:
+                    raise Denied('quarantine_recheck_pending')
+            reserved = self.reserve_preparation(db, self.pool_contexts(db, configured), '', target, queued=True)
+            self.store.event(db, 'maintenance:'+reserved['id'], None, 'quarantine_recheck_requested',
+                             {'original_reservation': failure, 'receipt_sha256': receipt})
+            return reserved['id']
+
     def prepare_next(self, owner: str, configured: tuple[dict, ...], project: str) -> dict | None:
-        """Reserve one isolated automatic operation, or serial idle legacy preparation."""
+        """Reserve one isolated profile operation after readiness and recovery gates."""
         self.worker_id(owner)
         with self.store.transaction() as db:
             db.execute("INSERT INTO console_preparer VALUES(1,?) ON CONFLICT(id) DO UPDATE SET updated=excluded.updated", (int(time.time()),))
+            if not warm.enabled(db) or not profiles.configuration(db):
+                return None
             pending = db.execute("SELECT * FROM console_preparations WHERE state IN ('preparing','blocked')").fetchone()
             if pending:
                 if pending['owner'] != owner or pending['state'] == 'blocked':
                     return None
                 return {'id': pending['id'], 'target': json.loads(pending['target'])}
             worker = db.execute('SELECT * FROM console_worker WHERE id=1').fetchone()
-            if warm.enabled(db):
-                if (not worker or worker['updated'] <= time.time() - 20 or worker['phase'] != 'ready'
-                        or worker['checked_at'] < time.time() - 90
-                        or (worker['catalog_expires'] and worker['catalog_expires'] <= time.time() + 600)
-                        or self.recovery_required(db)
-                        or db.execute("SELECT 1 FROM actions WHERE state IN ('executing','unknown')").fetchone()):
-                    return None
-                target = warm.next_target(db)
-                if target is None:
-                    return None
-                reservation = self.reserve_preparation(db, self.pool_contexts(db, configured), owner, target)
-                warm.reserved(db, reservation)
-                return reservation
-            if warm.profiles.configuration(db):
-                return None  # Disabled profile scheduling must never fall back to legacy provisioning.
             if (not worker or worker['updated'] <= time.time() - 20 or worker['phase'] != 'ready'
+                    or worker['checked_at'] < time.time() - 90
                     or (worker['catalog_expires'] and worker['catalog_expires'] <= time.time() + 600)
                     or self.recovery_required(db)
-                    or db.execute("SELECT 1 FROM console_jobs WHERE state IN ('queued','running')").fetchone()
-                    or db.execute("SELECT 1 FROM runs WHERE active<>0").fetchone()
                     or db.execute("SELECT 1 FROM actions WHERE state IN ('executing','unknown')").fetchone()):
                 return None
-            contexts = self.pool_contexts(db, configured)
-            used = {r['workload']: r['id'] for r in db.execute('SELECT workload,id FROM runs ORDER BY rowid')}
-            batch = db.execute("SELECT * FROM console_batches WHERE state IN ('preparing','holding')").fetchone()
-            if batch:
-                if batch['state'] == 'holding':
-                    return None  # Presentation spares are spent without a refill between starts.
-                snapshot = self.pool_counts(db, contexts, project, batch)
-                plan = snapshot['batch']['plan']
-                for target in snapshot['batch']['slots']:
-                    if target['available'] >= target['target']:
-                        continue
-                    unused = [c for c in contexts if c['workload'] not in used]
-                    if (len(unused) >= plan['global_limit'] or sum(c.get('workflow', 'cve') == target['workflow'] for c in unused)
-                            >= plan['workflow_limits'][target['workflow']]):
-                        return None
-                    return self.reserve_preparation(db, contexts, owner,
-                        {k: target[k] for k in ('workflow', 'role', 'project')} | {'previous': None, 'batch_id': batch['id']})
-                return None  # Explicit live verification seals the fully prepared batch.
-            # Give a presenter a short opportunity to start an already prepared
-            # scenario before an automatic refill monopolizes the shared lane.
-            # This does not permit concurrent provisioning or delay recovery when
-            # every configured slot is exhausted. The grace is bounded, not a
-            # permanent preference that could starve exhausted scenarios.
-            if any(c['workload'] not in used for c in contexts):
-                last = db.execute("SELECT MAX(updated) FROM console_jobs WHERE state IN ('completed','failed')").fetchone()[0]
-                if last is not None and time.time() < last + 20:
-                    return None
-            slots = sorted({(c.get('workflow', 'cve'), c['role'], c.get('project', project)) for c in contexts})
-            for workflow, role, scope in slots:
-                group = [c for c in contexts if (c.get('workflow', 'cve'), c['role'], c.get('project', project)) == (workflow, role, scope)]
-                if any(c['workload'] not in used for c in group):
-                    continue
-                previous = group[-1]
-                job = db.execute('SELECT state,evidence FROM console_jobs WHERE run_id=?', (used[previous['workload']],)).fetchone()
-                if not job or job['state'] not in ('completed', 'failed') or json.loads(job['evidence']).get('cleanup_verified') is not True:
-                    continue
-                return self.reserve_preparation(db, contexts, owner,
-                    {'workflow': workflow, 'role': role, 'project': scope, 'previous': previous})
-            return None
+            recheck = db.execute("SELECT id,target FROM console_preparations WHERE state='queued'").fetchone()
+            if recheck:
+                target = json.loads(recheck['target'])
+                try:
+                    checked = warm.reverification_target(db, target['recheck_of'], target['failure_sha256'])
+                    if checked != {k: v for k, v in target.items() if k != 'suffix'}:
+                        raise Denied('quarantine_binding')
+                except Denied as error:
+                    db.execute("UPDATE console_preparations SET state='cancelled',updated=? WHERE id=?",
+                               (int(time.time()), recheck['id']))
+                    self.store.event(db, 'maintenance:'+recheck['id'], None, 'quarantine_recheck_cancelled',
+                                     {'reason': str(error)})
+                else:
+                    db.execute("UPDATE console_preparations SET state='preparing',owner=?,updated=? WHERE id=?",
+                               (owner, int(time.time()), recheck['id']))
+                    return {'id': recheck['id'], 'target': target}
+            target = warm.next_target(db)
+            if target is None:
+                return None
+            reservation = self.reserve_preparation(db, self.pool_contexts(db, configured), owner, target)
+            warm.reserved(db, reservation)
+            return reservation
 
     def finish_preparation(self, owner: str, reservation: str, context: dict | None, receipt: str) -> None:
         """Commit one attested context or retain an explicit recovery block; never reassign."""
@@ -522,6 +396,10 @@ class ConsoleStore:
             row = db.execute('SELECT * FROM console_preparations WHERE id=? AND owner=?', (reservation, owner)).fetchone()
             if not row:
                 raise Denied('preparation_owner')
+            target = json.loads(row['target'])
+            if (row['state'] == 'quarantined' and 'recheck_of' in target
+                    and context is None and row['receipt'] == receipt):
+                return
             if row['state'] == 'completed' and json.loads(row['target']).get('operation') == 'retire':
                 if row['receipt'] != receipt or context != json.loads(row['target'])['previous']:
                     raise Denied('preparation_replay')
@@ -534,7 +412,6 @@ class ConsoleStore:
                 return
             if row['state'] != 'preparing':
                 raise Denied('preparation_blocked')
-            target = json.loads(row['target'])
             if target.get('automatic') and target.get('operation') == 'retire':
                 if context is not None and context != target['previous']:
                     raise Denied('retirement_binding')
@@ -544,34 +421,20 @@ class ConsoleStore:
                 db.execute('UPDATE console_preparations SET state=?,receipt=?,updated=? WHERE id=?',
                            ('completed' if context is not None else 'quarantined', receipt, int(time.time()), reservation))
                 return
-            if target.get('automatic') and target.get('profile_id'):
-                if target['operation']=='verify':
-                    if context is not None and context != target['previous']:
-                        raise Denied('preparation_binding')
-                elif context is not None:
-                    if (context['sandbox_name'] != 'demo-s56-' + target['role'] + '-' + target['suffix']
-                            or db.execute('SELECT 1 FROM runs WHERE workload=?',(context['workload'],)).fetchone()):
-                        raise Denied('preparation_binding')
-                    db.execute('INSERT INTO console_contexts VALUES(?,?,?,?)',
-                               (context['workload'],json.dumps(context,sort_keys=True),context['namespace'],context['sandbox_name']))
-                warm.finish(db,row,context,receipt)
-                db.execute('UPDATE console_preparations SET state=?,receipt=?,updated=? WHERE id=?',
-                           ('completed' if context is not None else 'quarantined',receipt,int(time.time()),reservation))
-                return
-            if context is not None:
-                if (context['sandbox_name'] != 'demo-s56-' + target['role'] + '-' + target['suffix']
-                        or (context.get('workflow'), context['role'], context['project']) != (target['workflow'], target['role'], target['project'])
-                        or db.execute('SELECT 1 FROM runs WHERE workload=?', (context['workload'],)).fetchone()):
+            if target.get('automatic') is not True or not target.get('profile_id'):
+                raise Denied('legacy_preparation_requires_recovery')
+            if target['operation'] == 'verify':
+                if context is not None and context != target['previous']:
                     raise Denied('preparation_binding')
-                try:
-                    db.execute('INSERT INTO console_contexts VALUES(?,?,?,?)', (context['workload'], json.dumps(context, sort_keys=True),
-                        context['namespace'], context['sandbox_name']))
-                except sqlite3.IntegrityError as error:
-                    raise Denied('preparation_binding') from error
-            if target.get('automatic'):
-                warm.finish(db, row, context, receipt)
+            elif context is not None:
+                if (context['sandbox_name'] != 'demo-s56-' + target['role'] + '-' + target['suffix']
+                        or db.execute('SELECT 1 FROM runs WHERE workload=?',(context['workload'],)).fetchone()):
+                    raise Denied('preparation_binding')
+                db.execute('INSERT INTO console_contexts VALUES(?,?,?,?)',
+                           (context['workload'],json.dumps(context,sort_keys=True),context['namespace'],context['sandbox_name']))
+            warm.finish(db,row,context,receipt)
             db.execute('UPDATE console_preparations SET state=?,receipt=?,updated=? WHERE id=?',
-                       ('completed' if context is not None else 'quarantined' if target.get('automatic') else 'blocked', receipt, int(time.time()), reservation))
+                       ('completed' if context is not None else 'quarantined', receipt, int(time.time()), reservation))
 
     def enqueue(self, run: str, workflow: str) -> None:
         """Accept only a server-created run and keep shared native configuration single-flight."""

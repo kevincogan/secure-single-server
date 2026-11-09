@@ -16,7 +16,7 @@ from identity_demo_action_policy import DRIVER
 from boundary_flow import BoundaryFlow
 from permission_flow import PermissionFlow
 from gateway_evidence_flow import GatewayEvidenceFlow
-import probe_native_exchange as native
+import native_exchange as native
 from identity_demo_fixture_http import LoginForm
 
 CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"

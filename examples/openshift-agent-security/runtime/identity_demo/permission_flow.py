@@ -1,32 +1,26 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Real browser submission/consent and bounded native sandbox acceptance probes.
-
-Use only the already approved private credentials and owned execution context.
-This first gate does not claim the complete two-user/workload or write matrix.
-"""
+"""Execute an owned workflow through a supplied authenticated run session."""
 
 from __future__ import annotations
 
 import argparse
 from copy import deepcopy
 from html import unescape
-from http.cookiejar import CookieJar
 import json
 from pathlib import Path
 import subprocess
 from urllib.error import HTTPError
 from urllib.parse import urlencode, urlparse
-from urllib.request import HTTPCookieProcessor, Request, build_opener
+from urllib.request import Request
 
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from identity_demo_action_policy import DRIVER
-from identity_demo_keycloak_upstream import BASE
-from identity_demo_fixture_http import LoginForm, NoRedirect
 from deployment_profile import active_profile
 
 
 class PermissionFlow:
-    """Retain one real browser session and its immutable controlled execution run."""
+    """Prepare a proposal and execute only the effects authorized for its run."""
 
     workflow = "cve"
     project = "TEST"
@@ -48,112 +42,30 @@ class PermissionFlow:
                 or report.get('proposed_create', {}).get('project') != self.project):
             raise ValueError('Preserved assessment and exact project required')
 
-    def __init__(
-        self, args: argparse.Namespace, secrets_file: Path, username: str = "analyst"
-    ) -> None:
+    def __init__(self, args: argparse.Namespace, secrets_file: Path | None = None,
+                 username: str = "analyst", *, run_session=None) -> None:
         self.args, self.username = args, username
         if username not in ("analyst", "viewer"):
             raise ValueError("Approved demo user required")
-        self.passwords = json.loads(Path(args.credentials_file).read_text())
-        self.keys = json.loads(secrets_file.read_text())
-        self.client = build_opener(HTTPCookieProcessor(CookieJar()), NoRedirect())
+        if run_session is None:
+            if secrets_file is None:
+                raise ValueError("Private operator inputs required for browser qualification")
+            from browser_run_session import BrowserRunSession
+
+            run_session = BrowserRunSession(self, secrets_file)
+        self.run_session = run_session
         self.run_id = self.user = self.csrf = ""
         self.proposal: dict = {}
         self.results: list[dict] = []
-        from identity_demo_control_transport import configured_transport
-        self.operator_transport = configured_transport()
 
-    def http(
-        self,
-        url: str,
-        fields: dict | None = None,
-        value: dict | None = None,
-        operator: bool = False,
-    ) -> tuple[int, object, bytes]:
-        """Call fixed HTTPS driver/issuer URLs; never emit token-bearing responses."""
-        parsed = urlparse(url)
-        if parsed.scheme != "https" or parsed.hostname not in (
-            urlparse(DRIVER).hostname,
-            urlparse(BASE).hostname,
-        ):
-            raise ValueError("Approved HTTPS target required")
-        headers = {"Origin": DRIVER}
-        data = urlencode(fields).encode() if fields is not None else None
-        if value is not None:
-            data = json.dumps(value).encode()
-            headers["Content-Type"] = "application/json"
-        if operator:
-            if getattr(self, 'operator_transport', None):
-                if not url.startswith(DRIVER + '/internal/operator/') or fields is not None:
-                    raise ValueError('Exact JSON operator target required')
-                return self.operator_transport.request(url.removeprefix(DRIVER),
-                                                       self.keys['operator_secret'], data)
-            headers["Authorization"] = "Bearer " + self.keys["operator_secret"]
-        try:
-            response = self.client.open(
-                Request(url, data=data, headers=headers), timeout=12
-            )
-        except HTTPError as error:
-            response = error
-        with response:
-            body = response.read(131_073)
-            if len(body) > 131_072:
-                raise ValueError("Bounded driver response required")
-            return response.status, response.headers, body
+    def http(self, url, fields=None, value=None, operator=False):
+        return self.run_session.http(self, url, fields=fields, value=value, operator=operator)
 
     def authenticate(self) -> None:
-        """Establish a real browser session without allocating an execution run."""
-        status, headers, _ = self.http(DRIVER + "/login")
-        assert status == 302
-        status, headers, body = self.http(headers["Location"])
-        if status == 200:
-            form = LoginForm()
-            form.feed(body.decode())
-            status, headers, _ = self.http(
-                form.action,
-                fields={
-                    **form.fields,
-                    "username": self.username,
-                    "password": self.passwords[self.username],
-                    "credentialId": "",
-                },
-            )
-        assert status == 302 and headers["Location"].startswith(DRIVER + "/callback?")
-        status, _, _ = self.http(headers["Location"])
-        assert status == 303
-        status, _, body = self.http(DRIVER + "/")
-        assert status == 200
-        form = LoginForm()
-        form.feed(body.decode())
-        self.csrf = form.fields["csrf"]
+        self.run_session.authenticate(self)
 
     def login(self, context: object) -> dict:
-        """Authenticate, submit a CVE and release credentials only to coordination."""
-        self.authenticate()
-        status, headers, _ = self.http(
-            DRIVER + "/submit",
-            fields={"csrf": self.csrf, "role": context.role, **self.submission},
-        )
-        assert status == 303 and headers["Location"].startswith("/runs/")
-        self.run_id = headers["Location"].split("/")[-1]
-        status, _, body = self.http(
-            DRIVER + "/internal/operator/credentials/" + self.run_id, operator=True
-        )
-        assert status == 200
-        credential = json.loads(body)
-        assert credential["workload"] == context.workload
-        self.user = credential["user"]
-        native.private_write(
-            self.args.output_dir / (self.args.label + ".driver-association.json"),
-            {
-                "run_id": self.run_id,
-                "user": self.user,
-                "workload": context.workload,
-                "real_browser_login": True,
-                "expires_at": credential["expires_at"],
-            },
-        )
-        return {"access_token": credential["access_token"]}
+        return self.run_session.login(self, context)
 
     def read_program(self, resource: str) -> str:
         """Run a credential-free own-project read in the actual CVE image."""
@@ -168,7 +80,7 @@ class PermissionFlow:
         """Read authoritative backend state using the trusted adapter's held credential."""
         import os
         if os.environ.get('IDENTITY_DEMO_RUNTIME') == 'cluster':
-            result = self.control.request('backend-state/' + self.run_id)
+            result = self.run_session.control.request('backend-state/' + self.run_id)
             if type(result.get('total')) is not int or result['total'] < 0:
                 raise ValueError('Verified run-scoped backend count required')
             return result['total']
@@ -278,7 +190,7 @@ asyncio.run(run())""".replace(
                 ],
                 json_output=True,
             )
-            native.private_write(
+            write_evidence(
                 self.args.output_dir
                 / (self.args.label + ".permission-" + name + ".private.json"),
                 result,
@@ -345,7 +257,7 @@ asyncio.run(run())""".replace(
                 if not presentation_only:
                     call("successful_duplicate", arguments, True)
                 outcome = self.verify_created_outcome(created_key, context.workload)
-                native.private_write(self.args.output_dir / (self.args.label + ".created-outcome.summary.json"), outcome)
+                write_evidence(self.args.output_dir / (self.args.label + ".created-outcome.summary.json"), outcome)
             if not presentation_only:
                 changed = deepcopy(arguments)
                 changed["description"] += " Changed after consent."
@@ -445,29 +357,17 @@ asyncio.run(run())""".replace(
         }
 
     def progress(self, stage: str, evidence: dict | None = None) -> None:
-        """Optional trusted console hook; acceptance execution has no display side effects."""
+        self.run_session.progress(self, stage, evidence)
 
     def approve_proposal(self, report: dict) -> None:
-        """Keep the original authenticated approval flow overridable by a human-driven coordinator."""
-        status, _, displayed = self.http(DRIVER + "/runs/" + self.run_id)
-        assert status == 200 and report["assessment"] in unescape(displayed.decode())
-        assert self.proposal["digest"] in displayed.decode()
-        status, _, _ = self.http(
-            DRIVER + "/runs/" + self.run_id + "/approve",
-            fields={
-                "csrf": self.csrf,
-                "action": self.proposal["action_id"],
-                "digest": self.proposal["digest"],
-            },
-        )
-        assert status == 303
+        self.run_session.approve_proposal(self, report)
 
 
     def verify_created_outcome(self, key: str, workload: str) -> dict:
         """Independently match Jira fields and the durable attributed action/audit."""
         import os
         if os.environ.get('IDENTITY_DEMO_RUNTIME') == 'cluster':
-            result = self.control.request('backend-state/' + self.run_id).get('outcome')
+            result = self.run_session.control.request('backend-state/' + self.run_id).get('outcome')
             if (not isinstance(result, dict) or result.get('verified_issue_key') != key
                     or result.get('workload') != workload or result.get('user') != self.user
                     or result.get('project') != self.project
@@ -529,10 +429,5 @@ print(json.dumps({'durable_action_succeeded':True,'one_dispatch_claim':True,'app
         return summary
 
     def close(self) -> None:
-        """Cancel through the owner's CSRF-protected UI; never reset or reassign identity."""
-        if not self.run_id:
-            return
-        status, _, _ = self.http(
-            DRIVER + "/runs/" + self.run_id + "/cancel", fields={"csrf": self.csrf}
-        )
-        assert status == 303
+        if self.run_id:
+            self.run_session.close(self)

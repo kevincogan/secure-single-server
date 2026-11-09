@@ -145,28 +145,6 @@ def wait_controllers(args: argparse.Namespace, objects: list[dict]) -> None:
         time.sleep(5)
 
 
-def presenter_subject(objects: list[dict]) -> str:
-    """Expose only the synthetic Analyst ID from the fresh exchange-realm import.
-
-    This is setup metadata, not an authorization grant. The caller still must
-    explicitly configure the presenter allowlist during console registration.
-    """
-    from uuid import UUID
-    realms = [o for o in objects if o["kind"] == "Secret"
-              and o["metadata"]["name"] == "fixture-keycloak-upstream-realm"]
-    if len(realms) != 1:
-        raise ValueError("Exactly one fresh exchange-realm import required")
-    realm = json.loads(base64.b64decode(realms[0]["data"]["realm.json"], validate=True))
-    users = [u for u in realm.get("users", []) if u.get("username") == "analyst"]
-    if (len(users) != 1 or users[0].get("enabled") is not True
-            or "analyst" not in users[0].get("realmRoles", [])):
-        raise ValueError("Exact enabled synthetic Analyst required")
-    subject = users[0].get("id", "")
-    if not isinstance(subject, str) or str(UUID(subject)) != subject:
-        raise ValueError("Canonical fresh Analyst subject required")
-    return subject
-
-
 def connected_install(args: argparse.Namespace) -> dict:
     """Prepare a connected application using existing create-only mechanisms.
 
@@ -236,11 +214,11 @@ def connected_install(args: argparse.Namespace) -> dict:
     run("01-preflight", "preflight", ["--installation-config", str(config_path)])
     config_path = resolve_ingress(args, config_path)
     _, rendered = run("02-render", "render", ["--installation-config", str(config_path),
-        *(["--state-file", args.state_file] if args.state_file else [])])
+        *(["--state-file", args.state_file] if args.state_file else []),
+        *(["--render-console"] if getattr(args, "activate_cluster_runtime", False) else [])])
     bundle_path = rendered / "stack.private.json"
     bundle = read_json(bundle_path)
     objects = setup.validate(bundle)
-    suggested_presenter = presenter_subject(objects)
     if not bundle["native_build_contract_matches"]:
         return {"ready": False, "cluster_changed": False, "native_artifacts_ready": False,
                 "next_action": "Build/publish target-bound native images; retain 02-render state and trust",
@@ -266,14 +244,14 @@ def connected_install(args: argparse.Namespace) -> dict:
         run(name + "-plan", action, pinned)
         run(name + "-apply", action, [*pinned, "--apply"])
     result = finish_installation(args, env, stages, run, rendered, objects, cli,
-                                 suggested_presenter, inference_path)
+                                 inference_path)
     if getattr(args, 'activate_cluster_runtime', False):
         return activate_cluster_services(args, env, stages, rendered, cli, inference_path, result)
     return result
 
 
 def finish_installation(args, env, stages, run, rendered, objects, cli,
-                        suggested_presenter, inference_path, *, creation_ledger=None):
+                        inference_path, *, creation_ledger=None):
     """Complete verified installation stages; never replay application creation."""
     bundle_path = rendered / "stack.private.json"
     pinned = ["--bundle", str(bundle_path), "--bundle-sha256", setup.sha(bundle_path)]
@@ -289,11 +267,11 @@ def finish_installation(args, env, stages, run, rendered, objects, cli,
             '--managed-certificate-config', args.installation_config, '--verify-certificate-loading'])
     wait_controllers(args, objects)
     return finish_execution_setup(args, env, stages, rendered, objects, cli,
-        suggested_presenter, inference_path, dormant=dormant, creation_ledger=creation_ledger)
+        inference_path, dormant=dormant, creation_ledger=creation_ledger)
 
 
 def finish_execution_setup(args, env, stages, rendered, objects, cli,
-                           suggested_presenter, inference_path, *, dormant, creation_ledger=None):
+                           inference_path, *, dormant, creation_ledger=None):
     """Initialize execution and write the handoff after verified application/trust setup.
 
     The normal installer calls this only after readiness and trust verification.
@@ -336,7 +314,6 @@ def finish_execution_setup(args, env, stages, rendered, objects, cli,
         "gateway_ca": str(rendered / "runtime-gateway-ca.pem"),
         "catalog_credential": str(args.output_dir / "catalog-credential.private.json"),
         "creation_ledger": str(creation_ledger or args.output_dir / "07-install/creation-ledger.private.json"),
-        "suggested_presenter_subject": suggested_presenter,
         "inference_config": inference_path})
     paths = {
         "IDENTITY_DEMO_CONFIG": env["IDENTITY_DEMO_CONFIG"],
@@ -350,7 +327,6 @@ def finish_execution_setup(args, env, stages, rendered, objects, cli,
         "DEMO_CLI_CONFIG": str(args.output_dir / "cli-config"),
         "DEMO_CORE_NAMESPACE": profile.core_namespace,
         "DEMO_RUNTIME_CA": str(rendered / "runtime-gateway-ca.pem"),
-        "DEMO_PRESENTER_SUBJECT": suggested_presenter,
     }
     if inference_path:
         paths["DEMO_INFERENCE_CONFIG"] = inference_path
@@ -401,8 +377,9 @@ def resume_discovery(args, env, stages, run, config_path, cli, inference_path):
     bundle_path = setup.private_file(str(rendered / "stack.private.json"))
     bundle = read_json(bundle_path)
     state = read_json(setup.private_file(str(rendered / "installation-state.private.json")))
-    expected, _, _ = render(config_path, state)
-    if (expected["installation_profile"] != bundle.get("installation_profile")
+    expected, _, _ = render(config_path, state, **({"final_console": True} if bundle.get("fresh_console") else {}))
+    if (expected.get("fresh_console") != bundle.get("fresh_console")
+            or expected["installation_profile"] != bundle.get("installation_profile")
             or expected["objects"] != bundle.get("objects")
             or expected["native_ca_bundle_sha256"] != bundle.get("native_ca_bundle_sha256")
             or not expected["native_build_contract_matches"] or not bundle.get("native_build_contract_matches")):
@@ -438,7 +415,7 @@ def resume_discovery(args, env, stages, run, config_path, cli, inference_path):
                 "cluster_changed": False, "functional_scenarios_proven": False}
     run("09-discovery-apply", "discovery-access", [*pinned, "--apply"])
     result = finish_installation(args, env, stages, run, rendered, objects, cli,
-        presenter_subject(objects), inference_path, creation_ledger=ledger_path)
+        inference_path, creation_ledger=ledger_path)
     return {**result, "resumed_after_read_only_failure": True, "completed_mutations_replayed": False}
 
 
@@ -511,13 +488,13 @@ def activate_cluster_services(args, env, stages, rendered, cli, inference_path, 
     console('20-runtime-permissions', 'permissions')
     console('21-workload-policies', 'policies', ['--artifacts-file', env['IDENTITY_DEMO_ARTIFACTS']])
     console('22-realm-permissions', 'realm-permissions', [*ledger_args])
-    _, configuration = console('23-console-configuration', 'configure', [*ledger_args,
+    observed, configuration = console('23-console-configuration', 'configure', [*ledger_args,
         '--bundle', str(rendered/'stack.private.json'), '--bundle-sha256', setup.sha(rendered/'stack.private.json')])
-    # Configuration replaces the driver/adapter Pods. Observe that rollout
-    # before the next helper reads durable idle state through the driver.
-    wait_controllers(args, [o for o in read_json(rendered/'stack.private.json').get('objects', [])
-        if o['kind'] == 'Deployment' and o['metadata']['name'] in (
-            'fixture-identity-driver', 'fixture-protected-adapter')])
+    if not observed.get("observed_fresh_configuration"):
+        # Existing installations still take the guarded replacement path.
+        wait_controllers(args, [o for o in read_json(rendered/'stack.private.json').get('objects', [])
+            if o['kind'] == 'Deployment' and o['metadata']['name'] in (
+                'fixture-identity-driver', 'fixture-protected-adapter')])
     configuration_args = ['--console-configuration-receipt', str(configuration/'setup.summary.json'),
         '--console-configuration-sha256', setup.sha(configuration/'setup.summary.json')]
     _, gateway = stages.run('25-persistent-gateway', 'scripts/identity_demo/identity_demo_execution_setup.py', [
@@ -572,7 +549,7 @@ def cluster_runtime_inputs(args):
             or not IMAGE_REFERENCE.fullmatch(image)
             or not image.startswith('image-registry.openshift-image-registry.svc:5000/' + args.profile.core_namespace + '/')):
         raise ValueError('Verified owned cluster runtime publication required')
-    if (getattr(args, 'pool_mode', 'legacy') == 'profiles'
+    if (getattr(args, 'pool_mode', 'profiles') == 'profiles'
             and not getattr(args, 'pool_profile_configuration', None)
             and (not isinstance(getattr(args, 'workload_image', None), str)
                  or not IMAGE_REFERENCE.fullmatch(args.workload_image)

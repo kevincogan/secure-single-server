@@ -9,13 +9,12 @@ import json
 import subprocess
 
 from deployment_artifacts import IMAGE_REFERENCE, validate_artifacts
-from identity_demo_setup import private_file, write
+from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
 from source_render import read_json
 
 PROBES = {
     'jira_runtime': '''import os
-# Imports require configuration; no request is made and these are not credentials.
-os.environ.update(JIRA_SERVER="https://jira.invalid", JIRA_USER="synthetic-probe", JIRA_TOKEN="synthetic-probe-only")
+os.environ.update(JIRA_SERVER='https://jira.invalid', JIRA_USER='synthetic-probe', JIRA_TOKEN='synthetic-probe-only')
 from jira_emulator.app import create_app
 from jira_emulator.database import get_session_factory
 from jira_emulator.models.api_token import ApiToken
@@ -24,15 +23,18 @@ from sqlalchemy import update
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 import uvicorn
-assert callable(create_app) and callable(get_session_factory)
-assert callable(getJiraIssue) and callable(searchJiraIssuesUsingJql)
+if not (callable(create_app) and callable(get_session_factory)):
+    raise ValueError('Required maintenance or interface check failed')
+if not (callable(getJiraIssue) and callable(searchJiraIssuesUsingJql)):
+    raise ValueError('Required maintenance or interface check failed')
 ''',
     'cve_workload': '''from exploit_iq_commons.data_models.common import AnalysisType, PipelineMode, TargetPackage
 from exploit_iq_commons.data_models.info import ExploitIqInfo
 from exploit_iq_commons.data_models.input import ExploitIqInput, ImageInfoInput, ScanInfoInput, VulnInfo
 from vuln_analysis.data_models.output import CVSSOutput, ExploitIqEngineOutput, ExploitIqOutput, JustificationOutput, OutputPayload
 from vuln_analysis.utils.jira_handoff import build_jira_handoff_payload, handoff_to_jira
-assert callable(build_jira_handoff_payload) and callable(handoff_to_jira)
+if not (callable(build_jira_handoff_payload) and callable(handoff_to_jira)):
+    raise ValueError('Required maintenance or interface check failed')
 ''',
 }
 

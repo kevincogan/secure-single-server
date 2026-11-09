@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from probe_native_exchange import read_program, run as native_run
+from native_exchange import read_program, run as native_run
 from permission_flow import PermissionFlow
 
 

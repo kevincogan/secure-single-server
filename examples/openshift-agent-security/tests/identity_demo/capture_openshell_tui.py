@@ -21,7 +21,7 @@ import pyte
 from browser_permission_flow import CHROME
 from execution_context import resolve_context
 from identity_demo_runtime import guard
-import probe_native_exchange as native
+import native_exchange as native
 
 
 def run(args: argparse.Namespace) -> dict:

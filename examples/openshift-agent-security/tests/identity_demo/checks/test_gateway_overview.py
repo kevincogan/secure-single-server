@@ -68,7 +68,7 @@ def test_cluster_presentation_uses_actual_native_discovery_without_pod_exec(monk
 
 
 def test_native_client_embeds_the_same_bounded_projection_without_extra_calls():
-    from probe_native_exchange import read_program
+    from native_exchange import read_program
     program=read_program('https://resource.example/mcp')
     compile(program,'native-client','exec')
     assert 'def project_schemas' in program and '"published_tool_schemas":published_schemas' in program
@@ -78,7 +78,7 @@ def test_native_client_embeds_the_same_bounded_projection_without_extra_calls():
 def test_native_error_cannot_export_a_reflected_body_even_as_base64(monkeypatch,capsys):
     import base64
     import urllib.request
-    from probe_native_exchange import read_program
+    from native_exchange import read_program
     canary='synthetic-service-credential-canary'
     class Response:
         status=403

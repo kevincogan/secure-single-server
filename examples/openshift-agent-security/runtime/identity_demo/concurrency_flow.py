@@ -13,7 +13,8 @@ import yaml
 
 from identity_demo_action_policy import DRIVER
 from permission_flow import PermissionFlow
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from run_binding import ReadRun
 import identity_demo_fixture_http as components
 from deployment_profile import active_profile
@@ -84,7 +85,7 @@ class ConcurrencyFlow(PermissionFlow):
             profile['id'] = prefix
             profile['display_name'] = 'Isolated controlled concurrent context'
             filename = self.args.output_dir / (flow.args.label + '.profile.yaml')
-            native.private_write(filename, yaml.safe_dump(profile, sort_keys=False))
+            write_evidence(filename, yaml.safe_dump(profile, sort_keys=False))
             peer_exec(['provider', 'profile', 'lint', '-f', str(filename)])
             peer_exec(['provider', 'profile', 'import', '-f', str(filename)])
             record = {'context': context, 'prefix': prefix, 'profile': True, 'provider': False, 'attached': False}
@@ -196,7 +197,7 @@ print(json.dumps({'live_viewer_denial_audited':True}))""".replace('RUN', repr(vi
                    'two_users_and_two_analyst_triage_runs': True, 'viewer_denial_audited': True,
                    'verified_issue_key': key, 'outcome_checks': outcome,
                    'backend_before': before, 'backend_after': self.backend_count(), 'steps5_and6_complete': False}
-        native.private_write(self.args.output_dir / (self.args.label + '.concurrency.summary.json'), summary)
+        write_evidence(self.args.output_dir / (self.args.label + '.concurrency.summary.json'), summary)
         return summary
 
     def close(self) -> None:

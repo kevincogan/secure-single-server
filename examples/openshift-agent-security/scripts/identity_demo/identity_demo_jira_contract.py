@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 
 from identity_demo_connector import ConnectorContract, Denied, tool_arguments
@@ -53,17 +51,8 @@ def normalize_create(arguments: dict) -> dict:
 
 
 def canonical(arguments: dict) -> tuple[str, str]:
-    """Bind the normalized payload to the fixed tool/backend/schema contract."""
-    payload = json.dumps(
-        normalize_create(arguments),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    material = json.dumps(
-        [BACKEND, SCHEMA, TOOL, payload], separators=(",", ":"), ensure_ascii=False
-    )
-    return payload, hashlib.sha256(material.encode()).hexdigest()
+    """Keep the historical helper backed by the shared Jira contract."""
+    return JIRA.canonical(arguments)
 
 
 def create_call(

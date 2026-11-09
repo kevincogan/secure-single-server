@@ -11,8 +11,9 @@ import pytest
 
 import identity_demo_controller_identity as controller
 from deployment_profile import LEGACY
-from checks.test_execution_context import fixture
 from execution_context import resolve_context
+
+from checks.support.execution_context import fixture
 
 IMAGE = 'registry.example.test/native/supervisor@sha256:' + 'a' * 64
 
@@ -182,7 +183,7 @@ def test_controller_failure_is_terminal_even_when_counts_pending(tmp_path, monke
 
 
 def test_pending_registration_stops_before_native_setup_or_credential_release(tmp_path, monkeypatch):
-    import probe_native_exchange as probe
+    import native_exchange as probe
     _, path, _, policy, read = controller_fixture(tmp_path, monkeypatch)
     policy['status']['stats']['entriesToSet'] = 0
     now = clock(monkeypatch)

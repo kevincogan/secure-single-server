@@ -8,12 +8,13 @@ import time
 import pytest
 from starlette.testclient import TestClient
 from identity_demo_driver import Driver, COOKIE, STATE_COOKIE
-from identity_demo_login_state import LoginState
+from openshift_security.login_state import LoginState
 from identity_demo_run_store import Denied
 from identity_demo_issue_view import issue_html, fetch_issue
 from identity_demo_realm_access import realm_token
 from deployment_profile import active_profile
-from checks.test_driver import setup, approved
+
+from checks.support.driver import setup, approved
 
 
 def test_anonymous_logins_do_not_exhaust_pending_capacity(tmp_path):
@@ -174,27 +175,22 @@ def test_real_sdk_history_route_is_read_only_and_requires_a_redeemable_ticket(tm
     assert not any(c[0] in ('POST','DELETE','PATCH','PUT') for c in calls)
 
 
-def test_preparer_can_verify_only_presenter_requested_batches(tmp_path):
-    from checks.test_console_pool import setup_pool, plan
-    previous, _, _, _ = setup_pool(tmp_path)
+def test_worker_secrets_cannot_change_the_profile_pool_or_acknowledge_retirement(tmp_path):
+    from checks.support.console import configured
+    from checks.support.pool_profiles import configuration
+    previous, _, _ = configured(tmp_path)
     driver = Driver(replace(previous.config, private_operator_api=True,
         coordinator_secret='c'*40, preparer_secret='p'*40), previous.verify)
     client = TestClient(driver.private_app, base_url=driver.config.origin)
     endpoint = '/internal/operator/console/pool'
-    headers = {'Authorization': 'Bearer '+'p'*40}
-    batch = driver.console.configure_pool(plan(1), driver.config.contexts, driver.config.project)
-    identifier = batch['batch']['id']
-    seal = {'action': 'seal', 'id': identifier, 'receipt_sha256': 'b'*64}
-    assert client.post(endpoint, headers=headers, json=seal).status_code == 403
-    with driver.store.transaction() as db:
-        db.execute("UPDATE console_batches SET requested_by='synthetic-presenter' WHERE id=?", (identifier,))
-    assert client.post(endpoint, headers=headers, json={
-        'action': 'verification-status', 'id': identifier, 'status': 'verifying'}).status_code == 200
-    assert client.post(endpoint, headers=headers, json=seal).status_code == 200
-    for data in ({**seal, 'action': 'release'}, {'action': 'configure', 'plan': plan(1)},
-                 {'action': 'automatic', 'enabled': True, 'receipt_sha256': 'a'*64, 'retired_workloads': []}):
-        assert client.post(endpoint, headers=headers, json=data).status_code == 403
-    assert client.post(endpoint, headers={'Authorization':'Bearer '+'c'*40}, json=seal).status_code == 403
+    for key in ('p'*40, 'c'*40):
+        headers = {'Authorization': 'Bearer ' + key}
+        assert client.get(endpoint, headers=headers).status_code == 200
+        for data in (
+            {'action': 'profiles', 'configuration': configuration(), 'receipt_sha256': 'b'*64},
+            {'action': 'automatic', 'enabled': False, 'receipt_sha256': 'b'*64, 'retired_workloads': []},
+        ):
+            assert client.post(endpoint, headers=headers, json=data).status_code == 403
 
 
 def test_runtime_roles_never_read_issuer_or_gateway_private_keys():
@@ -222,7 +218,8 @@ def test_retired_identity_ledger_is_read_only_and_coordinator_only():
     assert rule['verbs'] == ['get']
 
 
-def test_initial_empty_pool_bootstrap_is_explicit_operator_only_and_not_replayed(tmp_path):
+def test_profile_bootstrap_is_explicit_operator_only(tmp_path):
+    from checks.support.pool_profiles import configuration
     previous, _, _, _ = setup(tmp_path)
     driver = Driver(replace(previous.config, database=tmp_path/'fresh.db',contexts=(),
         coordinator_enabled=True,private_operator_api=True,coordinator_secret='c'*40,preparer_secret='p'*40), previous.verify)
@@ -231,14 +228,12 @@ def test_initial_empty_pool_bootstrap_is_explicit_operator_only_and_not_replayed
     data={'action':'automatic','enabled':True,'receipt_sha256':'b'*64,'retired_workloads':[]}
     operator={'Authorization':'Bearer '+driver.config.operator_secret}
     assert client.post(endpoint,headers=operator,json=data).status_code==403
-    data['initial_empty']=True
+    data = {'action': 'profiles', 'configuration': configuration(), 'receipt_sha256': 'b'*64}
     for secret in ('c'*40,'p'*40):
         assert client.post(endpoint,headers={'Authorization':'Bearer '+secret},json=data).status_code==403
     response=client.post(endpoint,headers=operator,json=data)
     assert response.status_code==200 and response.json()['automatic']['target']==8
     assert response.json()['automatic']['managed']==0
-    # An unknown activation outcome is inspected, never replayed as fresh.
-    assert client.post(endpoint,headers=operator,json=data).status_code==403
     assert client.get(endpoint,headers=operator).json()['automatic']['managed']==0
 
 

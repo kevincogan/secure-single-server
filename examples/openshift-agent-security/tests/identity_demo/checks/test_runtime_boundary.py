@@ -31,7 +31,7 @@ class RejectTests(importlib.abc.MetaPathFinder):
    raise ImportError('test dependency in runtime')
 sys.meta_path.insert(0,RejectTests())
 import identity_demo_driver,identity_demo_console_worker,identity_demo_console_preparer
-import probe_native_exchange,identity_demo_fixture_http
+import native_exchange,identity_demo_fixture_http
 """
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -44,6 +44,6 @@ def test_runtime_source_list_excludes_automated_checks():
     assert len(manifest['files']) == len(set(manifest['files']))
     assert all((root/p).is_file() for p in manifest['files'])
     assert not any('/checks/' in p or p.startswith('tests/export/') or '/service-request-demo/tests/' in p for p in manifest['files'])
-    assert 'runtime/identity_demo/probe_native_exchange.py' in manifest['files']
+    assert 'runtime/identity_demo/native_exchange.py' in manifest['files']
     requirements = (root/'config/requirements-runtime.txt').read_text().lower()
     assert 'pytest==' not in requirements and 'pluggy==' not in requirements

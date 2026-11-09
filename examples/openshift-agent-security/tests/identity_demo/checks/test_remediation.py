@@ -19,7 +19,8 @@ import identity_demo_console_visuals as visuals
 import identity_demo_execution_setup as setup
 from identity_demo_console_store import safe_evidence
 from identity_demo_run_store import Denied
-from checks.test_console import configured
+
+from checks.support.console import configured
 
 
 @pytest.mark.parametrize("role", ["analyst", "viewer"])

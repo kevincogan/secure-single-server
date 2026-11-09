@@ -7,10 +7,11 @@ import time
 import pytest
 from starlette.testclient import TestClient
 
-from checks.test_driver import setup, approved
 from identity_demo_driver import Driver
 from deployment_profile import active_profile
 import identity_demo_backend_observation as observation
+
+from checks.support.driver import setup, approved
 
 
 def fixture(tmp_path):

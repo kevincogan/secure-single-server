@@ -67,7 +67,7 @@ def test_execution_failure_keeps_service_only_after_verified_cleanup(tmp_path: P
             pass
         def progress(self,*args: object) -> None:
             pass
-    monkeypatch.setattr(worker,'ConsoleCveFlow',Flow)
+    monkeypatch.setattr(worker,'GatewayEvidenceFlow',Flow)
     monkeypatch.setattr(worker.native,'run',lambda _:{'passed':False,'errors':[{'failure_kind':'ValueError'}],'cleanup_verified':cleanup})
     context={'sandbox_name':'demo-s56-triage-abc','sandbox_id':str(uuid4()),'role':'triage',
              'service_account':'fixture-openshell-sandbox','registration_name':'identity-demo-test-abc',
@@ -223,7 +223,7 @@ def test_tunnel_startup_failure_closes_only_a_proven_unused_run(tmp_path: Path, 
     def failed_start(_: object) -> dict:
         raise worker.native.NativeTunnelStartupError('No native command dispatched')
 
-    monkeypatch.setattr(worker, 'ConsoleCveFlow', Flow)
+    monkeypatch.setattr(worker, 'GatewayEvidenceFlow', Flow)
     monkeypatch.setattr(worker.native, 'run', failed_start)
     context = {'sandbox_name': 'demo-s56-reader-abc', 'sandbox_id': str(uuid4()), 'role': 'reader',
                'service_account': 'fixture-openshell-sandbox', 'registration_name': 'identity-demo-reader-abc',

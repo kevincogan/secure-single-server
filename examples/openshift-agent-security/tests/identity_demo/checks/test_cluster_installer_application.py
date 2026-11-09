@@ -7,9 +7,10 @@ import pytest
 
 from cluster_installer_application import authority
 from cluster_installer_resources import bootstrap, build_job
-from checks.test_cluster_installer_session import config
-from checks.test_installer_prerequisites import source
 from deployment_profile import LEGACY
+
+from checks.support.cluster_installer_session import config
+from checks.support.installer_prerequisites import source
 
 
 def proposed():
@@ -150,7 +151,7 @@ def test_managed_leaf_identity_and_validity_are_part_of_admission():
 
 @pytest.mark.parametrize("phase", ["build", "application"])
 def test_installer_phase_remount_preserves_private_checkpoint_permissions(phase):
-    from checks.test_cluster_installer_session import config
+    from checks.support.cluster_installer_session import config
 
     job = build_job(
         config(), "registry.example/installer@sha256:" + "a" * 64, phase=phase

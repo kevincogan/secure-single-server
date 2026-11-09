@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import pytest
 
-from probe_native_exchange import authorizer_ready
+from native_exchange import authorizer_ready
 
 
 def fixture() -> tuple[dict, dict]:

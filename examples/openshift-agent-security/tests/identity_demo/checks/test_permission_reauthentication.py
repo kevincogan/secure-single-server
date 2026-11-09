@@ -6,11 +6,13 @@ import pytest
 from identity_demo_action_policy import DRIVER
 from identity_demo_keycloak_upstream import BASE
 from permission_flow import PermissionFlow
+from browser_run_session import BrowserRunSession
 
 
 def test_existing_sso_session_completes_driver_callback() -> None:
     """A restart loses driver state but need not lose the browser's issuer session."""
     flow = object.__new__(PermissionFlow)
+    flow.run_session = object.__new__(BrowserRunSession)
     calls = []
     replies = iter([
         (302, {"Location": BASE + "/protocol/openid-connect/auth"}, b""),
@@ -32,6 +34,7 @@ def test_existing_sso_session_completes_driver_callback() -> None:
 def test_sso_requires_exact_driver_callback() -> None:
     """An unexpected issuer redirect cannot skip the driver's state/nonce validation."""
     flow = object.__new__(PermissionFlow)
+    flow.run_session = object.__new__(BrowserRunSession)
     replies = iter([
         (302, {"Location": BASE + "/protocol/openid-connect/auth"}, b""),
         (302, {"Location": "https://untrusted.example/callback?code=opaque"}, b""),

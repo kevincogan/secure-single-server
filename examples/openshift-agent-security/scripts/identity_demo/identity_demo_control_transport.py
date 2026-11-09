@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Thread-isolated, hostname-verified operator connections; mutations never replay."""
 import http.client
+import json
 import os
 import socket
 import threading
@@ -124,3 +125,41 @@ class OperatorTransport:
             if connection:
                 connection.close()
                 setattr(self.local, name, None)
+
+
+def driver_request(client, url, fields=None, value=None, *, operator_secret=None, operator_transport=None):
+    """Bounded fixed-origin transport shared by headless workers and qualification."""
+    from urllib.error import HTTPError
+    from urllib.parse import urlencode, urlparse
+    from urllib.request import Request
+    from identity_demo_action_policy import DRIVER
+    from identity_demo_keycloak_upstream import BASE
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in (
+        urlparse(DRIVER).hostname,
+        urlparse(BASE).hostname,
+    ):
+        raise ValueError("Approved HTTPS target required")
+    headers = {"Origin": DRIVER}
+    data = urlencode(fields).encode() if fields is not None else None
+    if value is not None:
+        data = json.dumps(value).encode()
+        headers["Content-Type"] = "application/json"
+    if operator_secret is not None:
+        if not url.startswith(DRIVER + '/internal/operator/') or fields is not None:
+            raise ValueError('Exact JSON operator target required')
+        if operator_transport:
+            return operator_transport.request(url.removeprefix(DRIVER),
+                                                   operator_secret, data)
+        headers["Authorization"] = "Bearer " + operator_secret
+    try:
+        response = client.open(
+            Request(url, data=data, headers=headers), timeout=12
+        )
+    except HTTPError as error:
+        response = error
+    with response:
+        body = response.read(131_073)
+        if len(body) > 131_072:
+            raise ValueError("Bounded driver response required")
+        return response.status, response.headers, body

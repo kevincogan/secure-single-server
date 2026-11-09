@@ -23,7 +23,7 @@ from source_render import read_json
 
 def inputs(args: argparse.Namespace) -> tuple[dict, DeploymentProfile, dict]:
     """Bind publication to a completed build, exact profile and public contexts."""
-    from identity_demo_setup import private_file
+    from openshift_security.artifacts import require_private_file as private_file
 
     path = private_file(args.native_build_receipt)
     if digest(path) != args.native_build_sha256:
@@ -96,7 +96,8 @@ def network_policy(profile: DeploymentProfile, configuration: dict, names: list[
 
 def publication(args: argparse.Namespace) -> dict:
     """Plan or submit new binary builds once; uncertain submissions stop for inspection."""
-    from identity_demo_setup import kube, owned, private_file, target, write
+    from identity_demo_setup import kube, owned, target
+    from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
 
     receipt, profile, contexts = inputs(args)
     return publish_contexts(args, receipt, profile, contexts)
@@ -104,7 +105,7 @@ def publication(args: argparse.Namespace) -> dict:
 
 def console_publication(args: argparse.Namespace) -> dict:
     """Reuse the same guarded binary-build path for the thin console image."""
-    from identity_demo_setup import private_file
+    from openshift_security.artifacts import require_private_file as private_file
     path = private_file(args.runtime_build_receipt)
     if digest(path) != args.runtime_build_sha256:
         raise ValueError('Exact completed console build receipt hash required')
@@ -140,7 +141,8 @@ def console_publication(args: argparse.Namespace) -> dict:
 
 
 def publish_contexts(args, receipt, profile, contexts):
-    from identity_demo_setup import kube, owned, private_file, target, write
+    from identity_demo_setup import kube, owned, target
+    from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
     args.profile = profile
     target(args)
     owned(kube(args, "get", "namespace", profile.core_namespace, "-o", "json"), profile)
@@ -202,7 +204,8 @@ def publish_contexts(args, receipt, profile, contexts):
 
 def submit(args: argparse.Namespace, profile: DeploymentProfile, context: dict, role: str, name: str) -> None:
     """Upload once using the binary API's supported name output, then read its exact Build."""
-    from identity_demo_setup import kube, owned, write
+    from identity_demo_setup import kube, owned
+    from openshift_security.artifacts import write_json_receipt as write
 
         # Never upload from an unverified directory after intervening preparation.
     for file, expected in context["sha256"].items():
@@ -227,7 +230,8 @@ def submit(args: argparse.Namespace, profile: DeploymentProfile, context: dict, 
 
 def resume_publication(args: argparse.Namespace) -> dict:
     """Resume confirmed unsent uploads; uncertain network failures require investigation."""
-    from identity_demo_setup import kube, owned, private_file, target, write, fingerprint
+    from identity_demo_setup import kube, owned, target, fingerprint
+    from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
 
     path = private_file(args.publication_plan)
     if digest(path) != args.publication_plan_sha256:
@@ -282,7 +286,8 @@ def resume_publication(args: argparse.Namespace) -> dict:
 
 def publication_status(args: argparse.Namespace) -> dict:
     """Read exact submitted builds, record immutable image digests and retire build egress."""
-    from identity_demo_setup import kube, owned, private_file, target, write, fingerprint
+    from identity_demo_setup import kube, owned, target, fingerprint
+    from openshift_security.artifacts import require_private_file as private_file, write_json_receipt as write
 
     path = private_file(args.publication_plan)
     if digest(path) != args.publication_plan_sha256:

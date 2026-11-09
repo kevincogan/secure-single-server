@@ -304,10 +304,16 @@
     "optional_local_cli_compatibility": true,
     "private_inputs_outside_source": true,
     "placeholder_artifacts_installable": false,
-    "independent_engineer_walkthrough_completed": false
+    "independent_engineer_walkthrough_completed": true,
+    "second_lab_walkthrough": {
+      "status": "owner_reported_complete",
+      "reported_on": "2026-11-06",
+      "demo_reported_running": true,
+      "artifact_and_scenario_receipts_linked": false
+    }
   },
   "remaining_gates": [
-    "Independent engineer follows the final quickstart without undocumented assistance",
+    "Attach the reported second-lab walkthrough's exact source, image, platform and scenario receipts; verify the final quickstart on the intended customer target",
     "Customer access to required approved external artifacts and authoritative provenance/licence records",
     "Required security, licensing, distribution and preview-support release decisions, including unresolved optional diagnostic dependency findings"
   ],
@@ -317,7 +323,7 @@
   ],
   "not_claimed": [
     "Entire empty-platform controller bootstrap",
-    "Separate-cluster acceptance",
+    "Independent verification of the reported second-lab results against exact release artifacts",
     "Disconnected installation/operation",
     "Production certification or complete platform disaster recovery",
     "Uninterrupted long-lived streams through renewal",

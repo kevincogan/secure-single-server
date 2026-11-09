@@ -6,11 +6,12 @@ from uuid import uuid4
 
 import pytest
 
-from checks.test_source_render import config
 from source_render import render
 from deployment_profile import DeploymentProfile
 from cluster_console_configuration import configure,adapter_code_update
 from cluster_console_resources import private_network
+
+from checks.support.source_render import config
 
 
 def inputs(config):
@@ -26,7 +27,7 @@ def inputs(config):
 def test_private_listener_wiring_preserves_state_and_public_route(config):
     profile, driver, code, adapter = inputs(config)
     before = deepcopy((driver, code, adapter))
-    new, updated = configure(profile, driver, code, adapter, [str(uuid4())],
+    new, updated = configure(profile, driver, code, adapter,
                              {'coordinator_secret': 'c'*48, 'preparer_secret': 'p'*48})
     assert before == (driver, code, adapter)
     changed_adapter, changed_driver = updated
@@ -42,34 +43,122 @@ def test_private_listener_wiring_preserves_state_and_public_route(config):
                if any(e['name'] == 'JIRA_HISTORY_VIEW_ENABLED' for e in c['env'])]
     assert [c['name'] for c in enabled] == ['adapter-https']
     with pytest.raises(ValueError, match='already configured'):
-        configure(profile, changed_driver, new[0], changed_adapter, [str(uuid4())], new[1]['stringData'])
+        configure(profile, changed_driver, new[0], changed_adapter, new[1]['stringData'])
 
 
 def test_foreign_resources_and_reused_role_keys_are_refused(config):
     profile, driver, code, adapter = inputs(config)
     keys = {'coordinator_secret': 'c'*48, 'preparer_secret': 'c'*48}
-    with pytest.raises(ValueError): configure(profile, driver, code, adapter, [str(uuid4())], keys)
+    with pytest.raises(ValueError): configure(profile, driver, code, adapter, keys)
     keys['preparer_secret'] = 'p'*48
     adapter['metadata']['namespace'] = 'foreign'
-    with pytest.raises(ValueError): configure(profile, driver, code, adapter, [str(uuid4())], keys)
+    with pytest.raises(ValueError): configure(profile, driver, code, adapter, keys)
 
 
 def test_existing_context_and_permission_configuration_survives_private_listener_migration(config):
     profile, driver, code, adapter = inputs(config)
+    # Older driver deployments mounted the same ConfigMap without nested items.
+    old_mount = next(v['configMap'] for v in driver['spec']['template']['spec']['volumes']
+                     if v['name'] == 'code')
+    old_mount.pop('items')
     original = json.loads(code['data']['config.json'])
     original['contexts'] = [{'role': 'reader', 'workflow': 'cve', 'project': 'TEST',
                              'workload': 'spiffe://example.test/openshell/sandbox/'+str(uuid4())}]
     code['data']['config.json'] = json.dumps(original)
-    new, changed = configure(profile, driver, code, adapter, [str(uuid4())],
+    new, changed = configure(profile, driver, code, adapter,
                              {'coordinator_secret': 'c'*48, 'preparer_secret': 'p'*48})
     after = json.loads(new[0]['data']['config.json'])
-    updated_flags = {'coordinator_enabled', 'presenter_subjects', 'stateless_login',
+    updated_flags = {'coordinator_enabled', 'stateless_login',
                      'private_operator_api', 'jira_view_url', 'jira_view_ca'}
     assert {k: v for k, v in after.items() if k not in updated_flags} == {
         k: v for k, v in original.items() if k not in updated_flags}
     before_volumes = {v['name']: v for v in driver['spec']['template']['spec']['volumes']}
     after_volumes = {v['name']: v for v in changed[1]['spec']['template']['spec']['volumes']}
     assert all(after_volumes[k] == v for k, v in before_volumes.items() if k != 'code')
+    projected = {v['key']: v['path'] for v in after_volumes['code']['configMap']['items']}
+    assert projected['openshift_security.oidc.py'] == 'openshift_security/oidc.py'
+    assert set(projected) == set(new[0]['data'])
+
+
+def test_fresh_bundle_matches_the_guarded_console_transition(config):
+
+    base, state, _ = render(config)
+    fresh, private, _ = render(config, state, final_console=True)
+    profile = DeploymentProfile.from_dict(base['installation_profile'])
+    objects = {(o['kind'], o['metadata']['name']): o for o in base['objects']}
+    driver = objects['Deployment', 'fixture-identity-driver']
+    adapter = objects['Deployment', 'fixture-protected-adapter']
+    isolation = objects['NetworkPolicy', 'fixture-isolation']
+    code_name, = [v['configMap']['name'] for v in driver['spec']['template']['spec']['volumes']
+                  if v['name'] == 'code']
+    created, updated = configure(profile, driver, objects['ConfigMap', code_name], adapter,
+                                 private['console_role_keys'])
+    network, updated_isolation = private_network(profile, isolation)
+    final = {(o['kind'], o['metadata']['name']): o for o in fresh['objects']}
+    for wanted in [*created, *updated, *network, updated_isolation]:
+        assert final[wanted['kind'], wanted['metadata']['name']] == wanted
+    assert ('ConfigMap', code_name) not in final
+    assert fresh['native_ca_bundle_sha256'] == base['native_ca_bundle_sha256']
+    assert render(config, private, final_console=True)[0] == fresh
+
+
+def test_fresh_console_stage_observes_exact_creation_without_patching(config, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import cluster_console_install as install
+    import cluster_console_operator as control
+    import identity_demo_execution_setup as execution
+    import identity_demo_setup as setup
+
+    bundle, _, _ = render(config, final_console=True)
+    profile = DeploymentProfile.from_dict(bundle['installation_profile'])
+    live = {}
+    for obj in bundle['objects']:
+        if obj['metadata'].get('namespace') != profile.core_namespace:
+            continue
+        key = obj['kind'], obj['metadata']['name']
+        value = deepcopy(obj)
+        value['metadata']['uid'] = '-'.join(key) + '-uid'
+        live[key] = value
+    bundle_path, ledger_path = tmp_path / 'bundle.private.json', tmp_path / 'ledger.private.json'
+    setup.write(bundle_path, bundle)
+    setup.write(ledger_path, {'bundle_sha256': setup.sha(bundle_path),
+        'installation_profile': profile.to_dict(), 'created': [
+            {'kind': obj['kind'], 'namespace': profile.core_namespace, 'metadata': obj['metadata'],
+             'fingerprint': setup.fingerprint(obj)} for obj in live.values()]})
+    args = SimpleNamespace(bundle=str(bundle_path), ledger=str(ledger_path), apply=True,
+                           bundle_sha256=setup.sha(bundle_path), console_ledger_sha256=setup.sha(ledger_path))
+
+    def read(_args, verb, kind, name, *words):
+        assert verb == 'get' and words == ('-n', profile.core_namespace, '-o', 'json')
+        return deepcopy(live[kind, name])
+
+    monkeypatch.setattr(setup, 'kube', read)
+    monkeypatch.setattr(execution, 'inspect_state', lambda _: {'rollback_quiescent': True})
+    receipt = install.configure(args, profile)
+    assert receipt['observed_fresh_configuration'] and receipt['updated'] == []
+    assert any(v['kind'] == 'Service' and v['name'] == 'fixture-identity-operator'
+               for v in receipt['created'])
+
+    # The operator must use the exact observed driver identity from this receipt.
+    path = tmp_path / 'console-configuration.private.json'
+    setup.write(path, receipt)
+    args.output_dir = tmp_path
+    args.console_configuration_receipt = str(path)
+    args.console_configuration_sha256 = setup.sha(path)
+    args.console_runtime_stage = 'status'
+    monkeypatch.setattr(control, 'private_request',
+                        lambda _args, _profile, suffix: {'online': True} if suffix == 'state' else {})
+    assert control.run(args, profile)['online'] is True
+    driver = live['Deployment', 'fixture-identity-driver']
+    original_uid = driver['metadata']['uid']
+    driver['metadata']['uid'] = 'substituted'
+    with pytest.raises(ValueError, match='Exact recorded operator target'):
+        control.run(args, profile)
+    driver['metadata']['uid'] = original_uid
+    live['Deployment', 'fixture-identity-driver']['spec']['replicas'] = 0
+    with pytest.raises(ValueError, match='changed after creation'):
+        install.configure(args, profile)
 
 
 def catalog_inputs(config):

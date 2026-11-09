@@ -155,19 +155,20 @@ def validate_context(value: dict, read: Callable[..., dict], *, contract: dict |
     ):
         raise ValueError("Separate tokenless workload ServiceAccount required")
     supervisor = read("pod", "os-supervisor-" + context.sandbox_id, context.namespace)
+    spec = supervisor["spec"]
+    containers = spec.get("containers", [])
     statuses = supervisor.get("status", {}).get("containerStatuses", [])
-    if (
-        supervisor["spec"].get("serviceAccountName") != context.service_account
-        or supervisor["spec"].get("automountServiceAccountToken") is not False
-        or len(supervisor["spec"].get("containers", [])) != 1
-        or supervisor["spec"]["containers"][0].get("name") != "supervisor"
-        or supervisor["spec"]["containers"][0].get("image") not in SUPERVISOR_IMAGES
-        or (contract is not None and supervisor['spec']['containers'][0].get('image') != contract['supervisor_image'])
-        or len(statuses) != 1
-        or not statuses[0].get("ready")
-        or "@sha256:" not in statuses[0].get("imageID", "")
-    ):
-        raise ValueError("Reviewed ready native supervisor required")
+    image = containers[0].get("image") if len(containers) == 1 else None
+    checks = {
+        "service_account": spec.get("serviceAccountName") == context.service_account,
+        "tokenless": spec.get("automountServiceAccountToken") is False,
+        "container": len(containers) == 1 and containers[0].get("name") == "supervisor",
+        "image": image in SUPERVISOR_IMAGES and (contract is None or image == contract["supervisor_image"]),
+        "ready": len(statuses) == 1 and bool(statuses[0].get("ready")),
+        "image_digest": len(statuses) == 1 and "@sha256:" in statuses[0].get("imageID", ""),
+    }
+    if not all(checks.values()):
+        raise ValueError("Reviewed ready native supervisor required (" + ', '.join(k for k, ok in checks.items() if not ok) + ")")
     if not any(v.get("uid") == sandbox["metadata"]["uid"]
                for v in supervisor["metadata"].get("ownerReferences", [])):
         raise ValueError("Exact native supervisor owner required")

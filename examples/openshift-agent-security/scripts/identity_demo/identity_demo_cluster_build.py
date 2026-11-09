@@ -22,7 +22,7 @@ from identity_demo_private_state import checkpoint
 
 class OwnedOperations:
     def __init__(self, args, profile, directory):
-        from identity_demo_setup import write
+        from openshift_security.artifacts import write_json_receipt as write
 
         self.args, self.profile, self.directory = args, profile, directory
         self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -210,7 +210,8 @@ def compiler_context(args, lock, plan):
 
 
 def start(args):
-    from identity_demo_setup import kube, write
+    from identity_demo_setup import kube
+    from openshift_security.artifacts import write_json_receipt as write
 
     args.engine = "cluster"
     lock, plan = prepare(args)
@@ -587,7 +588,8 @@ def docker_objects(profile, name, recipe=None):
 
 def submit_build(args, ops, name, context=None):
     """Journal once, then reconcile only that exact build identity."""
-    from identity_demo_setup import kube, write
+    from identity_demo_setup import kube
+    from openshift_security.artifacts import write_json_receipt as write
 
     path = args.output_dir / (name + ".submission")
     write(
@@ -780,14 +782,15 @@ def complete(args):
     Requires the original private output directory. Exclusive receipts prevent
     replay; interrupted mutations require the existing explicit identity review.
     """
-    from identity_demo_setup import write
+    from openshift_security.artifacts import write_json_receipt as write
     from native_build import runtime_context
 
     if not args.apply:
         raise ValueError(
             "Completion requires explicit --apply and original build directory"
         )
-    from identity_demo_setup import private_file, in_checkout
+    from identity_demo_setup import in_checkout
+    from openshift_security.artifacts import require_private_file as private_file
 
     root = Path(args.native_build_directory)
     if (

@@ -13,9 +13,10 @@ import identity_demo_setup as setup
 from cluster_console_install import prerequisite_observation
 from cluster_console_resources import permissions
 from cluster_installer_application import authority
-from checks.test_installer_prerequisites import source
-from checks.test_cluster_installer_session import config
 from deployment_profile import LEGACY
+
+from checks.support.installer_prerequisites import source
+from checks.support.cluster_installer_session import config
 
 
 def shared_policy():

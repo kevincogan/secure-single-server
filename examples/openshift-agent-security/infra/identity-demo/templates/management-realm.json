@@ -1,87 +1,9 @@
 {
   "$common": "realm-common.json",
   "roles": {
-    "realm": [
-      {
-        "id": "${id.2}",
-        "name": "identity-demo-runtime-admin",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "${id.1}",
-        "attributes": {
-          "identity-demo-owner": [
-            "${owner}"
-          ]
-        }
-      },
-      {
-        "id": "${id.3}",
-        "name": "offline_access",
-        "description": "${role_offline-access}",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "${id.1}",
-        "attributes": {}
-      },
-      {
-        "id": "${id.4}",
-        "name": "uma_authorization",
-        "description": "${role_uma_authorization}",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "${id.1}",
-        "attributes": {}
-      },
-      {
-        "id": "${id.5}",
-        "name": "analyst",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "${id.1}",
-        "attributes": {}
-      },
-      {
-        "id": "${id.6}",
-        "name": "identity-demo-runtime-user",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "${id.1}",
-        "attributes": {
-          "identity-demo-owner": [
-            "${owner}"
-          ]
-        }
-      },
-      {
-        "id": "${id.7}",
-        "name": "viewer",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "${id.1}",
-        "attributes": {}
-      },
-      {
-        "id": "${id.8}",
-        "name": "default-roles-identity-demo",
-        "description": "${role_default-roles}",
-        "composite": true,
-        "composites": {
-          "realm": [
-            "offline_access",
-            "uma_authorization"
-          ],
-          "client": {
-            "account": [
-              "view-profile",
-              "manage-account"
-            ]
-          }
-        },
-        "clientRole": false,
-        "containerId": "${id.1}",
-        "attributes": {}
-      }
-    ],
+    "realm": {
+      "$realm_ref": "identity-demo-realm-roles"
+    },
     "client": {
       "realm-management": [
         {
@@ -313,94 +235,9 @@
         }
       ],
       "identity-demo-ui": [],
-      "account": [
-        {
-          "id": "${id.31}",
-          "name": "manage-account-links",
-          "description": "${role_manage-account-links}",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        },
-        {
-          "id": "${id.33}",
-          "name": "view-profile",
-          "description": "${role_view-profile}",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        },
-        {
-          "id": "${id.34}",
-          "name": "manage-consent",
-          "description": "${role_manage-consent}",
-          "composite": true,
-          "composites": {
-            "client": {
-              "account": [
-                "view-consent"
-              ]
-            }
-          },
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        },
-        {
-          "id": "${id.35}",
-          "name": "view-groups",
-          "description": "${role_view-groups}",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        },
-        {
-          "id": "${id.36}",
-          "name": "view-consent",
-          "description": "${role_view-consent}",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        },
-        {
-          "id": "${id.37}",
-          "name": "manage-account",
-          "description": "${role_manage-account}",
-          "composite": true,
-          "composites": {
-            "client": {
-              "account": [
-                "manage-account-links"
-              ]
-            }
-          },
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        },
-        {
-          "id": "${id.38}",
-          "name": "delete-account",
-          "description": "${role_delete-account}",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        },
-        {
-          "id": "${id.39}",
-          "name": "view-applications",
-          "description": "${role_view-applications}",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "${id.32}",
-          "attributes": {}
-        }
-      ],
+      "account": {
+        "$realm_ref": "account-client-roles"
+      },
       "fixture-runtime-denied": []
     }
   },
@@ -592,34 +429,9 @@
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
-      "protocolMappers": [
-        {
-          "id": "${id.53}",
-          "name": "adapter-audience",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "consentRequired": false,
-          "config": {
-            "id.token.claim": "false",
-            "access.token.claim": "true",
-            "included.custom.audience": "http://fixture-protected-adapter.${core_namespace}.svc:8083/mcp",
-            "userinfo.token.claim": "false"
-          }
-        },
-        {
-          "id": "${id.54}",
-          "name": "adapter-https-audience",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "consentRequired": false,
-          "config": {
-            "id.token.claim": "false",
-            "access.token.claim": "true",
-            "included.custom.audience": "https://fixture-protected-adapter.${core_namespace}.svc:8443/mcp",
-            "userinfo.token.claim": "false"
-          }
-        }
-      ],
+      "protocolMappers": {
+        "$realm_ref": "fixture-other-service-mappers"
+      },
       "defaultClientScopes": [
         "service_account"
       ],
@@ -655,36 +467,9 @@
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
-      "protocolMappers": [
-        {
-          "id": "${id.56}",
-          "name": "runtime-audience",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "consentRequired": false,
-          "config": {
-            "id.token.claim": "false",
-            "access.token.claim": "true",
-            "included.custom.audience": "identity-demo-runtime",
-            "userinfo.token.claim": "false"
-          }
-        },
-        {
-          "id": "${id.57}",
-          "name": "runtime-role",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-realm-role-mapper",
-          "consentRequired": false,
-          "config": {
-            "id.token.claim": "false",
-            "access.token.claim": "true",
-            "claim.name": "realm_access.roles",
-            "jsonType.label": "String",
-            "multivalued": "true",
-            "userinfo.token.claim": "false"
-          }
-        }
-      ],
+      "protocolMappers": {
+        "$realm_ref": "fixture-runtime-denied-mappers"
+      },
       "defaultClientScopes": [
         "service_account"
       ],
@@ -718,36 +503,9 @@
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": false,
       "nodeReRegistrationTimeout": -1,
-      "protocolMappers": [
-        {
-          "id": "${id.59}",
-          "name": "runtime-audience",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "consentRequired": false,
-          "config": {
-            "id.token.claim": "false",
-            "access.token.claim": "true",
-            "included.custom.audience": "identity-demo-runtime",
-            "userinfo.token.claim": "false"
-          }
-        },
-        {
-          "id": "${id.60}",
-          "name": "runtime-role",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-realm-role-mapper",
-          "consentRequired": false,
-          "config": {
-            "id.token.claim": "false",
-            "access.token.claim": "true",
-            "claim.name": "realm_access.roles",
-            "jsonType.label": "String",
-            "multivalued": "true",
-            "userinfo.token.claim": "false"
-          }
-        }
-      ],
+      "protocolMappers": {
+        "$realm_ref": "fixture-runtime-operator-mappers"
+      },
       "defaultClientScopes": [
         "service_account"
       ],
@@ -1025,58 +783,9 @@
         }
       }
     ],
-    "org.keycloak.keys.KeyProvider": [
-      {
-        "id": "${id.125}",
-        "name": "aes-generated",
-        "providerId": "aes-generated",
-        "subComponents": {},
-        "config": {
-          "priority": [
-            "100"
-          ]
-        }
-      },
-      {
-        "id": "${id.126}",
-        "name": "rsa-generated",
-        "providerId": "rsa-generated",
-        "subComponents": {},
-        "config": {
-          "priority": [
-            "100"
-          ]
-        }
-      },
-      {
-        "id": "${id.127}",
-        "name": "hmac-generated-hs512",
-        "providerId": "hmac-generated",
-        "subComponents": {},
-        "config": {
-          "priority": [
-            "100"
-          ],
-          "algorithm": [
-            "HS512"
-          ]
-        }
-      },
-      {
-        "id": "${id.128}",
-        "name": "rsa-enc-generated",
-        "providerId": "rsa-enc-generated",
-        "subComponents": {},
-        "config": {
-          "priority": [
-            "100"
-          ],
-          "algorithm": [
-            "RSA-OAEP"
-          ]
-        }
-      }
-    ]
+    "org.keycloak.keys.KeyProvider": {
+      "$realm_ref": "identity-demo-key-providers"
+    }
   },
   "requiredActions": [
     {

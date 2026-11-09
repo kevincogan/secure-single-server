@@ -70,7 +70,8 @@ The optional [document proof](examples/document-agent/README.md) uses real
 Keycloak login and attested OpenShell transport with a separate protected backend.
 The [artifact-metadata example](examples/artifact-metadata-agent/README.md)
 demonstrates independent offline onboarding through the installed package.
-Start with the [public runtime contract](docs/security-runtime.md). These examples
+Start with the [BYOA quickstart](docs/byoa-quickstart.md), then the
+[public runtime contract](docs/security-runtime.md). These examples
 have separate setup and acceptance requirements from the three browser workflows.
 
 ## Verified scope and review

@@ -24,7 +24,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "runtime" / "identity_demo"))
 
 from execution_context import ExecutionContext, resolve_context, context_identity  # noqa: E402
-import probe_native_exchange as native  # noqa: E402
+import native_exchange as native  # noqa: E402
+from driver_code_projection import code_items, driver_code
+from openshift_security.artifacts import write_evidence
 from identity_demo_lab import LABELS  # noqa: E402
 from identity_demo_runtime import guard  # noqa: E402
 from identity_demo_spire_registration import CVE_IMAGE, prepare  # noqa: E402
@@ -98,12 +100,12 @@ def prepare_workspaces(args: argparse.Namespace) -> dict:
         absent = [n for n in names if not any(w.get('name') == n for w in records)]
         if args.apply:
             for name in absent:
-                native.private_write(args.output_dir / (name + '.pending.json'), {'workspace': name})
+                write_evidence(args.output_dir / (name + '.pending.json'), {'workspace': name})
                 execute(['workspace', 'create', '--name', name,
                          '--label', 'identity-demo-owner=' + profile.owner,
                          '--label', 'identity-demo-installation=' + profile.installation_id])
             after = native.inventory(execute(['workspace', 'list', '--output', 'json'], json_output=True), 'workspaces')
-            native.private_write(args.output_dir / 'native-workspaces.private.json', after)
+            write_evidence(args.output_dir / 'native-workspaces.private.json', after)
             require(all(any(w.get('name') == n
                     and w.get('labels', {}).get('identity-demo-owner') == profile.owner
                     and w.get('labels', {}).get('identity-demo-installation') == profile.installation_id
@@ -123,7 +125,7 @@ def provision(args: argparse.Namespace) -> dict:
         require(contract['role']==args.role and contract['namespace']==context.namespace,
                 'Compatible approved preparation profile required')
         policy_path = args.output_dir/'profile-policy.yaml'
-        native.private_write(policy_path,contract['policy'])
+        write_evidence(policy_path,contract['policy'])
         # The native CLI accepts JSON as YAML; retain the exact trusted payload.
     args.execution_context = context
     _, credentials, _ = guard(args)
@@ -156,9 +158,9 @@ def provision(args: argparse.Namespace) -> dict:
                 str(policy_path), "--detach",
                 "--restart-policy", "always", "--no-tty", "--output", "json", "--",
                 "python", "-u", "-c", "import time; time.sleep(86400)"], json_output=True)
-            native.private_write(args.output_dir / "native-create.private.json", made)
+            write_evidence(args.output_dir / "native-create.private.json", made)
         else:
-            native.private_write(args.output_dir / "native-existing.private.json", existing)
+            write_evidence(args.output_dir / "native-existing.private.json", existing)
         state = execute(["sandbox", "get", context.sandbox_name, "--output", "json"],
                         json_output=True)
         require(state["phase"] == "Ready", "Native sandbox did not become Ready")
@@ -167,7 +169,7 @@ def provision(args: argparse.Namespace) -> dict:
                     "Native recovery identity mismatch")
         context = replace(context, sandbox_id=state["id"])
         args.execution_context = context
-    native.private_write(args.output_dir / "native-context.pending.private.json", asdict(context))
+    write_evidence(args.output_dir / "native-context.pending.private.json", asdict(context))
     gateway = read(args, "statefulset", "fixture-openshell", native.NAMESPACE)
     owned(gateway)
     supervisor = read(args, "pod", "os-supervisor-" + context.sandbox_id, context.namespace)
@@ -175,12 +177,12 @@ def provision(args: argparse.Namespace) -> dict:
         from identity_demo_controller_identity import verify, verify_gateway
         verify_gateway(lambda k, n, ns=None: read(args, k, n, ns))
         location = args.output_dir / "context.private.json"
-        native.private_write(location, asdict(context))
+        write_evidence(location, asdict(context))
         require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns),
                                 contract=contract, wait_timeout=60) == context,
                 "Fresh controller-derived context validation failed")
         policy = verify(context, lambda k, n, ns=None: read(args, k, n, ns))
-        native.private_write(args.output_dir / "controller-policy.private.json", policy)
+        write_evidence(args.output_dir / "controller-policy.private.json", policy)
         return {"applied": True, "native_ready": True, "registration_exact": True,
                 "registration_mode": "controller", "namespace": context.namespace,
                 "sandbox_name": context.sandbox_name,
@@ -202,7 +204,7 @@ def provision(args: argparse.Namespace) -> dict:
                 and before["spec"]["spiffeID"] == obj["spec"]["spiffeID"]
                 and before["spec"]["className"] == obj["spec"]["className"],
                 "Only the existing gateway's exact registration may refresh")
-            native.private_write(args.output_dir / "gateway-registration-before.private.json", before)
+            write_evidence(args.output_dir / "gateway-registration-before.private.json", before)
             if before["spec"] == obj["spec"]:
                 continue
             operations = [
@@ -217,9 +219,9 @@ def provision(args: argparse.Namespace) -> dict:
                     'Missing shared gateway registration requires idle maintenance')
             native.kube(args, "create", "--dry-run=server", "-f", "-", "-o", "json", payload=obj)
             made = native.kube(args, "create", "-f", "-", "-o", "json", payload=obj)
-        native.private_write(args.output_dir / (name + ".private.json"), made)
+        write_evidence(args.output_dir / (name + ".private.json"), made)
     location = args.output_dir / "context.private.json"
-    native.private_write(location, asdict(context))
+    write_evidence(location, asdict(context))
     require(resolve_context(str(location), lambda k, n, ns=None: read(args, k, n, ns), contract=contract) == context,
             "Fresh native context validation failed")
     return {"applied": True, "native_ready": True, "registration_exact": True,
@@ -318,7 +320,7 @@ def diagnostic_access(args: argparse.Namespace) -> dict:
                 and all(current.get(k) == grant.get(k) for k in ('rules', 'roleRef', 'subjects')),
                 'Different existing diagnostic grant refused')
         inspected.append((grant, current))
-    native.private_write(args.output_dir / 'diagnostic-access.plan.private.json',
+    write_evidence(args.output_dir / 'diagnostic-access.plan.private.json',
         {'grants': grants, 'existing': [v for _, v in inspected if v]})
     removing = args.action == 'retire-diagnostic-access'
     changed, deferred = [], 0
@@ -328,7 +330,7 @@ def diagnostic_access(args: argparse.Namespace) -> dict:
                 continue
             uri = '/apis/rbac.authorization.k8s.io/v1/namespaces/' + context.namespace + '/' + (
                 'roles/' if grant['kind'] == 'Role' else 'rolebindings/') + name
-            native.private_write(args.output_dir / (grant['kind'] + '.delete.pending.json'), current)
+            write_evidence(args.output_dir / (grant['kind'] + '.delete.pending.json'), current)
             native.kube(args, 'delete', '--raw', uri, '-f', '-', payload={'apiVersion': 'v1',
                 'kind': 'DeleteOptions', 'preconditions': {'uid': current['metadata']['uid'],
                     'resourceVersion': current['metadata']['resourceVersion']}})
@@ -339,9 +341,9 @@ def diagnostic_access(args: argparse.Namespace) -> dict:
                 continue
             native.kube(args, 'create', '--dry-run=server', '-f', '-', '-o', 'json', payload=grant)
             if args.apply:
-                native.private_write(args.output_dir / (grant['kind'] + '.create.pending.json'), grant)
+                write_evidence(args.output_dir / (grant['kind'] + '.create.pending.json'), grant)
                 created = native.kube(args, 'create', '-f', '-', '-o', 'json', payload=grant)
-                native.private_write(args.output_dir / (grant['kind'] + '.created.private.json'), created)
+                write_evidence(args.output_dir / (grant['kind'] + '.created.private.json'), created)
                 changed.append({'kind': grant['kind'], 'uid': created['metadata']['uid']})
     return {'applied': args.apply, 'removal_requested': removing, 'changed': changed,
             'namespace': context.namespace, 'pod_name': pod_name, 'installer_user': user,
@@ -372,7 +374,7 @@ def stage(args: argparse.Namespace) -> dict:
     if not args.apply:
         return {"planned": True, "applied": False, "shared_run_volume_only": True,
                 "diagnostic_hashes": {name: hashlib.sha256(data).hexdigest() for name, data in files}}
-    native.private_write(args.output_dir / "pod-before.private.json", pod)
+    write_evidence(args.output_dir / "pod-before.private.json", pod)
     payload = diagnostic_payload(pod, item)
     uri = "/api/v1/namespaces/" + context.namespace + "/pods/" + pod_name + "/ephemeralcontainers"
     native.kube(args, "replace", "--raw", uri + "?dryRun=All", "-f", "-", payload=payload)
@@ -395,7 +397,7 @@ def stage(args: argparse.Namespace) -> dict:
         result = subprocess.run(["oc", "--kubeconfig", args.kubeconfig, "-n", context.namespace,
             "exec", "-i", pod_name, "-c", item["name"], "--", "python", "-c", program],
             input=data, capture_output=True, timeout=45)
-        native.private_write(args.output_dir / (destination + ".transfer.private.json"), {
+        write_evidence(args.output_dir / (destination + ".transfer.private.json"), {
             "exit": result.returncode, "stderr": result.stderr.decode(errors="replace")})
         require(result.returncode == 0, "Diagnostic transfer failed")
     evidence = probe(argparse.Namespace(kubeconfig=args.kubeconfig, namespace=context.namespace,
@@ -452,8 +454,8 @@ def prepare_console(args: argparse.Namespace) -> dict:
     audience = "spiffe://" + active_profile().trust_domain + "/openshell/gateway/" + active_profile().gateway_id
     desired = console_audience_mapper(current, active_profile().owner, audience)
     before = next(m for m in current["protocolMappers"] if m["id"] == desired["id"])
-    native.private_write(args.output_dir / "driver-audience-before.private.json", before)
-    native.private_write(args.output_dir / "driver-audience-desired.private.json", desired)
+    write_evidence(args.output_dir / "driver-audience-before.private.json", before)
+    write_evidence(args.output_dir / "driver-audience-desired.private.json", desired)
     changed = before != desired
     if args.apply and changed:
         path = "/admin/realms/identity-demo/clients/" + current["id"] + "/protocol-mappers/models/" + desired["id"]
@@ -553,15 +555,13 @@ def register_driver(args: argparse.Namespace) -> dict:
                   if v["name"] == "code")
     current = read(args, "configmap", before, native.NAMESPACE)
     owned(current)
-    native.private_write(args.output_dir / "deployment-before.private.json", deployment)
+    write_evidence(args.output_dir / "deployment-before.private.json", deployment)
     existing_config = json.loads(current["data"]["config.json"])
     config = existing_config if refresh else append_contexts(existing_config, contexts, args.workflow, args.project)
     # Preserve installed support modules and profile files when adding mappings.
     # Dropping deployment_profile.py breaks source-rendered driver startup.
     data = dict(current['data'])
-    updates = {name: (ROOT / "scripts" / "identity_demo" / name).read_text()
-               for name in ("identity_demo_driver.py", "identity_demo_oidc.py", "identity_demo_login_state.py", "identity_demo_run_store.py", "deployment_profile.py",
-                            "identity_demo_console.py", "identity_demo_console_store.py", "identity_demo_console_visuals.py", "identity_demo_warm_pool.py", 'identity_demo_connector.py', 'identity_demo_jira_contract.py', 'identity_demo_pool_profiles.py', 'deployment_artifacts.py')}
+    updates = driver_code(ROOT)
     public_sources = provider_sources()
     require('identity_demo_console_store.py' in data
             and console_model_contract(data['identity_demo_console_store.py'], data.get('provider-contract.json'))
@@ -569,7 +569,6 @@ def register_driver(args: argparse.Namespace) -> dict:
             and ('provider-contract.json' not in data
                 or load_provider(data['provider-contract.json']) == load_provider(public_sources['provider-contract.json'])),
             'Provider-configured source matching the installed console is required; do not deploy pristine templates')
-    updates.update({p.name:p.read_text() for p in (ROOT/"runtime").glob("agent_security*.py")})
     updates.update(public_sources)
     data.update(updates)
     if getattr(args, "console_enabled", False):
@@ -580,8 +579,6 @@ def register_driver(args: argparse.Namespace) -> dict:
                 entry["console_prepared"] = True
     if getattr(args, "console_disabled", False):
         config["coordinator_enabled"] = False
-    if getattr(args, 'presenter_subject', None):
-        config['presenter_subjects'] = list(args.presenter_subject)
     data["config.json"] = json.dumps(config)
     desired = json.loads(json.dumps(deployment))
     desired.pop("status", None)
@@ -597,20 +594,20 @@ def register_driver(args: argparse.Namespace) -> dict:
             "Versioned driver configuration already exists")
     for volume in desired["spec"]["template"]["spec"]["volumes"]:
         if volume["name"] == "code":
-            volume["configMap"]["name"] = name
+            volume["configMap"].update(name=name, items=code_items(data))
     native.kube(args, "create", "--dry-run=server", "-f", "-", "-o", "json", payload=obj)
     native.kube(args, "replace", "--dry-run=server", "-f", "-", "-o", "json", payload=desired)
-    native.private_write(args.output_dir / "configmap-desired.private.json", obj)
-    native.private_write(args.output_dir / "deployment-desired.private.json", desired)
+    write_evidence(args.output_dir / "configmap-desired.private.json", obj)
+    write_evidence(args.output_dir / "deployment-desired.private.json", desired)
     if args.apply:
         made = native.kube(args, "create", "-f", "-", "-o", "json", payload=obj)
-        native.private_write(args.output_dir / "configmap-created.private.json", made)
+        write_evidence(args.output_dir / "configmap-created.private.json", made)
         changed = native.kube(args, "replace", "-f", "-", "-o", "json", payload=desired)
-        native.private_write(args.output_dir / "deployment-changed.private.json", changed)
+        write_evidence(args.output_dir / "deployment-changed.private.json", changed)
         result = subprocess.run(["oc", "--kubeconfig", args.kubeconfig, "-n", native.NAMESPACE,
             "rollout", "status", "deployment/fixture-identity-driver", "--timeout=90s"],
             capture_output=True, text=True, timeout=100)
-        native.private_write(args.output_dir / "rollout.private.json", {
+        write_evidence(args.output_dir / "rollout.private.json", {
             "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
         require(result.returncode == 0, "Owned driver rollout failed; preserve rollback receipt")
     return {"applied": args.apply, "code_configmap": name, "new_contexts": len(contexts),
@@ -648,18 +645,18 @@ def update_adapter(args: argparse.Namespace) -> dict:
     for filename, value in (("deployment-before.private.json", deployment),
                             ("code-before.private.json", current), ("code-desired.private.json", obj),
                             ("deployment-desired.private.json", desired)):
-        native.private_write(args.output_dir / filename, value)
+        write_evidence(args.output_dir / filename, value)
     native.kube(args, "create", "--dry-run=server", "-f", "-", "-o", "json", payload=obj)
     native.kube(args, "replace", "--dry-run=server", "-f", "-", "-o", "json", payload=desired)
     if args.apply:
-        native.private_write(args.output_dir / "code-created.private.json",
+        write_evidence(args.output_dir / "code-created.private.json",
                              native.kube(args, "create", "-f", "-", "-o", "json", payload=obj))
-        native.private_write(args.output_dir / "deployment-changed.private.json",
+        write_evidence(args.output_dir / "deployment-changed.private.json",
                              native.kube(args, "replace", "-f", "-", "-o", "json", payload=desired))
         result = subprocess.run(["oc", "--kubeconfig", args.kubeconfig, "-n", native.NAMESPACE,
             "rollout", "status", "deployment/fixture-protected-adapter", "--timeout=90s"],
             capture_output=True, text=True, timeout=100)
-        native.private_write(args.output_dir / "rollout.private.json", {
+        write_evidence(args.output_dir / "rollout.private.json", {
             "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
         require(result.returncode == 0, "Owned adapter rollout failed; retain rollback receipt")
     return {"applied": args.apply, "code_configmap": name, "credentials_and_mounts_preserved": True}
@@ -734,7 +731,7 @@ asyncio.run(run())'''
                 {"summary": "Synthetic checkout investigation runbook", "description": "Existing synthetic follow-up: inspect deployment changes, request timings and connection-pool limits. Record observed evidence before proposing remediation. Do not change any production service."}]),
             "jira_origin": "https://" + active_profile().service_host("fixture-jira") + ":8080"}),
         capture_output=True, text=True, timeout=35)
-    native.private_write(args.output_dir / "project-provision.private.json", {
+    write_evidence(args.output_dir / "project-provision.private.json", {
         "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
     require(result.returncode == 0, "Synthetic project provisioning failed; private receipt retained")
     return json.loads(result.stdout)
@@ -893,7 +890,7 @@ def retire_registration(args: argparse.Namespace, context: ExecutionContext) -> 
             and "k8s:sa:" + context.service_account in selectors
             and "k8s:container-name:supervisor" in selectors,
             "Exact retired supervisor registration required")
-    native.private_write(args.output_dir / "registration-before.private.json", registration)
+    write_evidence(args.output_dir / "registration-before.private.json", registration)
     current = read(args, kind, context.registration_name, optional=True)
     if not current:
         return {"registration_absent": True}
@@ -935,7 +932,7 @@ def retire(args: argparse.Namespace) -> dict:
     if getattr(args, 'unused_retirement', False):
         from unused_context_retirement import eligible
         state = eligible(args, context)
-        native.private_write(args.output_dir / 'retirement-state.private.json', state)
+        write_evidence(args.output_dir / 'retirement-state.private.json', state)
         eligible = state.get('eligible') is True
     elif controller_identities() and os.environ.get('IDENTITY_DEMO_RUNTIME') == 'cluster':
         # Runtime has no Pod exec grant. Installer CLI retains its existing
@@ -944,13 +941,13 @@ def retire(args: argparse.Namespace) -> dict:
         from identity_demo_console_worker import Control
         keys = json.loads(private_path(args.driver_credentials_file).read_text())
         state = Control(keys['operator_secret']).request('prepare/retirement-check', {'workload': context.workload})
-        native.private_write(args.output_dir / 'retirement-state.private.json', state)
+        write_evidence(args.output_dir / 'retirement-state.private.json', state)
         eligible = state.get('eligible') is True
     else:
         result = subprocess.run(["oc", "--kubeconfig", args.kubeconfig, "-n", native.NAMESPACE,
             "exec", "-i", "deployment/fixture-identity-driver", "--", "python", "-c", program],
             input=json.dumps({"workload": context.workload}), capture_output=True, text=True, timeout=30)
-        native.private_write(args.output_dir / "retirement-state.private.json", {
+        write_evidence(args.output_dir / "retirement-state.private.json", {
             "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
         eligible = result.returncode == 0 and json.loads(result.stdout).get('eligible')
     require(eligible,
@@ -960,7 +957,7 @@ def retire(args: argparse.Namespace) -> dict:
         if getattr(args, 'disposable_workspace_receipt', None):
             from identity_demo_workspace_retention import verify
             disposable = verify(args, context, sandbox, read)
-        native.private_write(args.output_dir / "sandbox-before.private.json", sandbox)
+        write_evidence(args.output_dir / "sandbox-before.private.json", sandbox)
         with native.native_session(args, credentials) as execute:
             state = execute(["sandbox", "get", context.sandbox_name, "-o", "json"], json_output=True)
             require(state["id"] == context.sandbox_id, "Native deletion identity mismatch")
@@ -997,7 +994,7 @@ def retire(args: argparse.Namespace) -> dict:
                     continue
                 require(len(matching) == 1 and len(refs) == 1,
                         "Workspace requires exactly this Sandbox owner before preservation")
-                native.private_write(args.output_dir / (name + ".pvc-before.private.json"), pvc)
+                write_evidence(args.output_dir / (name + ".pvc-before.private.json"), pvc)
                 patch = [
                     {"op": "test", "path": "/metadata/uid", "value": pvc["metadata"]["uid"]},
                     {"op": "test", "path": "/metadata/resourceVersion", "value": pvc["metadata"]["resourceVersion"]},
@@ -1007,7 +1004,7 @@ def retire(args: argparse.Namespace) -> dict:
                                     "--type=json", "-p", json.dumps(patch), "-o", "json")
                 require(not after["metadata"].get("ownerReferences"), "Workspace retention failed")
                 retained.append({"name": name, "uid": pvc["metadata"]["uid"]})
-            native.private_write(args.output_dir / "retained-workspaces.private.json", retained)
+            write_evidence(args.output_dir / "retained-workspaces.private.json", retained)
             execute(["sandbox", "delete", context.sandbox_name])
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
@@ -1042,7 +1039,6 @@ def main() -> None:
     for name in ("kubeconfig", "expected-server", "credentials-file", "cli", "cli-config-dir", "output-dir"):
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--action", choices=("prepare-workspaces", "provision", "recover-provision", "diagnostic-access", "retire-diagnostic-access", "stage", "register-driver", "update-console", "update-adapter", "prepare-console", "provision-project", "inspect-state", "review-dispatch-rejection", "retire", "retire-unused", "gateway-install", "gateway-remove"), required=True)
-    parser.add_argument('--presenter-subject', action='append', help='Explicit IdP subject allowed to request the fixed presentation batch')
     parser.add_argument('--installer-user', help='Exact authenticated non-admin user for explicit diagnostic access only')
     parser.add_argument('--ca-file')
     parser.add_argument('--catalog-credential-file', help='Private current gateway discovery credential')
@@ -1084,12 +1080,12 @@ def main() -> None:
                   "diagnostic-access": diagnostic_access, "retire-diagnostic-access": diagnostic_access,
                   "register-driver": register_driver, "update-console": register_driver, "prepare-console": prepare_console, "provision-project": provision_project,
                   "inspect-state": inspect_state, "review-dispatch-rejection": review_dispatch_rejection, "update-adapter": update_adapter, "retire": retire, "retire-unused": retire_unused}[args.action](args)
-        native.private_write(args.output_dir / "setup.summary.json", result)
+        write_evidence(args.output_dir / "setup.summary.json", result)
         print(json.dumps(result))
     except Exception as error:
         import traceback
 
-        native.private_write(args.output_dir / "failure.private.json", {
+        write_evidence(args.output_dir / "failure.private.json", {
             "kind": type(error).__name__, "traceback": traceback.format_exc()})
         print(json.dumps({"passed": False, "kind": type(error).__name__, "details_withheld": True}))
         raise SystemExit(1) from None

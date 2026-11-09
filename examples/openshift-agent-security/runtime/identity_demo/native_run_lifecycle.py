@@ -9,7 +9,8 @@ import json
 import time
 from typing import Callable
 
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 from native_delegation_acceptance import DelegationAcceptance
 from run_binding import ReadRun, authorization
 from execution_context import context_of
@@ -61,7 +62,7 @@ def retire(args: argparse.Namespace, run: ReadRun, provider_id: str) -> dict:
             "name": LEDGER, "namespace": native.NAMESPACE, "labels": dict(native.LABELS)}, "data": data}
         native.kube(args, "create", "--dry-run=server", "-f", "-", "-o", "json", payload=manifest)
         saved = native.kube(args, "create", "-f", "-", "-o", "json", payload=manifest)
-    native.private_write(args.output_dir / (args.label + ".retired-ledger.private.json"), saved)
+    write_evidence(args.output_dir / (args.label + ".retired-ledger.private.json"), saved)
     try:
         require_unused_identity(args, run.workload)
     except RetiredIdentityError:
@@ -122,5 +123,5 @@ def check(args: argparse.Namespace, execute: Callable, human: dict, login: dict,
         raise ValueError("Detached native provider was not explicitly denied")
     summary = {"passed": True, "cases": cases, **retire(args, cancelled, provider_id),
                "full_submission_and_approval_app": False}
-    native.private_write(args.output_dir / (args.label + ".lifecycle.summary.json"), summary)
+    write_evidence(args.output_dir / (args.label + ".lifecycle.summary.json"), summary)
     return summary, made["spec"]

@@ -75,12 +75,13 @@ def test_initial_activation_waits_through_observation_but_stops_on_security_fail
 @pytest.mark.parametrize('resume,items,remaining,native,accepted', [
     (True, 8, 0, False, True), (True, 0, 0, False, False),
     (True, 8, 1, False, False), (True, 8, 0, True, False),
-    (False, 0, 0, False, True)])
+    (False, 0, 0, False, True), (False, 8, 0, False, False)])
 def test_explicit_resume_preserves_history_only_after_exact_retirement(
         tmp_path, monkeypatch, resume, items, remaining, native, accepted):
     import cluster_console_operator as control
     import identity_demo_execution_setup as execution
     import identity_demo_capacity as capacity
+    from checks.support.pool_profiles import configuration
     args = Namespace(output_dir=tmp_path, apply=True, resume_retired_pool=resume,
         console_runtime_stage='automatic-enable', console_configuration_receipt='configuration',
         console_configuration_sha256='a'*64, console_worker_receipt='workers', console_worker_sha256='b'*64)
@@ -96,6 +97,7 @@ def test_explicit_resume_preserves_history_only_after_exact_retirement(
     monkeypatch.setattr(control.setup, 'kube', lambda *a, **kw: {'items': [{}] if native else []})
     monkeypatch.setattr(capacity, 'namespace_capacity', lambda *a: None)
     monkeypatch.setattr(control, 'wait_ready', lambda *a: None)
+    monkeypatch.setattr(control, 'demo_configuration', lambda _: configuration())
     sent = []
     def request(a, p, suffix, data=None):
         assert suffix == 'pool'
@@ -107,8 +109,8 @@ def test_explicit_resume_preserves_history_only_after_exact_retirement(
     if accepted:
         result = control.run(args, LEGACY)
         assert result['automatic_pool_enabled'] and result['retired_history_preserved'] == resume
-        assert len(sent) == 1 and sent[0]['initial_empty'] is not resume
-        assert sent[0]['retired_workloads'] == []
+        assert len(sent) == 1 and sent[0]['action'] == 'profiles'
+        assert sent[0]['configuration'] == configuration()
     else:
         with pytest.raises(ValueError): control.run(args, LEGACY)
         assert not sent
@@ -140,3 +142,41 @@ def test_default_profiles_reject_unpinned_or_placeholder_workload(image, monkeyp
                         "registry.example.test/supervisor@sha256:" + "a" * 64)
     with pytest.raises(Denied, match="pool_profile"):
         control.demo_configuration(image)
+
+
+@pytest.mark.parametrize('remaining', [None, 'sandboxes.agents.x-k8s.io', 'pod', 'clusterstaticentries.spire.spiffe.io'])
+def test_legacy_retirement_acknowledges_only_independently_absent_resources(tmp_path, monkeypatch, remaining):
+    from dataclasses import asdict, replace
+    from uuid import uuid4
+
+    import identity_demo_controller_identity as identities
+    import identity_demo_execution_setup as execution
+    from cluster_console_operator import confirmed_legacy_retirements
+    from identity_demo_warm_pool import retirement_identity
+
+    context = replace(execution.context_template('triage', 'ret'), sandbox_id=str(uuid4()))
+    tmp_path.chmod(0o700)
+    filename = tmp_path / 'retired.private.json'
+    filename.write_text(json.dumps(asdict(context)))
+    filename.chmod(0o600)
+    checks = []
+
+    def read(args, kind, name, namespace=None, optional=False):
+        assert optional
+        checks.append((kind, name, namespace))
+        return {'present': True} if kind == remaining else None
+
+    monkeypatch.setattr(execution, 'read', read)
+    monkeypatch.setattr(identities, 'enabled', lambda: False)
+    args = Namespace(retired_context_file=[str(filename)])
+    if remaining:
+        with pytest.raises(ValueError, match='absence'):
+            confirmed_legacy_retirements(args, LEGACY)
+    else:
+        assert confirmed_legacy_retirements(args, LEGACY) == {context.workload: retirement_identity(asdict(context))}
+        assert checks == [
+            ('sandboxes.agents.x-k8s.io', context.resource_name, context.namespace),
+            ('pod', context.resource_name, context.namespace),
+            ('pod', 'os-supervisor-' + context.sandbox_id, context.namespace),
+            ('clusterstaticentries.spire.spiffe.io', context.registration_name, None),
+        ]

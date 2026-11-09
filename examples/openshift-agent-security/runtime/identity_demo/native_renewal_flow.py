@@ -14,7 +14,8 @@ from typing import Callable
 from deployment_profile import active_profile
 from native_delegation_acceptance import DelegationAcceptance
 from permission_flow import PermissionFlow
-import probe_native_exchange as native
+import native_exchange as native
+from openshift_security.artifacts import write_evidence
 
 
 def read_body_hash(run_id: str, project: str) -> str:
@@ -102,7 +103,7 @@ class NativeRenewalFlow(PermissionFlow):
                 "logs", "deployment/fixture-mcp-openshift-ai-inference", "-c", "istio-proxy",
                 "--since=10m", "--tail=2000"], capture_output=True, text=True, timeout=20)
             self.renewal_audit_sequence += 1
-            native.private_write(self.args.output_dir / (
+            write_evidence(self.args.output_dir / (
                 self.args.label + f".renewal-audit-{self.renewal_audit_sequence}.private.json"),
                 {"exit": response.returncode, "stdout": response.stdout, "stderr": response.stderr})
             if not response.returncode:
@@ -173,6 +174,6 @@ class NativeRenewalFlow(PermissionFlow):
             "supervisor_restarted": False, "operator_replay_used_as_native_proof": False,
             "backend_before": before, "backend_after": self.backend_count(), "writes_exercised": False,
             "scope": "Fresh native MCP sessions after JWT-SVID and access-token expiry; uninterrupted long-lived streams are unproven"}
-        native.private_write(self.args.output_dir / (self.args.label + ".native-renewal.summary.json"), result)
+        write_evidence(self.args.output_dir / (self.args.label + ".native-renewal.summary.json"), result)
         self.close()
         return result
